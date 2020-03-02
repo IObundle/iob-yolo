@@ -1,0 +1,6 @@
+[submodule "submodules/iob-eth"]
+	path = submodules/iob-eth
+	url = git@bitbucket.org:jjts/iob-eth.git
+[submodule "submodules/iob-soc"]
+	path = submodules/iob-soc
+	url = https://github.com/jjts/iob-soc.git
