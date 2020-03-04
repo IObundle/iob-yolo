@@ -3,4 +3,4 @@
 	url = git@bitbucket.org:jjts/iob-eth.git
 [submodule "submodules/iob-soc"]
 	path = submodules/iob-soc
-	url = https://github.com/jjts/iob-soc.git
+	url = git@bitbucket.org:jjts/iob-soc.git
