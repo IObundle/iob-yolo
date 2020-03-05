@@ -1,15 +1,15 @@
-SIM_DIR = simulation/xcsim
-
+SIM_DIR = simulation/ncsim
 FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
+TEST = eth_repeat
 
 sim:
-	make -C $(SIM_DIR) 
+	make -C $(SIM_DIR) TEST=$(TEST)
 
 fpga:
-	make -C $(FPGA_DIR)
+	make -C $(FPGA_DIR) TEST=$(TEST)
 
-clean: 
-	make -C  $(SIM_DIR) clean
-	make -C fpga/xilinx/AES-KU040-DB-G clean
+clean:
+	make -C  $(SIM_DIR) clean TEST=$(TEST)
+	#make -C fpga/xilinx/AES-KU040-DB-G clean
 
 .PHONY: sim fpga clean

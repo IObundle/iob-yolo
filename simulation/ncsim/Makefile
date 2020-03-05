@@ -3,7 +3,6 @@ BAUD := 10000000
 FREQ := 100000000
 
 #software paths
-TEST = eth_repeat
 FIRM_DIR = ../../software/$(TEST)
 BOOT_DIR = ../../software/bootloader
 PYTHON_DIR := ../../submodules/iob-soc/software/python
