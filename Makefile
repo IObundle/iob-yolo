@@ -3,7 +3,7 @@ FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
 LD_SW_DIR = software/ld-sw
 
 TEST = eth_repeat
-LOOPBACK = 1
+LOOPBACK = 0
 
 all:
 	@echo "options: make [sim | fpga | ld-sw | ld-hw | clean]"

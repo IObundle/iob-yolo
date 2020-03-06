@@ -2,6 +2,7 @@
 
 `include "system.vh"
 `include "iob-uart.vh"
+`include "iob_eth_defs.vh"
 
 module eth_repeat_tb;
 
@@ -83,6 +84,7 @@ module eth_repeat_tb;
    end // test procedure
 
 
+
    //
    // INSTANTIATE COMPONENTS
    //
@@ -90,6 +92,52 @@ module eth_repeat_tb;
    wire       tester_txd, tester_rxd;
    wire       tester_rts, tester_cts;
    wire       trap;
+
+   // TESTER ETHERNET SIGNALS
+   reg 	      eth_sel, eth_we;
+   reg [`ETH_ADDR_W-1:0] eth_addr;
+   reg [31:0] 	       eth_data_in, eth_data_out;
+
+   wire 	       tester_pll_locked;
+   wire 	       tester_eth_phy_resetn;
+   wire 	       tester_tx_clk;
+   wire [3:0] 	       tester_tx_data;
+`ifdef LOOPBACK
+   reg                 tester_tx_en;
+`else
+   wire 	       tester_tx_en;
+`endif
+   wire 	       tester_rx_clk;
+   wire [3:0] 	       tester_rx_data;
+   wire 	       tester_rx_dv;
+
+   wire 	       eth_phy_resetn;
+
+
+   assign tester_pll_locked = 1'b1;
+   assign tester_rx_clk = RX_CLK;
+   assign tester_tx_clk = TX_CLK;
+
+
+   reg [7:0] data[256-18+30-1:0];
+   reg [47:0] mac_addr = `ETH_RMAC_ADDR;
+
+`ifndef LOOPBACK
+   // TEST ETHERNET
+   initial begin
+
+      //init signals
+      eth_sel = 0;
+      eth_we = 0;
+
+      repeat (700) @(posedge clk) #1;
+      cpu_ethinit();
+      cpu_ethset_rx_payload_size();
+      cpu_ethrcv_frame();
+      repeat (100) @(posedge clk) #1;
+      cpu_ethsend_frame();
+   end
+`endif
 
 `ifdef USE_DDR
    //Write address
@@ -135,11 +183,6 @@ module eth_repeat_tb;
    wire                 ddr_rvalid;
    wire                 ddr_rready;
 `endif
-
-   //Ethernet
-   wire                 ETH_RESETN, TX_EN;
-   reg                  RX_DV;
-   wire [3:0]           RX_DATA, TX_DATA;
 
    //
    // UNIT UNDER TEST
@@ -207,20 +250,22 @@ module eth_repeat_tb;
 	           .uart_cts            (tester_rts),
 
                    //ETHERNET
-                   .PLL_LOCKED          (1'b1),
-                   .ETH_PHY_RESETN      (ETH_RESETN),
-                   .RX_CLK              (RX_CLK),
-                   .RX_DATA             (RX_DATA),
-                   .RX_DV               (RX_DV),
-                   .TX_CLK              (TX_CLK),
-                   .TX_EN               (TX_EN),
-                   .TX_DATA             (TX_DATA)
+                   .PLL_LOCKED          (tester_pll_locked),
+                   .ETH_PHY_RESETN      (eth_phy_resetn),
+                   .RX_CLK              (tester_tx_clk),
+                   .RX_DATA             (tester_tx_data),
+                   .RX_DV               (tester_tx_en),
+                   .TX_CLK              (tester_rx_clk),
+                   .TX_EN               (tester_rx_dv),
+                   .TX_DATA             (tester_rx_data)
 	           );
 
    //Receive back everything being sent
-   always @(TX_EN)
-      RX_DV <=  TX_EN;
-   assign RX_DATA = TX_DATA;
+`ifdef LOOPBACK
+   assign tester_tx_en =  tester_rx_dv;
+   assign tester_tx_data = tester_rx_data;
+`endif
+
 
    //TESTER UART
    iob_uart test_uart (
@@ -239,6 +284,42 @@ module eth_repeat_tb;
 		               .rts       (tester_rts),
 		               .cts       (tester_cts)
 		               );
+
+
+   //
+   // TESTER ETHERNET
+   //
+
+`ifndef LOOPBACK
+   iob_eth  #(
+             .ETH_MAC_ADDR(`ETH_RMAC_ADDR)
+             )
+
+               test_eth (
+
+               //cpu interface
+               .clk                  (clk),
+               .rst                  (reset),
+
+               //cpu i/f
+               .sel                  (eth_sel),
+               .we                   (eth_we),
+               .addr                 (eth_addr),
+               .data_out             (eth_data_out),
+               .data_in              (eth_data_in),
+
+               //ethernet i/f
+               .PLL_LOCKED           (tester_pll_locked),
+               .ETH_PHY_RESETN       (tester_eth_phy_resetn),
+               .TX_CLK               (tester_tx_clk),
+               .TX_DATA              (tester_tx_data),
+               .TX_EN                (tester_tx_en),
+               .RX_CLK               (tester_rx_clk),
+               .RX_DATA              (tester_rx_data),
+               .RX_DV                (tester_rx_dv)
+               );
+`endif
+
 
 `ifdef USE_DDR
    axi_ram
@@ -295,6 +376,137 @@ module eth_repeat_tb;
    //
    // CPU TASKS
    //
+
+   task cpu_ethwrite;
+      input [`ETH_ADDR_W-1:0]  cpu_address;
+      input [31:0]  cpu_data;
+
+      #1 eth_addr = cpu_address;
+      eth_sel = 1;
+      eth_we = 1;
+      eth_data_in = cpu_data;
+      @ (posedge clk) #1 eth_we = 0;
+      eth_sel = 0;
+   endtask
+
+   task cpu_ethread;
+      input [`ETH_ADDR_W-1:0]   cpu_address;
+      output [31:0] read_reg;
+
+      #1 eth_addr = cpu_address;
+      eth_sel = 1;
+      @ (posedge clk) #1 read_reg = eth_data_out;
+      @ (posedge clk) #1 eth_sel = 0;
+   endtask
+
+   task cpu_ethinit;
+      integer i;
+      reg [31:0] cpu_reg;
+
+      //preamble
+      for(i=0; i < 15; i= i+1)
+         data[i] = 8'h55;
+
+      //sfd
+      data[15] = 8'hD5;
+
+      //dest mac address
+      mac_addr = `ETH_MAC_ADDR;
+      for(i=0; i < 6; i= i+1) begin
+         data[i+16] = mac_addr[47:40];
+         mac_addr = mac_addr<<8;
+      end
+      //source mac address
+      mac_addr = `ETH_RMAC_ADDR;
+      for(i=0; i < 6; i= i+1) begin
+         data[i+22] = mac_addr[47:40];
+         mac_addr = mac_addr<<8;
+      end
+
+      //eth type
+      data[28] = 8'h08;
+      data[29] = 8'h00;
+
+      //reset core
+      cpu_ethwrite(`ETH_SOFTRST, 1);
+      cpu_ethwrite(`ETH_SOFTRST, 0);
+
+      //wait for PHY to produce rx clock
+      cpu_ethread(`ETH_STATUS, cpu_reg);
+      while(!cpu_reg[3])
+        cpu_ethread(`ETH_STATUS, cpu_reg);
+      $display("TEST: Ethernet RX clock detected");
+
+      //wait for PLL to lock and produce tx clock
+      cpu_ethread(`ETH_STATUS, cpu_reg);
+      while(!cpu_reg[15])
+        cpu_ethread(`ETH_STATUS, cpu_reg);
+      $display("TEST: Ethernet TX PLL locked");
+
+      //set initial payload size to Ethernet minimum excluding FCS
+      cpu_ethwrite(`ETH_TX_NBYTES, 46);
+      cpu_ethwrite(`ETH_RX_NBYTES, 46);
+
+      //check processor interface
+      //write dummy register
+      cpu_ethwrite(`ETH_DUMMY, 32'hDEADBEEF);
+
+      //read and check result
+      cpu_ethread(`ETH_DUMMY, cpu_reg);
+      if (cpu_reg != 32'hDEADBEEF)
+	$display("TEST: Ethernet Init failed");
+      else
+	$display("TEST: Ethernet Core Initialized");
+   endtask
+
+   //set frame size
+   task cpu_ethset_rx_payload_size;
+      cpu_ethwrite(`ETH_RX_NBYTES, 256-18);
+   endtask
+
+   task cpu_ethrcv_frame;
+      reg [31:0] cpu_reg;
+      integer timeout;
+      integer 	 i;
+
+      timeout = 500000;
+      //wait until data received
+      do begin
+	 cpu_ethread(`ETH_STATUS, cpu_reg);
+	 @(posedge clk) #1 timeout = timeout-1;
+      end while( (!cpu_reg[1]) && (timeout != 0) );
+      if(timeout == 0)
+	$display("TEST: ETH_NO_DATA\n");
+      else begin
+	 for(i=14; i< 256+18 ; i = i+1) begin
+	    cpu_ethread(`ETH_DATA +i, cpu_reg);
+	    data[i+30-14] = cpu_reg;
+	 end
+	 cpu_ethwrite(`ETH_RCVACK, 1);
+      end
+   endtask
+
+   task cpu_ethsend_frame;
+      integer i;
+      reg [31:0] cpu_reg;
+
+      //wait for ready
+      do begin
+	 cpu_ethread(`ETH_STATUS, cpu_reg);
+      end while( !cpu_reg[0] );
+
+      //set frame size
+      cpu_ethwrite(`ETH_TX_NBYTES, 256-18);
+
+      //write data to send
+      for (i = 0; i < 30 + 256 - 18; i = i+1) begin
+         cpu_ethwrite(`ETH_DATA + i, data[i]);
+      end
+
+      //start sending
+      cpu_ethwrite(`ETH_SEND, `ETH_SEND);
+
+   endtask
 
    // 1-cycle write
    task cpu_uartwrite;
