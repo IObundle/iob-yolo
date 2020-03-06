@@ -18,7 +18,6 @@ PORT := -P 1418
 #implementation parameters
 BAUD := 115200
 FREQ := 100000000
-LOOPBACK = 1
 
 ifneq ($(shell grep USE_DDR $(RTL_DIR)/include/system.vh | grep -v "//"),)
 	USE_DDR = USE_DDR
