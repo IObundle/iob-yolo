@@ -282,6 +282,7 @@ module system (
 
                //cpu i/f
                .sel                  (s_valid[`ETHERNET_BASE]),
+	       .ready		     (s_ready[`ETHERNET_BASE]),
                .we                   (|m_wstrb),
                .addr                 (m_addr[`ETH_ADDR_W+1:2]),
                .data_out             (s_rdata[`ETHERNET_BASE]),
@@ -297,12 +298,6 @@ module system (
                .RX_DATA              (RX_DATA),
                .RX_DV                (RX_DV)
                );
-   reg eth_s_ready;
-   assign s_ready[`ETHERNET_BASE] = eth_s_ready;
-   always @(posedge clk) begin
-      eth_s_ready = s_valid[`ETHERNET_BASE];
-   end
-
 
    //
    // DDR MAIN MEMORY
