@@ -9,6 +9,10 @@ LD_SW_DIR = software/ld-sw
 ifeq ($(XILINX),1)
    FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
 endif
+FIRM_DIR = software/$(TEST)
+
+#Run source inside Makefile
+SHELL := /bin/bash
 
 all:
 	@echo "options: make [sim | fpga | ld-sw | ld-hw | clean]"
@@ -24,6 +28,9 @@ ld-sw:
 
 ld-hw:
 	make -C $(FPGA_DIR) ld-hw
+
+ld-eth:
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py;
 
 clean:
 	make -C $(SIM_DIR) clean TEST=$(TEST)

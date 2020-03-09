@@ -4,6 +4,8 @@
 `include "iob-uart.vh"
 `include "iob_eth_defs.vh"
 
+`define ETH_NBYTES (256-18)
+
 module eth_repeat_tb;
 
    //clock
@@ -35,7 +37,7 @@ module eth_repeat_tb;
    reg [7:0]    cpu_char = 0;
 
    integer      i;
-   reg          end_flag = 0;
+   reg          end_flag1, end_flag2 = 0;
 
    //
    // TEST PROCEDURE
@@ -75,7 +77,7 @@ module eth_repeat_tb;
             cpu_receiveFile();
          end else if (cpu_char == 4) begin // Finish
             $write("Bye, bye!\n");
-            end_flag = 1;
+            end_flag1 = 1;
          end else begin
             $write("%c", cpu_char);
          end
@@ -118,9 +120,9 @@ module eth_repeat_tb;
    assign tester_rx_clk = RX_CLK;
    assign tester_tx_clk = TX_CLK;
 
-
    reg [7:0] data[256-18+30-1:0];
    reg [47:0] mac_addr = `ETH_RMAC_ADDR;
+   reg [`ETH_NBYTES*8-1:0] data_tmp;
 
 `ifndef LOOPBACK
    // TEST ETHERNET
@@ -130,12 +132,27 @@ module eth_repeat_tb;
       eth_sel = 0;
       eth_we = 0;
 
-      repeat (700) @(posedge clk) #1;
+      //wait for reset
+      repeat (200) @(posedge clk) #1;
+
+      //init ethernet module
       cpu_ethinit();
       cpu_ethset_rx_payload_size();
-      cpu_ethrcv_frame();
-      repeat (100) @(posedge clk) #1;
+
+      //send frame
+      repeat (100000) @(posedge clk) #1;
+      data_tmp = {`ETH_NBYTES*8{1'b0}};
+      data_tmp[`ETH_NBYTES*8-1 -: 14*8] = "Hello from PC!";
+      for(i=0; i < `ETH_NBYTES; i= i+1) data[i+30]  = data_tmp[`ETH_NBYTES*8-i*8-1 -: 8];
       cpu_ethsend_frame();
+
+      //wait to receive frame
+      cpu_ethrcv_frame(1);
+      data_tmp = {`ETH_NBYTES*8{1'b0}};
+      for(i=0; i < `ETH_NBYTES; i= i+1) data_tmp[`ETH_NBYTES*8-i*8-1 -: 8] = data[i+30];
+      $display("Data received: %s", data_tmp);
+      end_flag2 = 1;
+
    end
 `endif
 
@@ -461,27 +478,35 @@ module eth_repeat_tb;
 
    //set frame size
    task cpu_ethset_rx_payload_size;
-      cpu_ethwrite(`ETH_RX_NBYTES, 256-18);
+      cpu_ethwrite(`ETH_RX_NBYTES, `ETH_NBYTES);
    endtask
 
    task cpu_ethrcv_frame;
+      input integer wait_flag;
+
       reg [31:0] cpu_reg;
       integer timeout;
       integer 	 i;
+      timeout = 5000;
 
-      timeout = 500000;
       //wait until data received
       do begin
 	 cpu_ethread(`ETH_STATUS, cpu_reg);
-	 @(posedge clk) #1 timeout = timeout-1;
+         if(wait_flag == 0)  @(posedge clk) #1 timeout = timeout-1;
       end while( (!cpu_reg[1]) && (timeout != 0) );
+
+      //check if timeout passed
       if(timeout == 0)
 	$display("TEST: ETH_NO_DATA\n");
       else begin
-	 for(i=14; i< 256+18 ; i = i+1) begin
+
+         //read received data
+	 for(i=14; i< `ETH_NBYTES+18 ; i = i+1) begin
 	    cpu_ethread(`ETH_DATA +i, cpu_reg);
 	    data[i+30-14] = cpu_reg;
 	 end
+
+         //confirm data was received
 	 cpu_ethwrite(`ETH_RCVACK, 1);
       end
    endtask
@@ -496,10 +521,10 @@ module eth_repeat_tb;
       end while( !cpu_reg[0] );
 
       //set frame size
-      cpu_ethwrite(`ETH_TX_NBYTES, 256-18);
+      cpu_ethwrite(`ETH_TX_NBYTES, `ETH_NBYTES);
 
       //write data to send
-      for (i = 0; i < 30 + 256 - 18; i = i+1) begin
+      for (i = 0; i < 30 + `ETH_NBYTES; i = i+1) begin
          cpu_ethwrite(`ETH_DATA + i, data[i]);
       end
 
@@ -642,9 +667,11 @@ module eth_repeat_tb;
 
 
    // finish simulation
-   always @(posedge end_flag)
+   always @(posedge clk)
      begin
-        #5 $finish;
+        if (end_flag1 == 1)
+           if (end_flag2 == 1)
+              $finish;
      end
 
 endmodule
