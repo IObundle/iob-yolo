@@ -29,17 +29,17 @@ int main() {
   int rcv_timeout = 5000;
   char data_to_send[ETH_NBYTES] = {0};
   char data_rcv[ETH_NBYTES+18];
-  strcpy(data_to_send, "Hello PC!\n");
+  strcpy(data_to_send, "Hello from FPGA\n");
+
+  //receive frame
+  uart_puts("Waiting to receive data\n");
+  while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+  uart_printf("Data received: %s\n", &data_rcv[14]);
 
   //send frame
   uart_printf("Data to be sent: %s\n", data_to_send);
   eth_send_frame (data_to_send, ETH_NBYTES);
   uart_puts("Data Sent\n");
-
-  //receive frame
-  eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout);
-  uart_puts("Data Received\n");
-  uart_printf("Data received: %s\n", &data_rcv[14]);
 
   //end program
   uart_putc(4);
