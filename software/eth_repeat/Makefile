@@ -4,12 +4,16 @@ PYTHON_DIR = ../../submodules/iob-soc/software/python/
 UART_DIR = ../../submodules/iob-soc/submodules/iob-uart/c-driver
 ETH_DIR = ../../submodules/iob-eth/c-driver
 
-LOOPBACK = 0
 INCLUDE = -I. -I$(UART_DIR) -I$(ETH_DIR)
 
 DEFINE = -DUART_BAUD_RATE=$(BAUD) -DUART_CLK_FREQ=$(FREQ)
 ifeq ($(LOOPBACK),1)
     DEFINE += -DLOOPBACK
+endif
+ifeq ($(XILINX),1)
+    DEFINE += -DXILINX
+else
+    DEFINE += -DALTERA
 endif
 
 SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c
