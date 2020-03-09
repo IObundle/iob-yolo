@@ -15,7 +15,13 @@ FIRM_DIR = software/$(TEST)
 SHELL := /bin/bash
 
 all:
-	@echo "options: make [sim | fpga | ld-sw | ld-hw | clean]"
+	@echo "options: make [sim | fpga | ld-sw | ld-hw | ld-eth | clean]"
+	@echo "sim    -> run simulation"
+	@echo "fpga   -> generate bitstream"
+	@echo "ld-sw  -> read from serial port and, if case, send program through uart"
+	@echo "ld-hw  -> send bitstream to FPGA"
+	@echo "ld-eth -> communicate through FPGA via Ethernet"
+	@echo "clean  -> clean repo"
 
 sim:
 	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)

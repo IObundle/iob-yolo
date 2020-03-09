@@ -38,6 +38,11 @@ module eth_repeat_tb;
 
    integer      i;
    reg          end_flag1, end_flag2 = 0;
+`ifdef USE_BOOT
+   reg          start_flag = 0;
+`else
+   reg          start_flag = 1;
+`endif
 
    //
    // TEST PROCEDURE
@@ -75,6 +80,7 @@ module eth_repeat_tb;
             $write("Please, insert a name for a file:");
             $write("out.bin\n");
             cpu_receiveFile();
+            start_flag = 1;
          end else if (cpu_char == 4) begin // Finish
             $write("Bye, bye!\n");
             end_flag1 = 1;
@@ -136,6 +142,9 @@ module eth_repeat_tb;
       repeat (200) @(posedge clk) #1;
 
       //init ethernet module
+      do
+        repeat (200) @(posedge clk) #1;
+      while(start_flag == 0);
       cpu_ethinit();
       cpu_ethset_rx_payload_size();
 
