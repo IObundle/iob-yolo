@@ -46,7 +46,7 @@ firmware.hex: $(FIRM_DIR)/firmware.hex
 	$(PYTHON_DIR)/hex_split.py firmware
 
 $(FIRM_DIR)/firmware.hex: FORCE
-	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK)
+	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
 
 boot.hex: $(BOOT_DIR)/boot.hex
 	cp $(BOOT_DIR)/boot.hex .

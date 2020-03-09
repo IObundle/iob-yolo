@@ -15,7 +15,7 @@ CHDRS = console.h
 all: run
 
 $(FW_DIR)/$(FW).bin: $(FW_DIR)/$(FW).c
-	make -C $(FW_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK)
+	make -C $(FW_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
 
 $(FW).bin: $(FW_DIR)/$(FW).bin
 	cp $^ .
