@@ -150,6 +150,7 @@ module system (
    //if DDR  not being used point to RAM
    m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
  `endif
+`else
    //if DDR  not being used point to RAM
    m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
 `endif

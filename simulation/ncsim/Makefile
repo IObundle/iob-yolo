@@ -22,7 +22,7 @@ ETH_DIR = ../../submodules/iob-eth
 HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include
 
 #hardware defines
-ifeq($(VCD),1)
+ifeq ($(VCD),1)
    HW_DEFINE = -define VCD
 endif
 HW_DEFINE += -define PROG_SIZE=$(shell wc -c ../../software/$(TEST)/firmware.bin | head -n1 | cut -d " " -f1)
