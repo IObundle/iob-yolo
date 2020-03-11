@@ -36,14 +36,14 @@ int main() {
 
   volatile int *weights = (volatile int*) (DDR_MEM + WEIGHTS);
   int num_weights = (DATA - WEIGHTS)/sizeof(int);
-  int w_step = num_weights/10000;
+  int w_step = num_weights/100000;
 
   uart_printf("Writing weights to DDR...");
 
   for(i=0;i<num_weights;i+=w_step){
     weights[i] = i;
     //if(i%(50000)==0){
-      uart_printf("ww: %d\n", i);
+    //uart_printf("ww: %d\n", i);
       //}
   }
 
@@ -52,14 +52,14 @@ int main() {
   //Data vector
   volatile int *data = (volatile int*) (DDR_MEM + DATA);
   int num_data = (DATA - WEIGHTS)/sizeof(int);
-  int d_step = num_data/10000;
+  int d_step = num_data/100000;
 
   uart_printf("Writing data to DDR...");
 
   for(i=0;i<num_data;i+=d_step){
     data[i] = i;
     //    if(i%(50000)==0){
-      uart_printf("wd: %d\n", i);
+    //  uart_printf("wd: %d\n", i);
       //x}
   }
 
@@ -78,7 +78,7 @@ int main() {
     w = weights[i];
     acc++;
     //    if(i%50000 == 0){
-    uart_printf("rw: %d\n", i);
+    //uart_printf("rw: %d\n", i);
       //}
     if(w != i){
       uart_printf("Wrong weight %d: %d at pos %p\n", i, w, weights[i]);
@@ -94,7 +94,7 @@ int main() {
     d = data[i];
     acc++;
     //    if(i%50000 == 0){
-    uart_printf("rd: %d\n", i);
+    //uart_printf("rd: %d\n", i);
       //}
     if(d != i){
       uart_printf("Wrong data %d: %d at pos %p\n", i, d, data[i]);

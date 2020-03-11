@@ -36,12 +36,7 @@ module ddr_test_tb;
    reg [7:0]    cpu_char = 0;
 
    integer      i;
-   reg          end_flag1, end_flag2 = 0;
-`ifdef USE_BOOT
-   reg          start_flag = 0;
-`else
-   reg          start_flag = 1;
-`endif
+   reg          end_flag1;
 
    //
    // TEST PROCEDURE
@@ -79,7 +74,6 @@ module ddr_test_tb;
             $write("Please, insert a name for a file:");
             $write("out.bin\n");
             cpu_receiveFile();
-            start_flag = 1;
          end else if (cpu_char == 4) begin // Finish
             $write("Bye, bye!\n");
             end_flag1 = 1;
@@ -461,8 +455,7 @@ module ddr_test_tb;
    always @(posedge clk)
      begin
         if (end_flag1 == 1)
-           if (end_flag2 == 1)
-              $finish;
+          $finish;
      end
 
 endmodule
