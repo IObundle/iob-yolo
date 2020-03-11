@@ -22,7 +22,9 @@ ETH_DIR = ../../submodules/iob-eth
 HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include
 
 #hardware defines
-HW_DEFINE = -define VCD
+ifeq ($(VCD),1)
+   HW_DEFINE = -define VCD
+endif
 HW_DEFINE += -define PROG_SIZE=$(shell wc -c ../../software/$(TEST)/firmware.bin | head -n1 | cut -d " " -f1)
 HW_DEFINE += -define UART_BAUD_RATE=$(BAUD)
 HW_DEFINE += -define UART_CLK_FREQ=$(FREQ)
