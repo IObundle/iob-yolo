@@ -5,6 +5,7 @@ RISCV_DIR = ../../../submodules/iob-soc/submodules/iob-rv32
 UART_DIR = ../../../submodules/iob-soc/submodules/iob-uart
 FIFO_DIR = ../../../submodules/iob-soc/submodules/fifo
 ETH_DIR = ../../../submodules/iob-eth
+TIMER_DIR = ../../../submodules/iob-timer
 
 #software paths
 FIRM_DIR := ../../../software/$(TEST)
@@ -26,7 +27,7 @@ ifeq ($(LOOPBACK),1)
 	DO_LOOPBACK = LOOPBACK	
 endif
 
-VSRC = verilog/top_system.v $(RTL_DIR)/include/*.vh $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(RTL_DIR)/src/*.v $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v
+VSRC = verilog/top_system.v $(RTL_DIR)/include/*.vh $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(RTL_DIR)/src/*.v $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/iob_timer.v
 
 # work-around for http://svn.clifford.at/handicraft/2016/vivadosig11
 export RDI_VERBOSE = False
@@ -68,5 +69,6 @@ clean:
 	@rm -rf *.ltx fsm_encoding.os
 	make -C $(FIRM_DIR) clean --no-print-directory
 	make -C $(BOOT_DIR) clean --no-print-directory
+	@rm -rf ip
 
 .PHONY: all clean ld-hw FORCE
