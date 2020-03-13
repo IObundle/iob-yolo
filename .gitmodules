@@ -4,3 +4,6 @@
 [submodule "submodules/iob-soc"]
 	path = submodules/iob-soc
 	url = git@bitbucket.org:jjts/iob-soc.git
+[submodule "submodules/iob-timer"]
+	path = submodules/iob-timer
+	url = git@bitbucket.org:jjts/iob-timer.git

@@ -143,11 +143,16 @@ module system (
      //if main memory is being addressed and system not booting
      if (!m_addr[`ADDR_W-1 -: `N_SLAVES_W] && !boot)
        //if DDR being used point to cache
-`ifdef USE_DDR
+`ifdef USE_BOOT
+ `ifdef USE_DDR
        m_addr_int = `N_SLAVES_W'd`CACHE_BASE;
+ `else
+   //if DDR  not being used point to RAM
+   m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
+ `endif
 `else
-       //if DDR  not being used point to RAM
-       m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
+   //if DDR  not being used point to RAM
+   m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
 `endif
      else
        //do not modify address prefix
@@ -297,6 +302,24 @@ module system (
                .RX_CLK               (RX_CLK),
                .RX_DATA              (RX_DATA),
                .RX_DV                (RX_DV)
+               );
+
+   //
+   // TIMER
+   //
+
+   iob_timer timer (
+
+               //cpu interface
+               .clk                  (clk),
+               .rst                  (reset_int),
+
+               //cpu i/f
+               .addr                 (m_addr[2]),
+               .data_in              (m_wdata),
+               .data_out             (s_rdata[`TIMER_BASE]),
+               .valid                (s_valid[`TIMER_BASE]),
+               .ready                (s_ready[`TIMER_BASE])
                );
 
    //

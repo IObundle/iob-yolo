@@ -14,9 +14,10 @@ clean:
 	make -C fpga/xilinx/AES-KU040-DB-G clean
 =======
 #configurable parameters
-TEST = eth_repeat
+TEST = ddr_test
 LOOPBACK = 0
 XILINX = 1
+VCD = 0
 
 #directories
 SIM_DIR = simulation/ncsim
@@ -39,7 +40,7 @@ all:
 	@echo "clean  -> clean repo"
 
 sim:
-	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
+	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
 
 fpga:
 	make -C $(FPGA_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
