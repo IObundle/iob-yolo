@@ -140,6 +140,9 @@ module eth_weights_tb;
    reg [7:0] input_weights[`WEIGHTS_FILE_SIZE-1:0];
    integer j, count_bytes = 0, bytes_to_send, count_errors = 0;
 
+   parameter data_file = {`STRINGIFY(`FILES_DIR), "input_fixed.hex"};
+   parameter weight_file = {`STRINGIFY(`FILES_DIR), "yolov3-tiny_batch-fixed.hex"};
+
 `ifndef LOOPBACK
    // TEST ETHERNET
    initial begin
@@ -159,8 +162,8 @@ module eth_weights_tb;
       cpu_ethset_rx_payload_size();
 
       //read input data
-      $readmemh(`STRINGIFY(`DATA_FILE), input_data, 0, `DATA_FILE_SIZE-1);
-      $readmemh(`STRINGIFY(`WEIGHTS_FILE), input_weights, 0, `WEIGHTS_FILE_SIZE-1);
+      $readmemh(data_file, input_data, 0, `DATA_FILE_SIZE-1);
+      $readmemh(weight_file, input_weights, 0, `WEIGHTS_FILE_SIZE-1);
 
       //wait a bit for RISC-V to be ready to receive data
       repeat (100000) @(posedge clk) #1;

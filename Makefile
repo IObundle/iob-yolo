@@ -4,10 +4,6 @@ LOOPBACK = 0
 XILINX = 1
 VCD = 0
 
-#files
-DATA_FILE = input_fixed
-WEIGHTS_FILE = yolov3-tiny_batch-fixed
-
 #directories
 SIM_DIR = simulation/ncsim
 LD_SW_DIR = software/ld-sw
@@ -29,7 +25,7 @@ all:
 	@echo "clean  -> clean repo"
 
 sim:
-	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD) DATA_FILE=$(DATA_FILE).hex WEIGHTS_FILE=$(WEIGHTS_FILE).hex
+	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
 
 fpga:
 	make -C $(FPGA_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
