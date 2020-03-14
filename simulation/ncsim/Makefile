@@ -7,6 +7,7 @@ FIRM_DIR = ../../software/$(TEST)
 BOOT_DIR = ../../software/bootloader
 PYTHON_DIR := ../../submodules/iob-soc/software/python
 TB_DIR := ../../rtl/testbench
+FILES_DIR = ../../../
 
 #hardware paths
 RTL_DIR = ../../rtl
@@ -38,6 +39,8 @@ ifeq ($(XILINX),1)
 else
     HW_DEFINE += -define ALTERA
 endif
+HW_DEFINE += -define DATA_FILE=$(FILES_DIR)$(DATA_FILE)
+HW_DEFINE += -define WEIGHTS_FILE=$(FILES_DIR)$(WEIGHTS_FILE)
 
 #hardware sources
 VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v
