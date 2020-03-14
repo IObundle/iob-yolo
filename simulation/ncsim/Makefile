@@ -7,6 +7,7 @@ FIRM_DIR = ../../software/$(TEST)
 BOOT_DIR = ../../software/bootloader
 PYTHON_DIR := ../../submodules/iob-soc/software/python
 TB_DIR := ../../rtl/testbench
+FILES_DIR = ../../../
 
 #hardware paths
 RTL_DIR = ../../rtl
@@ -17,9 +18,10 @@ FIFO_DIR = ../../submodules/iob-soc/submodules/fifo
 CACHE_DIR = ../../submodules/iob-soc/submodules/iob-cache
 AXI_RAM = ../../submodules/iob-soc/submodules/axi-mem
 ETH_DIR = ../../submodules/iob-eth
+TIMER_DIR = ../../submodules/iob-timer
 
 #hardware includes
-HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include
+HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR)
 
 #hardware defines
 ifeq ($(VCD),1)
@@ -37,9 +39,10 @@ ifeq ($(XILINX),1)
 else
     HW_DEFINE += -define ALTERA
 endif
+HW_DEFINE += -define FILES_DIR=$(FILES_DIR)
 
 #hardware sources
-VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v
+VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v
 
 #simulator flags
 CFLAGS = -errormax 15 -status -update -linedebug -sv $(HW_DEFINE) $(HW_INCLUDE)

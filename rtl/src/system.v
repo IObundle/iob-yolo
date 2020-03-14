@@ -305,6 +305,24 @@ module system (
                );
 
    //
+   // TIMER
+   //
+
+   iob_timer timer (
+
+               //cpu interface
+               .clk                  (clk),
+               .rst                  (reset_int),
+
+               //cpu i/f
+               .addr                 (m_addr[2]),
+               .data_in              (m_wdata),
+               .data_out             (s_rdata[`TIMER_BASE]),
+               .valid                (s_valid[`TIMER_BASE]),
+               .ready                (s_ready[`TIMER_BASE])
+               );
+
+   //
    // DDR MAIN MEMORY
    //
 

@@ -36,6 +36,9 @@ read_verilog ../../../submodules/iob-eth/rtl/src/iob_eth_rx.v
 read_verilog ../../../submodules/iob-eth/rtl/src/iob_eth_tx.v
 read_verilog ../../../submodules/iob-eth/rtl/src/iob_eth.v
 
+#timer
+read_verilog ../../../submodules/iob-timer/iob_timer.v
+
 set_property part xcku040-fbva676-1-c [current_project]
 
 if { [lindex $argv 0] == {USE_DDR} } {
