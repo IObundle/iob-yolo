@@ -66,6 +66,7 @@ int main() {
   uart_printf("Data transmission done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
 
   //measure initial time for weight transmission
+  timer_reset(TIMER);
   start = timer_get_count(TIMER);
 
   //Loop to receive and send back weight frames
