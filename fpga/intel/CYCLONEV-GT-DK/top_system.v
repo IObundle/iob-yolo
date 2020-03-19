@@ -94,7 +94,10 @@ module top_system(
                                          .dataout ( ENET_GTX_CLK )
                                          );
 
-`endif
+`endif // !`ifdef XILINX
+
+    assign locked = 1'b1;
+
    
 `ifdef USE_DDR
    //

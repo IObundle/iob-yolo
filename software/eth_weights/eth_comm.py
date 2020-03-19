@@ -88,8 +88,8 @@ def main(argv):
         print("Failed to load .weights file: %s\n" % weights_path)
         sys.exit(1)
 
-    #Ethernet parameters
-    BOARD = "XILINX"
+    #Ethernet parameters 
+    BOARD = "ALTERA"
     if(BOARD == "ALTERA"):
         interface = "enp0s31f6"
         src_addr = "\x30\x9C\x23\x1E\x62\x4B"   # sender MAC address
@@ -114,7 +114,11 @@ def main(argv):
     print("num_weight_frames: %d\n" % num_weight_frames)
 
 
-
+    print(interface)
+    readable_dst_mac = ":".join("{:02x}".format(ord(c)) for c in dst_addr)
+    print(readable_dst_mac)
+    readable_src_mac = ":".join("{:02x}".format(ord(c)) for c in src_addr)
+    print(readable_src_mac)
     #Open socket and bind
     s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
     s.bind((interface, 0))
@@ -127,20 +131,30 @@ def main(argv):
     count_bytes = 0
     count_errors = 0
 
-    # #Synchronize with fpga
-    # payload = "PC\n"
-    # padding = '\x00' * (eth_nbytes-len(payload))
+    #Synchronize with fpga
+    payload = "PC\n"
+    padding = '\x00' * (eth_nbytes-len(payload))
     
-    # #send message
-    # s.send(dst_addr + src_addr + eth_type + payload + padding)
+    print("Before send")
+
+    # rcv = s.recv(4096)
+    
+    # print(rcv[14:])
+
+    #send message
+    s.send(dst_addr + src_addr + eth_type + payload + padding)
+
+    print("After send")
 
     #receive message
-    # rcv = s.recv(4096)
-    # msg = rcv[14:17]
-    # sent = "OK\n"
-    # if msg != sent:
-    #     print("Failed synchronization: %s" % (msg))
-    #     sys.exit(1)
+    rcv = s.recv(4096)
+    msg = rcv[14:17]
+    sent = "OK\n"
+    if msg != sent:
+        print("Failed synchronization: %s" % (msg))
+        sys.exit(1)
+    else:
+        print("Synchronized with FPGA")
 
     #set socket timeout
     s.settimeout(1) # 1 second timeout
