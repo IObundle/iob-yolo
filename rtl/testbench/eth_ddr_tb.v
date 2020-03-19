@@ -5,13 +5,13 @@
 `include "iob_eth_defs.vh"
 
 `define ETH_NBYTES (256-18)
-`define DATA_FILE_SIZE (418*418*3*2) //16 bits per input
-`define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
+`define INPUT_FILE_SIZE (418*418*3*2) //16 bits per input
+`define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
 `define STRINGIFY(x) `"x`"
-`define NUM_DATA_FRAMES (`DATA_FILE_SIZE/`ETH_NBYTES)
-`define NUM_WEIGHT_FRAMES (`WEIGHTS_FILE_SIZE/`ETH_NBYTES)
+`define NUM_INPUT_FRAMES (`INPUT_FILE_SIZE/`ETH_NBYTES)
+`define NUM_OUTPUT_FRAMES (`OUTPUT_FILE_SIZE/`ETH_NBYTES)
 
-module eth_weights_tb;
+module eth_ddr_tb;
 
    //clock
    reg clk = 1;
@@ -136,12 +136,17 @@ module eth_weights_tb;
    reg [7:0] data_aux[`ETH_NBYTES-1:0];
    reg [47:0] mac_addr = `ETH_RMAC_ADDR;
    reg [`ETH_NBYTES*8-1:0] data_tmp;
-   reg [7:0] input_data[`DATA_FILE_SIZE-1:0];
-   reg [7:0] input_weights[`WEIGHTS_FILE_SIZE-1:0];
-   integer j, count_bytes = 0, bytes_to_send, count_errors = 0;
 
-   parameter data_file = {`STRINGIFY(`FILES_DIR), "input_fixed.hex"};
-   parameter weight_file = {`STRINGIFY(`FILES_DIR), "yolov3-tiny_batch-fixed.hex"};
+   reg [7:0] input_fixed_data[`INPUT_FILE_SIZE-1:0];
+   reg [7:0] output_fixed_data[`OUTPUT_FILE_SIZE-1:0];
+   integer j, count_bytes = 0, bytes_to_send, bytes_to_receive, count_errors = 0;
+
+   parameter input_fixed_file = {`STRINGIFY(`FILES_DIR), "input_fixed.hex"};
+   parameter output_fixed_file = {`STRINGIFY(`FILES_DIR), "output_fixed.hex"};
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "input_output_ntw_fixed.hex"};
+   parameter file_size = (`INPUT_FILE_SIZE+`OUTPUT_FILE_SIZE)/4;
+   parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
+
 
 `ifndef LOOPBACK
    // TEST ETHERNET
@@ -162,89 +167,78 @@ module eth_weights_tb;
       cpu_ethset_rx_payload_size();
 
       //read input data
-      $readmemh(data_file, input_data, 0, `DATA_FILE_SIZE-1);
-      $readmemh(weight_file, input_weights, 0, `WEIGHTS_FILE_SIZE-1);
+      $readmemh(input_fixed_file, input_fixed_data, 0, `INPUT_FILE_SIZE-1);
+      $readmemh(output_fixed_file, output_fixed_data, 0, `OUTPUT_FILE_SIZE-1);
 
       //wait a bit for RISC-V to be ready to receive data
       repeat (100000) @(posedge clk) #1;
 
-      //for loop to send and receive back data frames
-      $display("Starting input data transmission...");
-      for(j = 0; j < `NUM_DATA_FRAMES+1; j = j+1) begin
+      //for loop to send input.network frames
+      for(j = 0; j < `NUM_INPUT_FRAMES+1; j = j+1) begin
 
          //check if it is last packet (has less data that full payload size)
-         if(j == `NUM_DATA_FRAMES) begin
-            bytes_to_send = `DATA_FILE_SIZE - count_bytes;
+         if(j == `NUM_INPUT_FRAMES) begin
+            bytes_to_send = `INPUT_FILE_SIZE - count_bytes;
             //set remaining bytes to zero
             for(i = bytes_to_send; i < `ETH_NBYTES; i=i+1) begin
                 data[i+30] = 8'b0;
-                data_aux[i] = 8'b0;
             end
          end else bytes_to_send = `ETH_NBYTES;
 
          //for loop to form frame
          for(i = 0; i < bytes_to_send; i=i+1) begin
-            data[i+30] = input_data[j * `ETH_NBYTES + i];
-            data_aux[i] = input_data[j * `ETH_NBYTES + i];
+            data[i+30] = input_fixed_data[j * `ETH_NBYTES + i];
          end
          count_bytes = count_bytes + `ETH_NBYTES;
 
          //send frame
          cpu_ethsend_frame();
 
-         //wait to receive frame back
-         cpu_ethrcv_frame(1);
+         //print progress each 200 cycles
+         if( (j%200) == 0) $display("iter = %d", j);
+         repeat (25000) @(posedge clk) #1;
 
-         //check that sent and receive packages are the same
-         for(i = 0; i < `ETH_NBYTES; i=i+1) begin
-            if(data[i+30] != data_aux[i]) count_errors = count_errors + 1;
-         end
-
-         //print progress each 100 cycles
-         if( (j%100) == 0) $display("iter = %d, total_err = %d", j, count_errors);
       end
 
       //reset byte counter
       count_bytes = 0;
-      $display("Starting input weight transmission...");
 
-      //for loop to send and receive back weight frames
-      for(j = 0; j < `NUM_WEIGHT_FRAMES+1; j = j+1) begin
+      //for loop to receive output.network frames
+      for(j = 0; j < `NUM_OUTPUT_FRAMES+1; j = j+1) begin
 
          //check if it is last packet (has less data that full payload size)
-         if(j == `NUM_WEIGHT_FRAMES) begin
-            bytes_to_send = `WEIGHTS_FILE_SIZE - count_bytes;
+         if(j == `NUM_OUTPUT_FRAMES) begin
+            bytes_to_receive = `OUTPUT_FILE_SIZE - count_bytes;
             //set remaining bytes to zero
-            for(i = bytes_to_send; i < `ETH_NBYTES; i=i+1) begin
+            for(i = bytes_to_receive; i < `ETH_NBYTES; i=i+1) begin
                 data[i+30] = 8'b0;
-                data_aux[i] = 8'b0;
             end
-         end else bytes_to_send = `ETH_NBYTES;
+         end else bytes_to_receive = `ETH_NBYTES;
 
          //for loop to form frame
-         for(i = 0; i < bytes_to_send; i=i+1) begin
-            data[i+30] = input_weights[j * `ETH_NBYTES + i];
-            data_aux[i] = input_weights[j * `ETH_NBYTES + i];
+         for(i = 0; i < bytes_to_receive; i=i+1) begin
+            data[i+30] = output_fixed_data[j * `ETH_NBYTES + i];
+            data_aux[i] = output_fixed_data[j * `ETH_NBYTES + i];
          end
          count_bytes = count_bytes + `ETH_NBYTES;
-
-         //send frame
-         cpu_ethsend_frame();
 
          //wait to receive frame back
          cpu_ethrcv_frame(1);
 
          //check that sent and receive packages are the same
-         for(i = 0; i < `ETH_NBYTES; i=i+1) begin
-            if(data[i+30] != data_aux[i]) count_errors = count_errors + 1;
+         for(i = 0; i < bytes_to_receive; i=i+1) begin
+            if(data[i+30] != output_fixed_data[j*`ETH_NBYTES+i]) count_errors = count_errors + 1;
          end
 
-         //print progress each 1000 cycles
-         if( (j%1000) == 0) $display("iter = %d, total_err = %d", j, count_errors);
+         //print progress each 200 cycles
+         if( (j%200) == 0) $display("iter = %d, total_err = %d", j, count_errors);
+         repeat (200) @(posedge clk) #1;
+
       end
 
-     //end of procedure
-      $display("Data sent and received with %d errors", count_errors);
+      //end of procedure
+      repeat (5000) @(posedge clk) #1;
+      $display("output.network received with %d errors", count_errors);
       end_flag2 = 1;
 
    end
@@ -433,13 +427,17 @@ module eth_weights_tb;
 
 
 `ifdef USE_DDR
-   axi_ram
+   axi_ram #(
+            .ADDR_WIDTH(file_addr_w),
+            .FILE(file_ddr),
+            .FILE_SIZE(file_size)
+            )
    ddr_model_mem(
                  //address write
                    .clk            (clk),
                    .rst            (reset),
 		           .s_axi_awid     ({8{ddr_awid}}),
-		           .s_axi_awaddr   (ddr_awaddr[15:0]),
+		           .s_axi_awaddr   (ddr_awaddr[file_addr_w-1:0]),
                    .s_axi_awlen    (ddr_awlen),
                    .s_axi_awsize   (ddr_awsize),
                    .s_axi_awburst  (ddr_awburst),
@@ -464,7 +462,7 @@ module eth_weights_tb;
 
 		           //address read
 		           .s_axi_arid     ({8{ddr_arid}}),
-		           .s_axi_araddr   (ddr_araddr[15:0]),
+		           .s_axi_araddr   (ddr_araddr[file_addr_w-1:0]),
 		           .s_axi_arlen    (ddr_arlen),
 		           .s_axi_arsize   (ddr_arsize),
                    .s_axi_arburst  (ddr_arburst),
