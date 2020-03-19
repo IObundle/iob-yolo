@@ -1,7 +1,7 @@
 #configurable parameters
 TEST = eth_weights
 LOOPBACK = 0
-XILINX = 1
+XILINX = 0
 VCD = 0
 
 #files
@@ -13,6 +13,8 @@ SIM_DIR = simulation/ncsim
 LD_SW_DIR = software/ld-sw
 ifeq ($(XILINX),1)
    FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
+else
+   FPGA_DIR = fpga/intel/CYCLONEV-GT-DK
 endif
 FIRM_DIR = software/$(TEST)
 
