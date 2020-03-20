@@ -55,7 +55,7 @@ all: firmware.hex boot.hex $(VSRC)
 
 #make firmware
 firmware.hex:
-	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
+	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) SIM=1
 	cp $(FIRM_DIR)/progmem.hex .
 	cp $(FIRM_DIR)/firmware.hex .
 	$(PYTHON_DIR)/hex_split.py firmware
