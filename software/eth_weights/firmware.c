@@ -12,7 +12,7 @@
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 #define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
 
-#define ETH_NBYTES (256-18) //minimum ethernet payload excluding FCS
+#define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define DATA_FILE_SIZE (418*418*3*2) //16 bits per input
 #define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
 #define NUM_DATA_FRAMES (DATA_FILE_SIZE/ETH_NBYTES)
@@ -51,6 +51,12 @@ int main() {
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
+     // start timer
+     if(j == 0){
+       timer_reset(TIMER);
+       start = timer_get_count(TIMER);
+     }
+
      //save in local mem
      for(i = 0; i < ETH_NBYTES; i++) input_data_p[i] = data_rcv[14+i];
 
@@ -65,15 +71,17 @@ int main() {
   int end = timer_get_count(TIMER);
   uart_printf("Data transmission done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
 
-  //measure initial time for weight transmission
-  timer_reset(TIMER);
-  start = timer_get_count(TIMER);
-
   //Loop to receive and send back weight frames
   for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     
+     // start timer
+     if(j == 0){
+       timer_reset(TIMER);
+       start = timer_get_count(TIMER);
+     }
 
      //save in local mem
      for(i = 0; i < ETH_NBYTES; i++) input_data_p[i] = data_rcv[14+i];
@@ -83,6 +91,7 @@ int main() {
 
      //send frame back
      eth_send_frame(data_to_send, ETH_NBYTES);
+
   }
 
   //measure final time for weight transmission
