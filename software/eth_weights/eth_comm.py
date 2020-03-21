@@ -3,8 +3,6 @@ from socket import socket, AF_PACKET, SOCK_RAW, htons, timeout
 import sys
 import os
 import struct
-import time
-
 
 def get_MAC_ADDR(rcv):
     mac_addr = ""
@@ -25,11 +23,8 @@ def print_MAC_ADDR(rcv, i):
     readable_dst_mac = ":".join("{:02x}".format(ord(c)) for c in dst_mac_addr)
     eth_type = rcv[12:14] 
     readable_eth_type = ":".join("{:02x}".format(ord(c)) for c in eth_type)
-
-#    raw_mac_addr = r"{}".format(mac_addr)
     print("[%d]DST: %s SRC: %s ETH: %s" %(i, readable_dst_mac, readable_mac, readable_eth_type))
     return
-
 
 def main(argv):
     
@@ -39,16 +34,13 @@ def main(argv):
 
     #Open .network file
     try:
-        # f_img = open(sys.argv[1], "r")
         f_img = open(data_path, "r")
-
         data_file_size = os.path.getsize(data_path)
     except:
         print("Failed to load .network file: %s\n" % data_path)
         sys.exit(1)
     #Open .weights file
     try:
-        # f_weights = open(sys.argv[2], "r")
         f_weights = open(weights_path, "r")
         weights_file_size = os.path.getsize(weights_path)
     except:
@@ -81,7 +73,6 @@ def main(argv):
     #debug
     print("data_file_size: %d\n" % data_file_size)
     print("weights_file_size: %d\n" %  weights_file_size)
-
     print("num_data_frames: %d\n" % num_data_frames)
     print("num_weight_frames: %d\n" % num_weight_frames)
 
@@ -100,11 +91,9 @@ def main(argv):
         # check if it is last packet (not enough for full payload)
         if j == num_data_frames:
             bytes_to_send = data_file_size - count_bytes
-            #set remaining bytes to zero - same as adding padding
             padding = '\x00' * (eth_nbytes-bytes_to_send)
         else:
             bytes_to_send = eth_nbytes
-            #empty string
             padding = ''
 
         #form frame
@@ -126,10 +115,9 @@ def main(argv):
                 count_errors += 1
 
     print("DEBUG:Data sent and received with %d errors\n" % (count_errors))
-
-    # Reset byte counter
+ 
+   # Reset byte counter
     count_bytes = 0
-
     print("Starting input weight transmission...\n")
 
     # Loop to send and receive back data frames
@@ -138,11 +126,9 @@ def main(argv):
         # check if it is last packet (not enough for full payload)
         if j == num_weight_frames:
             bytes_to_send = weights_file_size - count_bytes
-            #set remaining bytes to zero - same as adding padding
             padding = '\x00' * (eth_nbytes-bytes_to_send)
         else:
             bytes_to_send = eth_nbytes
-            #empty string
             padding = ''
 
         #form frame
@@ -152,7 +138,6 @@ def main(argv):
         count_bytes += eth_nbytes
 
         #Send packet
-        # padding = '\x00' * (eth_nbytes-len(payload))
         s.send(dst_addr + src_addr + eth_type + payload + padding)
     
         #Receive packet
@@ -160,11 +145,15 @@ def main(argv):
 
         # Check that sent and received packages are the same
         sent = payload + padding
-        for sent_byte, rcv_byte_ in zip(sent, rcv[14:]):
+        for sent_byte, rcv_byte in zip(sent, rcv[14:]):
             if sent_byte != rcv_byte:
                 count_errors += 1
 
     print("Data sent and received with %d errors\n" % (count_errors))
+
+    #close files
+    f_img.close()
+    f_weights.close()
 
 #Check if argument identifying type of board is present
 if len(sys.argv) != 2:

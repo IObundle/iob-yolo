@@ -13,7 +13,11 @@
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 #define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
-#define DDR_MEM ((CACHE_BASE<<(ADDR_W-N_SLAVES_W)) + 0x00100000)
+#ifdef SIM
+  #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
+#else
+  #define DDR_MEM ((CACHE_BASE<<(ADDR_W-N_SLAVES_W)) + 0x00100000)
+#endif
 
 //define constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS

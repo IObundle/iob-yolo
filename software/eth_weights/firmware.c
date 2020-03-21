@@ -41,9 +41,7 @@ int main() {
   int16_t input_data[ETH_NBYTES/2];
   char * input_data_p = (char *) &input_data;
   uart_printf("\n");
-
-  //measure initial time for data transmission
-  int start = timer_get_count(TIMER);
+  int start, end;
 
   //Loop to receive and send back data frames
   for(j = 0; j < NUM_DATA_FRAMES+1; j++) {
@@ -68,7 +66,7 @@ int main() {
   }
 
   //measure final time for data transmission
-  int end = timer_get_count(TIMER);
+  end = timer_get_count(TIMER);
   uart_printf("Data transmission done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
 
   //Loop to receive and send back weight frames
