@@ -1,6 +1,8 @@
 FW_DIR = ../$(TEST)
 FW = firmware
 
+CONSOLE_DIR = ../../submodules/iob-soc/software/ld-sw
+
 SERIAL := /dev/ttyUSB0
 BAUD := 115200
 FREQ := 100000000
@@ -9,8 +11,8 @@ CC := gcc
 CFLAGS := -g -Wall -pedantic
 
 TRGT = console
-CSRCS = console.c
-CHDRS = console.h
+CSRCS = $(CONSOLE_DIR)/console.c
+CHDRS = $(CONSOLE_DIR)/console.h
 
 all: run
 
