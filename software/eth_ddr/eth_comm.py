@@ -2,9 +2,21 @@
 from socket import socket, AF_PACKET, SOCK_RAW, htons
 from os.path import getsize
 from time import sleep
+import sys
+
+#Check if argument identifying type of board is present
+if len(sys.argv) != 2:
+    print("<usage>: python eth_comm.py <val> ")
+    print("val = 0 (ALTERA), val = 1 (XILINX)")
+    sys.exit()
+
+#Check type of board
+if(int(sys.argv[1]) == 1):
+    BOARD = "XILINX"
+else:
+    BOARD = "ALTERA"
 
 #Ethernet parameters
-BOARD = "XILINX"
 if(BOARD == "ALTERA"):
     interface = "enp0s31f6"
     src_addr = "\x30\x9C\x23\x1E\x62\x4B"   # sender MAC address

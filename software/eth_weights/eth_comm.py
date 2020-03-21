@@ -55,8 +55,13 @@ def main(argv):
         print("Failed to load .weights file: %s\n" % weights_path)
         sys.exit(1)
 
+    #Check type of board
+    if(int(sys.argv[1]) == 1):
+        BOARD = "XILINX"
+    else:
+        BOARD = "ALTERA"
+
     #Ethernet parameters
-    BOARD = "XILINX"
     if(BOARD == "ALTERA"):
         interface = "enp0s31f6"
         src_addr = "\x30\x9C\x23\x1E\x62\x4B"   # sender MAC address
@@ -161,6 +166,11 @@ def main(argv):
 
     print("Data sent and received with %d errors\n" % (count_errors))
 
+#Check if argument identifying type of board is present
+if len(sys.argv) != 2:
+    print("<usage>: python eth_comm.py <val> ")
+    print("val = 0 (ALTERA), val = 1 (XILINX)")
+    sys.exit()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
