@@ -315,7 +315,7 @@ module system (
                .rst                  (reset_int),
 
                //cpu i/f
-               .addr                 (m_addr[2]),
+               .addr                 (m_addr[3:2]),
                .data_in              (m_wdata),
                .data_out             (s_rdata[`TIMER_BASE]),
                .valid                (s_valid[`TIMER_BASE]),

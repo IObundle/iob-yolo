@@ -41,7 +41,7 @@ int main() {
   int16_t input_data[ETH_NBYTES/2];
   char * input_data_p = (char *) &input_data;
   uart_printf("\n");
-  int start, end;
+  unsigned int start, end;
 
   //Loop to receive and send back data frames
   for(j = 0; j < NUM_DATA_FRAMES+1; j++) {
@@ -52,7 +52,7 @@ int main() {
      // start timer
      if(j == 0){
        timer_reset(TIMER);
-       start = timer_get_count(TIMER);
+       start = timer_get_count_us(TIMER);
      }
 
      //save in local mem
@@ -66,8 +66,8 @@ int main() {
   }
 
   //measure final time for data transmission
-  end = timer_get_count(TIMER);
-  uart_printf("Data transmission done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Data transmission done in %d ms\n", (end-start)/1000);
 
   //Loop to receive and send back weight frames
   for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
@@ -78,7 +78,7 @@ int main() {
      // start timer
      if(j == 0){
        timer_reset(TIMER);
-       start = timer_get_count(TIMER);
+       start = timer_get_count_us(TIMER);
      }
 
      //save in local mem
@@ -93,8 +93,8 @@ int main() {
   }
 
   //measure final time for weight transmission
-  end = timer_get_count(TIMER);
-  uart_printf("Weight transmission done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Weight transmission done in %d ms\n", (end-start)/1000);
 
   //end program
   uart_putc(4);

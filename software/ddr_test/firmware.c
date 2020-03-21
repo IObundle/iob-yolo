@@ -31,21 +31,23 @@ int main() {
   int num_weights = (DATA - WEIGHTS)/sizeof(int);
   int w_step = num_weights/100000;
   uart_printf("\nWriting weights to DDR...\n");
-  int start = timer_get_count(TIMER);
+  unsigned int start = timer_get_count_us(TIMER);
   for(i = 0; i < num_weights; i += w_step) weights[i] = i;
-  int end = timer_get_count(TIMER);
-  uart_printf("done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  unsigned int end = timer_get_count_us(TIMER);
+  uart_printf("done in %d us\n", end-start);
+  timer_reset(TIMER);
 
   //Data vector
   volatile int *data = (volatile int*) (DATA);
   int num_data = (DATA - WEIGHTS)/sizeof(int);
   int d_step = num_data/100000;
   uart_printf("\nWriting data to DDR...\n");
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   for( i = 0; i < num_data; i += d_step) data[i] = i;
-  end = timer_get_count(TIMER);
-  uart_printf("done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("done in %d us\n", end-start);
   uart_printf("num_weights = %d\tnum_data = %d\n", num_weights, num_data);
+  timer_reset(TIMER);
 
   //Read loops
   int w = -1, d = -1;
@@ -54,7 +56,7 @@ int main() {
 
   //Weights vector
   uart_printf("\nReading and verifying weights...\n");
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   for(i = 0; i < num_weights; i += w_step) {
     w = weights[i];
     acc++;
@@ -63,12 +65,13 @@ int main() {
       err++;
     }
   }
-  end = timer_get_count(TIMER);
-  uart_printf("done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("done in %d us\n", end-start);
+  timer_reset(TIMER);
 
   //Data vector
   uart_printf("\nReading and verifying data...\n");
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   for(i = 0; i < num_data; i += d_step){
     d = data[i];
     acc++;
@@ -77,8 +80,8 @@ int main() {
       err++;
     }
   }
-  end = timer_get_count(TIMER);
-  uart_printf("done in %d us\n", ((end-start)*1000000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("done in %d us\n", end-start);
   uart_printf("\nDDR Test terminated with %d errors out of %d read operations\n", err, acc);
 
   //end program
