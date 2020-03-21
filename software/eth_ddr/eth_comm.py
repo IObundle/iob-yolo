@@ -56,7 +56,7 @@ for j in range(num_frames+1):
     s.send(dst_addr + src_addr + eth_type + payload + padding)
 
     #Wait some time
-    sleep(0.001)
+    sleep(0.005)
     
 #Close and open file again
 fp.close()

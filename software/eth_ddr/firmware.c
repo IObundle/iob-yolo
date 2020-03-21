@@ -13,7 +13,7 @@
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 #define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
-#define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
+#define DDR_MEM ((CACHE_BASE<<(ADDR_W-N_SLAVES_W)) + 0x00100000)
 
 //define constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
@@ -44,18 +44,17 @@ int main() {
   int i, j;
   volatile char *ddr_p = (volatile char*) (DDR_MEM);
   unsigned int count_errors = 0, bytes_to_send, bytes_to_receive, count_bytes = 0;
-  unsigned int start, end;
+  int start, end;
 
 #ifdef SIM
-  //measure initial time for receiving input.network
   uart_puts("\nStarting input.network reception\n");
-  start = timer_get_count(TIMER);
 
   //Loop to receive input.network frames
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     if(j==0) start = timer_get_count(TIMER);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
@@ -108,15 +107,14 @@ int main() {
 
 #else
 
-  //measure initial time for receiving output.network
   uart_puts("\nStarting output.network reception\n");
-  start = timer_get_count(TIMER);
 
   //Loop to receive input.network frames
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     if(j == 0) start = timer_get_count(TIMER);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_receive = OUTPUT_FILE_SIZE - count_bytes;
