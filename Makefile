@@ -1,5 +1,5 @@
 #configurable parameters
-TEST = eth_weights
+TEST = eth_ddr
 LOOPBACK = 0
 XILINX = 1
 VCD = 0

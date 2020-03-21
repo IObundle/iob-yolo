@@ -4,7 +4,7 @@
 `include "iob-uart.vh"
 `include "iob_eth_defs.vh"
 
-`define ETH_NBYTES (256-18)
+`define ETH_NBYTES (1024-18)
 `define INPUT_FILE_SIZE (418*418*3*2) //16 bits per input
 `define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
 `define STRINGIFY(x) `"x`"
@@ -194,9 +194,9 @@ module eth_ddr_tb;
          //send frame
          cpu_ethsend_frame();
 
-         //print progress each 200 cycles
-         if( (j%200) == 0) $display("iter = %d", j);
-         repeat (25000) @(posedge clk) #1;
+         //print progress each 100 cycles
+         if( (j%100) == 0) $display("iter = %d", j);
+         repeat (100000) @(posedge clk) #1;
 
       end
 
@@ -230,8 +230,8 @@ module eth_ddr_tb;
             if(data[i+30] != output_fixed_data[j*`ETH_NBYTES+i]) count_errors = count_errors + 1;
          end
 
-         //print progress each 200 cycles
-         if( (j%200) == 0) $display("iter = %d, total_err = %d", j, count_errors);
+         //print progress each 50 cycles
+         if( (j%50) == 0) $display("iter = %d, total_err = %d", j, count_errors);
          repeat (200) @(posedge clk) #1;
 
       end

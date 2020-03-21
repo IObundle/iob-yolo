@@ -16,7 +16,7 @@
 #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
 
 //define constants
-#define ETH_NBYTES (256-18) //minimum ethernet payload excluding FCS
+#define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE (418*418*3*2) //16 bits per point
 #define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
@@ -43,7 +43,7 @@ int main() {
   //Local variables
   int i, j;
   volatile char *ddr_p = (volatile char*) (DDR_MEM);
-  unsigned int count_errors = 0, bytes_to_receive, count_bytes = 0;
+  unsigned int count_errors = 0, bytes_to_send, bytes_to_receive, count_bytes = 0;
   unsigned int start, end;
 
 #ifdef SIM
@@ -77,7 +77,7 @@ int main() {
   uart_puts("Starting output.network transfer\n");
 
   //new local variables
-  int ddr_offset = NUM_INPUT_FRAMES*ETH_NBYTES + bytes_to_receive, bytes_to_send;
+  int ddr_offset = NUM_INPUT_FRAMES*ETH_NBYTES + bytes_to_receive;
   count_bytes = 0;
 
   //measure initial time for output.network transmission
@@ -108,7 +108,7 @@ int main() {
 
 #else
 
-  //measure initial time for receiving input.network
+  //measure initial time for receiving output.network
   uart_puts("\nStarting output.network reception\n");
   start = timer_get_count(TIMER);
 
