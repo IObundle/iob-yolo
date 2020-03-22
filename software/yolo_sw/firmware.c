@@ -174,9 +174,9 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm
 
   //perform convolution
   for(i = 0; i < num_ker; i++) {                //Number of kernels
+    uart_printf("%d\n", i);
     for(j = 0; j < w; j++) {   	        	//Output map size
       for(k = 0; k < w; k++) {
-        //uart_printf("%d\n", k);
         if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1);
 	else output_pos = i*new_w*new_w + j*new_w + k;
 	acc_final = 0;
@@ -356,12 +356,12 @@ void send_data() {
 #else
 
   //char file pointers
-  unsigned int pos = 2*(NETWORK_INPUT); // + DATA_LAYER_1);
+  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2);
   char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = DATA_LAYER_1*2;
+  unsigned int LAYER_FILE_SIZE = DATA_LAYER_3*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
   //Loop to receive and send back input network frames
@@ -429,15 +429,15 @@ int main(int argc, char **argv) {
   eth_init(ETHERNET);
   eth_set_rx_payload_size(ETH_NBYTES);
 
-  //Reset DDR to zero
-#ifndef SIM
-  //reset_DDR();
-#endif
-
   //load data
   define_memory_regions();
   receive_data();
   unsigned int total_time;
+
+  //Reset DDR to zero
+#ifndef SIM
+  reset_DDR();
+#endif
 
   //layer1 (418x418x3 -> 416x416x16)
   timer_reset(TIMER);
@@ -448,7 +448,7 @@ int main(int argc, char **argv) {
   total_time = (end-start)/1000;
 
   //layer2 (416x416x16 -> 210x210x16)
-/*  timer_reset(TIMER);
+  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_2_W, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
@@ -457,45 +457,51 @@ int main(int argc, char **argv) {
 
   //layer3 (210x210x16 -> 208x208x32)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_3_W, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer3 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer4 (208x208x32 -> 106x106x32)
-  timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+/*  timer_reset(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_4_W, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer4 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer5 (106x106x32 -> 104x104x64)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_5_W, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer5 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer6 (104x104x64 -> 54x54x64)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer6 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer7 (54x54x64 -> 52x52x128)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_7_W, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer7 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer8 (52x52x128 -> 28x28x128)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_8_W, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer8 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //Initial address of layer 10 output
   unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
@@ -503,70 +509,79 @@ int main(int argc, char **argv) {
   //layer9 (28x28x128 -> 28x28x256) -> Zero-padding
   //Result of layer 9 goes after result of layer 20
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_9_W, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer9 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer10 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer11 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer12 (14x14x512 -> 15x15x512)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer12 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer13 (15x15x512 -> 13x13x1024)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer13 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer14 (13x13x1024 -> 15x15x256)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer14 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //Stores initial address of layer 14 output for first route layer
   unsigned int data_pos_layer14 = data_pos;
 
   //layer15 (15x15x256 -> 13x13x512)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer15 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer16 (13x13x512 -> 13x13x255)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer16 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer17 (13x13x255 -> 13x13x255)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_17_W);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer17 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //Stores initial address of first yolo layer for sending
   unsigned int data_pos_layer17 = data_pos;
@@ -579,39 +594,44 @@ int main(int argc, char **argv) {
 
   //layer19 (15x15x256 -> 13x13x128)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer19 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer20 (13x13x128 -> 28x28x128)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   upsample_layer(LAYER_20_W, LAYER_20_NUM_KER);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer20 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer22 (28x28x128 -> 26x26x256)
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer22 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer23 (26x26x256 -> 26x26x255)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   conv_layer(LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer23 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //layer24 (26x26x255 -> 26x26x255)
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_24_W);
-  end = timer_get_count(TIMER);
-  uart_printf("Layer24 %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
 
   //return data
   send_data(data_pos_layer17, data_pos);*/
