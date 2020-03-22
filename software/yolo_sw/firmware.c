@@ -356,12 +356,12 @@ void send_data() {
 #else
 
   //char file pointers
-  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4);
+  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7);
   char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = DATA_LAYER_5*2;
+  unsigned int LAYER_FILE_SIZE = DATA_LAYER_8*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
   //Loop to receive and send back input network frames
@@ -414,6 +414,14 @@ void reset_DDR() {
   //layer4
   pos += DATA_LAYER_2 + DATA_LAYER_3;
   for(i = 0; i < DATA_LAYER_4; i++) fp_data[pos + i] = 0;
+
+  //layer6
+  pos += DATA_LAYER_4 + DATA_LAYER_5;
+  for(i = 0; i < DATA_LAYER_6; i++) fp_data[pos + i] = 0;
+
+  //layer8
+  pos += DATA_LAYER_6 + DATA_LAYER_7;
+  for(i = 0; i < DATA_LAYER_8; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -484,7 +492,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //layer6 (104x104x64 -> 54x54x64)
-/*  timer_reset(TIMER);
+  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
@@ -508,7 +516,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //Initial address of layer 10 output
-  unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
+/*  unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
 
   //layer9 (28x28x128 -> 28x28x256) -> Zero-padding
   //Result of layer 9 goes after result of layer 20

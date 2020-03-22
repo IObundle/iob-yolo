@@ -77,7 +77,7 @@ for j in range(num_frames_input_ntw+1):
     s.send(dst_addr + src_addr + eth_type + payload + padding)
     
     #Wait some time
-    sleep(0.003)
+    sleep(0.0035)
 print("input.network transmitted...")
 
 #######################################################################################
@@ -123,7 +123,7 @@ for j in range(num_frames_weights+1):
     s.send(dst_addr + src_addr + eth_type + payload + padding)
     
     #Wait some time
-    sleep(0.003)
+    sleep(0.0035)
 print("weights transmitted...")            
 
 #######################################################################################
@@ -148,7 +148,7 @@ print("weights transmitted...")
 count_bytes = 0
 print("\nChecking layer output")
 
-layer_file_size = DATA_LAYER_5
+layer_file_size = DATA_LAYER_8
 
 #Frame parameters
 num_frames_layer = int(layer_file_size/eth_nbytes)
@@ -156,7 +156,7 @@ print("layer_file_size: %d" % layer_file_size)
 print("num_frames_layer: %d" % (num_frames_layer+1))
 
 #Check output of layer
-pos = NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4
+pos = NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7
 f_data.seek(pos)
 for j in range(num_frames_layer+1):
     
