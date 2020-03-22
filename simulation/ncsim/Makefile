@@ -7,6 +7,7 @@ FIRM_DIR = ../../software/$(TEST)
 BOOT_DIR = ../../software/bootloader
 PYTHON_DIR := ../../submodules/iob-soc/software/python
 TB_DIR := ../../rtl/testbench
+FILES_DIR = ../../../
 
 #hardware paths
 RTL_DIR = ../../rtl
@@ -38,6 +39,7 @@ ifeq ($(XILINX),1)
 else
     HW_DEFINE += -define ALTERA
 endif
+HW_DEFINE += -define FILES_DIR=$(FILES_DIR)
 
 #hardware sources
 VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v
@@ -53,7 +55,7 @@ all: firmware.hex boot.hex $(VSRC)
 
 #make firmware
 firmware.hex:
-	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
+	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) SIM=1
 	cp $(FIRM_DIR)/progmem.hex .
 	cp $(FIRM_DIR)/firmware.hex .
 	$(PYTHON_DIR)/hex_split.py firmware

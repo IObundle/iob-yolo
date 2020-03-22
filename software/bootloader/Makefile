@@ -4,18 +4,20 @@ PYTHON_DIR := ../../submodules/iob-soc/software/python
 CONSOLE_DIR = ../../submodules/iob-soc/software/ld-sw
 UART_DIR := ../../submodules/iob-soc/submodules/iob-uart/c-driver
 CACHE_DIR := ../../submodules/iob-soc/submodules/iob-cache/c-driver
+BOOT_DIR := ../../submodules/iob-soc/software/bootloader
+
 
 INCLUDE =  -I. -I$(UART_DIR) -I$(CACHE_DIR) -I$(CONSOLE_DIR)
 
 DEFINE = -DUART_BAUD_RATE=$(BAUD) -DUART_CLK_FREQ=$(FREQ)
 DEFINE += -DPROG_SIZE=`wc -c   ../../software/$(TEST)/firmware.bin | head -n1 | cut -d " " -f1`
 
-SRC = boot.S boot.c $(UART_DIR)/iob-uart.c
+SRC = $(BOOT_DIR)/boot.S $(BOOT_DIR)/boot.c $(UART_DIR)/iob-uart.c
 
 all: boot.hex
 
-boot.hex: $(SRC) system.h $(UART_DIR)/iob-uart.h $(CONSOLE_DIR)/console.h boot.lds
-	$(TOOLCHAIN_PREFIX)gcc -Os -ffreestanding -nostdlib -o boot.elf $(INCLUDE) $(DEFINE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,boot.lds,-Map,boot.map,--strip-debug -lgcc -lc
+boot.hex: $(SRC) system.h $(UART_DIR)/iob-uart.h $(CONSOLE_DIR)/console.h $(BOOT_DIR)/boot.lds
+	$(TOOLCHAIN_PREFIX)gcc -Os -ffreestanding -nostdlib -o boot.elf $(INCLUDE) $(DEFINE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,$(BOOT_DIR)/boot.lds,-Map,boot.map,--strip-debug -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary boot.elf boot.bin
 	$(eval MEM_SIZE=`$(PYTHON_DIR)/get_memsize.py BOOTROM_ADDR_W`)
 	$(PYTHON_DIR)/makehex.py boot.bin $(MEM_SIZE) > boot.hex

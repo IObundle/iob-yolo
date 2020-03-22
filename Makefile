@@ -1,20 +1,5 @@
-<<<<<<< HEAD
-SIM_DIR = simulation/xcsim
-
-FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
-
-sim:
-	make -C $(SIM_DIR) 
-
-fpga:
-	make -C $(FPGA_DIR)
-
-clean: 
-	make -C  $(SIM_DIR) clean
-	make -C fpga/xilinx/AES-KU040-DB-G clean
-=======
 #configurable parameters
-TEST = ddr_test
+TEST = eth_ddr
 LOOPBACK = 0
 XILINX = 1
 VCD = 0
@@ -52,12 +37,11 @@ ld-hw:
 	make -C $(FPGA_DIR) ld-hw
 
 ld-eth:
-	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py;
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(XILINX);
 
 clean:
 	make -C $(SIM_DIR) clean TEST=$(TEST)
 	make -C $(FPGA_DIR) clean TEST=$(TEST)
 	make -C $(LD_SW_DIR) clean TEST=$(TEST)
->>>>>>> 7c2044af785495e83d71e5b5d5eb59b2fc7bd2cc
 
 .PHONY: sim fpga clean
