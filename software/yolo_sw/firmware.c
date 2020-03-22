@@ -356,12 +356,12 @@ void send_data() {
 #else
 
   //char file pointers
-  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2);
+  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4);
   char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = DATA_LAYER_3*2;
+  unsigned int LAYER_FILE_SIZE = DATA_LAYER_5*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
   //Loop to receive and send back input network frames
@@ -410,6 +410,10 @@ void reset_DDR() {
   //layer2
   pos = NETWORK_INPUT + DATA_LAYER_1;
   for(i = 0; i < DATA_LAYER_2; i++) fp_data[pos + i] = 0;
+
+  //layer4
+  pos += DATA_LAYER_2 + DATA_LAYER_3;
+  for(i = 0; i < DATA_LAYER_4; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -464,7 +468,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //layer4 (208x208x32 -> 106x106x32)
-/*  timer_reset(TIMER);
+  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_4_W, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
@@ -480,7 +484,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //layer6 (104x104x64 -> 54x54x64)
-  timer_reset(TIMER);
+/*  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
@@ -635,7 +639,7 @@ int main(int argc, char **argv) {
 
   //return data
   send_data(data_pos_layer17, data_pos);*/
-  uart_printf("\ntotal_time = %d seconds\n", total_time/1000);
+  uart_printf("\ntotal_time = %d minutes\n", (total_time/1000)/60);
   send_data();
   uart_putc(4);
   return 0;
