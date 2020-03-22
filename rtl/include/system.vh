@@ -33,8 +33,8 @@
 
 //boot memory address space (log2 of byte size)
 `define BOOTROM_ADDR_W 12
-`define BOOTRAM_ADDR_W 13
+`define BOOTRAM_ADDR_W 14
 
 //main memory address space (log2 of byte size)
 //must be same as BOOTRAM_ADDR_W if DDR is unused
-`define MAINRAM_ADDR_W 13
+`define MAINRAM_ADDR_W 14
