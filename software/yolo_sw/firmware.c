@@ -356,12 +356,12 @@ void send_data() {
 #else
 
   //char file pointers
-  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7 + DATA_LAYER_8);
+  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16);
   char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = DATA_LAYER_10*2;
+  unsigned int LAYER_FILE_SIZE = DATA_LAYER_17*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
   //Loop to receive and send back input network frames
@@ -427,8 +427,16 @@ void reset_DDR() {
   pos += DATA_LAYER_8;
   for(i = 0; i < DATA_LAYER_10; i++) fp_data[pos + i] = 0;
 
-  //layer9
-  pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
+  //layer12
+  pos += DATA_LAYER_10 + DATA_LAYER_11;
+  for(i = 0; i < DATA_LAYER_12; i++) fp_data[pos + i] = 0;
+
+  //layer14
+  pos += DATA_LAYER_12 + DATA_LAYER_13;
+  for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
+ 
+ //layer9
+  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
   for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
@@ -545,7 +553,7 @@ int main(int argc, char **argv) {
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
-/*  timer_reset(TIMER);
+  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
@@ -604,7 +612,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //Stores initial address of first yolo layer for sending
-  unsigned int data_pos_layer17 = data_pos;
+/*  unsigned int data_pos_layer17 = data_pos;
 
   //Stores initial address of the output of layer 19
   unsigned int previous_data_pos = data_pos + DATA_LAYER_17;
