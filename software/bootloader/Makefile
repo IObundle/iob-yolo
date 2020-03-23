@@ -12,7 +12,7 @@ INCLUDE =  -I. -I$(UART_DIR) -I$(CACHE_DIR) -I$(CONSOLE_DIR)
 DEFINE = -DUART_BAUD_RATE=$(BAUD) -DUART_CLK_FREQ=$(FREQ)
 DEFINE += -DPROG_SIZE=`wc -c   ../../software/$(TEST)/firmware.bin | head -n1 | cut -d " " -f1`
 
-SRC = $(BOOT_DIR)/boot.S $(BOOT_DIR)/boot.c $(UART_DIR)/iob-uart.c
+SRC = $(BOOT_DIR)/boot.S boot.c $(UART_DIR)/iob-uart.c
 
 all: boot.hex
 

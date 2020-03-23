@@ -5,6 +5,7 @@
 //Optional memories (passed as command line macro)
 `define USE_BOOT
 `define USE_DDR
+`define USE_MAINRAM
 
 // slaves
 // minimum 3 slaves: boot, uart and reset
@@ -33,8 +34,8 @@
 
 //boot memory address space (log2 of byte size)
 `define BOOTROM_ADDR_W 12
-`define BOOTRAM_ADDR_W 14
+`define BOOTRAM_ADDR_W 15
 
 //main memory address space (log2 of byte size)
 //must be same as BOOTRAM_ADDR_W if DDR is unused
-`define MAINRAM_ADDR_W 14
+`define MAINRAM_ADDR_W 15
