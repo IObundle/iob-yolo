@@ -4,8 +4,9 @@ PYTHON_DIR = ../../submodules/iob-soc/software/python/
 UART_DIR = ../../submodules/iob-soc/submodules/iob-uart/c-driver
 ETH_DIR = ../../submodules/iob-eth/c-driver
 TIMER_DIR = ../../submodules/iob-timer
+CACHE_DIR = ../../submodules/iob-soc/submodules/iob-cache/c-driver
 
-INCLUDE = -I. -I$(UART_DIR) -I$(ETH_DIR) -I$(TIMER_DIR)
+INCLUDE = -I. -I$(UART_DIR) -I$(ETH_DIR) -I$(TIMER_DIR) -I$(CACHE_DIR)
 
 DEFINE = -DUART_BAUD_RATE=$(BAUD) -DUART_CLK_FREQ=$(FREQ)
 ifeq ($(LOOPBACK),1)
@@ -24,7 +25,7 @@ SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_
 
 all: firmware.hex
 
-firmware.hex: firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h firmware.h
+firmware.hex: firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h firmware.h $(CACHE_DIR)/iob-cache.h
 	$(TOOLCHAIN_PREFIX)gcc -Os -ffreestanding  -nostdlib -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary firmware.elf firmware.bin
 	$(eval MEM_SIZE=`./get_firmsize.sh`)

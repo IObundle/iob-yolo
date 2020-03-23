@@ -78,30 +78,17 @@ for j in range(num_frames_input_ntw+1):
     #Send packet
     s.send(dst_addr + src_addr + eth_type + payload + padding)
     
-    #Wait some time
-    sleep(0.0035)
-print("input.network transmitted...")
+    #receive data back as ack
+    rcv = s.recv(4096)
+    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_send+14]):
+        if sent_byte != rcv_byte:
+            count_errors += 1
 
-#######################################################################################
-##Check if input.network was well transmitted
-#f_in.seek(0)
-#count_bytes = 0
-#for j in range(num_frames_input_ntw+1):
-#    if j == num_frames_input_ntw:
-#        bytes_to_receive = input_ntw_file_size - count_bytes
-#    else:
-#        bytes_to_receive = eth_nbytes
-#    payload = f_in.read(bytes_to_receive)
-#    count_bytes += eth_nbytes
-#    rcv = s.recv(4096)
-#    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
-#        if sent_byte != rcv_byte:
-#            count_errors += 1
-#print("DEBUG: input.network sent and received with %d errors\n" % (count_errors))
-#######################################################################################
+print("input.network transmitted with %d errors..." %(count_errors))
 
 #Reset byte counter
 count_bytes = 0
+count_errors = 0
 print("\nStarting input weight transmission...")
 
 # Loop to send weights frames
@@ -124,28 +111,16 @@ for j in range(num_frames_weights+1):
     #Send packet
     s.send(dst_addr + src_addr + eth_type + payload + padding)
     
-    #Wait some time
-    sleep(0.0035)
-print("weights transmitted...")            
+    #receive data back as ack
+    rcv = s.recv(4096)
+    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_send+14]):
+        if sent_byte != rcv_byte:
+            count_errors += 1
 
-#######################################################################################
-##Check if weights were well transmitted
-#f_weights.seek(0)
-#count_bytes = 0
-#for j in range(num_frames_weights+1):
-#    if j == num_frames_weights:
-#        bytes_to_receive = weights_file_size - count_bytes
-#    else:
-#        bytes_to_receive = eth_nbytes
-#    payload = f_weights.read(bytes_to_receive)
-#    count_bytes += eth_nbytes
-#    rcv = s.recv(4096)
-#    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
-#        if sent_byte != rcv_byte:
-#            count_errors += 1    
-#print("DEBUG: weights sent and received with %d errors\n" % (count_errors))
-#######################################################################################
+print("weights transmitted with %d errors..." %(count_errors))
 
+#Reset error counter
+count_errors = 0
 print("\nStarting reception of yolo layers...")
 yolo_layer_file_size_arr = [DATA_LAYER_17, DATA_LAYER_24]
 

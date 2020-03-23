@@ -4,6 +4,7 @@
 #include "iob-eth.h"
 #include "iob_timer.h"
 #include "firmware.h"
+#include "iob-cache.h"
 
 //import c libraries
 #include <stdint.h>
@@ -16,6 +17,7 @@
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 #define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
 #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
+#define CACHE_CTRL (CACHE_CTRL_BASE<<(ADDR_W-N_SLAVES_W))
 
 //define constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
@@ -80,7 +82,13 @@ void receive_data() {
      else bytes_to_receive = ETH_NBYTES;
 
      //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) fp_data_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     for(i = 0; i < bytes_to_receive; i++) {
+       fp_data_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+       data_to_send[i] = data_rcv[14+i];
+     }
+
+     //send data back as ack
+     eth_send_frame(data_to_send, ETH_NBYTES);
 
      //update byte counter
      count_bytes += ETH_NBYTES;
@@ -89,20 +97,6 @@ void receive_data() {
   //measure transference time
   end = timer_get_count_us(TIMER);
   uart_printf("input.network transferred in %d ms\n", (end-start)/1000);
-
-  //check if input.network was well received
-  /*count_bytes = 0;
-  timer_reset(TIMER);
-  start = timer_get_count_us(TIMER);
-  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
-    if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
-    else bytes_to_send = ETH_NBYTES;
-    for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
-    eth_send_frame(data_to_send, ETH_NBYTES);
-    count_bytes += ETH_NBYTES;
-  }
-  end = timer_get_count_us(TIMER);
-  uart_printf("input.network transferred in %d ms\n", (end-start)/1000);*/
 
   //Loop to receive weight frames
   for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
@@ -122,7 +116,13 @@ void receive_data() {
      else bytes_to_receive = ETH_NBYTES;
 
      //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) fp_weights_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     for(i = 0; i < bytes_to_receive; i++) {
+       fp_weights_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+       data_to_send[i] = data_rcv[14+i];
+     }
+
+     //send data back as ack
+     eth_send_frame(data_to_send, ETH_NBYTES);
 
      //update byte counter
      count_bytes += ETH_NBYTES;
@@ -131,20 +131,6 @@ void receive_data() {
   //measure transference time
   end = timer_get_count_us(TIMER);
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);
-
-  //check if weights were well received
-  /*count_bytes = 0;
-  timer_reset(TIMER);
-  start = timer_get_count_us(TIMER);
-  for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
-    if(j == NUM_WEIGHT_FRAMES) bytes_to_send = WEIGHTS_FILE_SIZE - count_bytes;
-    else bytes_to_send = ETH_NBYTES;
-    for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_weights_char[j*ETH_NBYTES + i];
-    eth_send_frame(data_to_send, ETH_NBYTES);
-    count_bytes += ETH_NBYTES;
-  }
-  end = timer_get_count_us(TIMER);
-  uart_printf("weights transferred in %d ms\n", (end-start)/1000);*/
 }
 
 //perform convolutional layer
@@ -353,7 +339,7 @@ void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
   unsigned int LAYER_FILE_SIZE = data_amount*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
-  //Loop to send output of first yolo layer
+  //Loop to send output of yolo layer
   for(j = 0; j < NUM_LAYER_FRAMES+1; j++) {
 
      // start timer
@@ -434,6 +420,19 @@ void reset_DDR() {
   uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
+void print_cache_status() {
+  uart_printf("ctrl_cache_hit = %d\n", ctrl_cache_hit(CACHE_CTRL));
+  uart_printf("ctrl_cache_miss = %d\n", ctrl_cache_miss(CACHE_CTRL));
+  uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
+  uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
+  uart_printf("ctrl_data_hit = %d\n", ctrl_data_hit(CACHE_CTRL));
+  uart_printf("ctrl_data_miss = %d\n", ctrl_data_miss(CACHE_CTRL));
+  uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
+  uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
+  uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
+  uart_printf("ctrl_data_write_miss = %d\n", ctrl_data_write_miss(CACHE_CTRL));
+}
+
 int main(int argc, char **argv) {
 
   //init UART
@@ -457,6 +456,8 @@ int main(int argc, char **argv) {
   reset_DDR();
 #endif
 
+  //print_cache_status();
+ 
   //layer1 (418x418x3 -> 416x416x16)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
@@ -464,6 +465,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
+
+  //print_cache_status();
 
   //layer2 (416x416x16 -> 210x210x16)
   timer_reset(TIMER);
