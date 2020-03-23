@@ -7,11 +7,18 @@
 `define ETH_NBYTES (1024-18)
 `define INPUT_FILE_SIZE (418*418*3*2) //16 bits per input
 `define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
-`define STRINGIFY(x) `"x`"
-`define NUM_INPUT_FRAMES (`INPUT_FILE_SIZE/`ETH_NBYTES)
 `define NUM_OUTPUT_FRAMES (`OUTPUT_FILE_SIZE/`ETH_NBYTES)
+`define WEIGTHS_BASE_ADDRESS 32768 //0x00008000
+`define DATA_BASE_ADDRESS 21004288 //0x01408000
+`define WEIGHT_FILE_SIZE (`DATA_BASE_ADDRESS+`INPUT_FILE_SIZE)
+`define STRINGIFY(x) `"x`"
 
-module eth_ddr_tb;
+`define DATA_LAYER_17 (13*13*255*2)
+`define DATA_LAYER_24 (26*26*255*2)
+`define NUM_FRAMES_LAYER_17 (`DATA_LAYER_17/`ETH_NBYTES)
+`define NUM_FRAMES_LAYER_24 (`DATA_LAYER_24/`ETH_NBYTES)
+
+module yolo_sw_tb;
 
    //clock
    reg clk = 1;
@@ -56,7 +63,7 @@ module eth_ddr_tb;
 
 `ifdef VCD
       $dumpfile("system.vcd");
-      $dumpvars(2, eth_ddr_tb.uut.eth, eth_ddr_tb.uut.picorv32_core);
+      $dumpvars(2, yolo_sw_tb.uut.eth, yolo_sw_tb.uut.picorv32_core);
       $dumpvars(0, test_eth);
 `endif
 
@@ -97,8 +104,6 @@ module eth_ddr_tb;
 
    end // test procedure
 
-
-
    //
    // INSTANTIATE COMPONENTS
    //
@@ -127,26 +132,19 @@ module eth_ddr_tb;
 
    wire 	       eth_phy_resetn;
 
-
    assign tester_pll_locked = 1'b1;
    assign tester_rx_clk = RX_CLK;
    assign tester_tx_clk = TX_CLK;
 
    reg [7:0] data[`ETH_NBYTES+30-1:0];
-   reg [7:0] data_aux[`ETH_NBYTES-1:0];
    reg [47:0] mac_addr = `ETH_RMAC_ADDR;
-   reg [`ETH_NBYTES*8-1:0] data_tmp;
-
-   reg [7:0] input_fixed_data[`INPUT_FILE_SIZE-1:0];
    reg [7:0] output_fixed_data[`OUTPUT_FILE_SIZE-1:0];
-   integer j, count_bytes = 0, bytes_to_send, bytes_to_receive, count_errors = 0;
+   integer j, count_bytes = 0, bytes_to_receive, count_errors = 0, offset;
 
-   parameter input_fixed_file = {`STRINGIFY(`FILES_DIR), "input_fixed.hex"};
    parameter output_fixed_file = {`STRINGIFY(`FILES_DIR), "output_fixed.hex"};
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "input_output_ntw_fixed.hex"};
-   parameter file_size = (`INPUT_FILE_SIZE+`OUTPUT_FILE_SIZE)/4;
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "weights_input_ntw_fixed.hex"};
+   parameter file_size = (`WEIGHT_FILE_SIZE)/4;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
-
 
 `ifndef LOOPBACK
    // TEST ETHERNET
@@ -166,78 +164,72 @@ module eth_ddr_tb;
       cpu_ethinit();
       cpu_ethset_rx_payload_size();
 
-      //read input data
-      $readmemh(input_fixed_file, input_fixed_data, 0, `INPUT_FILE_SIZE-1);
+      //read output.network
       $readmemh(output_fixed_file, output_fixed_data, 0, `OUTPUT_FILE_SIZE-1);
 
       //wait a bit for RISC-V to be ready to receive data
       repeat (100000) @(posedge clk) #1;
 
-      //for loop to send input.network frames
-      for(j = 0; j < `NUM_INPUT_FRAMES+1; j = j+1) begin
+      //for loop to receive output of first yolo layer
+      for(j = 0; j < `NUM_FRAMES_LAYER_17+1; j = j+1) begin
 
          //check if it is last packet (has less data that full payload size)
-         if(j == `NUM_INPUT_FRAMES) begin
-            bytes_to_send = `INPUT_FILE_SIZE - count_bytes;
-            //set remaining bytes to zero
-            for(i = bytes_to_send; i < `ETH_NBYTES; i=i+1) begin
-                data[i+30] = 8'b0;
-            end
-         end else bytes_to_send = `ETH_NBYTES;
-
-         //for loop to form frame
-         for(i = 0; i < bytes_to_send; i=i+1) begin
-            data[i+30] = input_fixed_data[j * `ETH_NBYTES + i];
-         end
-         count_bytes = count_bytes + `ETH_NBYTES;
-
-         //send frame
-         cpu_ethsend_frame();
-
-         //print progress each 100 cycles
-         if( (j%100) == 0) $display("iter = %d", j);
-         repeat (100000) @(posedge clk) #1;
-
-      end
-
-      //reset byte counter
-      count_bytes = 0;
-
-      //for loop to receive output.network frames
-      for(j = 0; j < `NUM_OUTPUT_FRAMES+1; j = j+1) begin
-
-         //check if it is last packet (has less data that full payload size)
-         if(j == `NUM_OUTPUT_FRAMES) begin
-            bytes_to_receive = `OUTPUT_FILE_SIZE - count_bytes;
+         if(j == `NUM_FRAMES_LAYER_17) begin
+            bytes_to_receive = `DATA_LAYER_17 - count_bytes;
             //set remaining bytes to zero
             for(i = bytes_to_receive; i < `ETH_NBYTES; i=i+1) begin
                 data[i+30] = 8'b0;
             end
          end else bytes_to_receive = `ETH_NBYTES;
 
-         //for loop to form frame
-         for(i = 0; i < bytes_to_receive; i=i+1) begin
-            data[i+30] = output_fixed_data[j * `ETH_NBYTES + i];
-            data_aux[i] = output_fixed_data[j * `ETH_NBYTES + i];
-         end
-         count_bytes = count_bytes + `ETH_NBYTES;
-
          //wait to receive frame back
          cpu_ethrcv_frame(1);
+         count_bytes = count_bytes + bytes_to_receive;
 
          //check that sent and receive packages are the same
          for(i = 0; i < bytes_to_receive; i=i+1) begin
             if(data[i+30] != output_fixed_data[j*`ETH_NBYTES+i]) count_errors = count_errors + 1;
          end
 
-         //print progress each 50 cycles
-         if( (j%50) == 0) $display("iter = %d, total_err = %d", j, count_errors);
+         //print progress each 100 cycles
+         if( (j%100) == 0) $display("iter = %d, total_err = %d", j, count_errors);
+         repeat (200) @(posedge clk) #1;
+
+      end
+
+      //reset byte counter
+      offset = count_bytes;
+      count_bytes = 0;
+
+      //for loop to receive output of second yolo layer
+      for(j = 0; j < `NUM_FRAMES_LAYER_24+1; j = j+1) begin
+
+         //check if it is last packet (has less data that full payload size)
+         if(j == `NUM_FRAMES_LAYER_24) begin
+            bytes_to_receive = `DATA_LAYER_24 - count_bytes;
+            //set remaining bytes to zero
+            for(i = bytes_to_receive; i < `ETH_NBYTES; i=i+1) begin
+                data[i+30] = 8'b0;
+            end
+         end else bytes_to_receive = `ETH_NBYTES;
+
+         //wait to receive frame back
+         cpu_ethrcv_frame(1);
+         count_bytes = count_bytes + bytes_to_receive;
+
+         //check that sent and receive packages are the same
+         for(i = 0; i < bytes_to_receive; i=i+1) begin
+            if(data[i+30] != output_fixed_data[j*`ETH_NBYTES+i+offset]) count_errors = count_errors + 1;
+         end
+
+         //print progress each 100 cycles
+         if( (j%100) == 0) $display("iter = %d, total_err = %d", j, count_errors);
          repeat (200) @(posedge clk) #1;
 
       end
 
       //end of procedure
-      repeat (5000) @(posedge clk) #1;
+      repeat (50000) @(posedge clk) #1;
       $display("output.network received with %d errors", count_errors);
       end_flag2 = 1;
 

@@ -21,10 +21,8 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE (418*418*3*2) //16 bits per point
 #define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
-#define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
 #define DATA_BASE_ADDRESS (DDR_MEM + 0x01408000)
 
@@ -56,8 +54,6 @@ void define_memory_regions() {
 
 //receive weights and data
 void receive_data() {
-
-#ifndef SIM
 
   uart_printf("\nReady to receive input.network and weights\n");
 
@@ -149,8 +145,6 @@ void receive_data() {
   }
   end = timer_get_count_us(TIMER);
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);*/
-
-#endif
 }
 
 //perform convolutional layer
@@ -348,23 +342,18 @@ void upsample_layer(int w, int num_ker) {
 }
 
 //send detection results back
-//void send_data(unsigned int data_pos_yolo1, unsigned int data_pos_yolo2) {
-void send_data() {
-
-#ifdef SIM
-
-#else
+void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
 
   //char file pointers
-  unsigned int pos = 2*(NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16);
+  unsigned int pos = 2*data_pos_yolo;
   char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = DATA_LAYER_17*2;
+  unsigned int LAYER_FILE_SIZE = data_amount*2;
   unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
 
-  //Loop to receive and send back input network frames
+  //Loop to send output of first yolo layer
   for(j = 0; j < NUM_LAYER_FRAMES+1; j++) {
 
      // start timer
@@ -390,10 +379,7 @@ void send_data() {
 
   //measure transference time
   end = timer_get_count_us(TIMER);
-  uart_printf("\nlayer transferred in %d ms\n\n", (end-start)/1000);
-
-#endif
-
+  uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
 //reset certain DDR positions to zero due to padding
@@ -434,9 +420,13 @@ void reset_DDR() {
   //layer14
   pos += DATA_LAYER_12 + DATA_LAYER_13;
   for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
+
+  //layer20
+  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19;
+  for(i = 0; i < DATA_LAYER_20; i++) fp_data[pos + i] = 0;
  
- //layer9
-  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
+  //layer9
+  pos += DATA_LAYER_20;
   for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
@@ -457,13 +447,13 @@ int main(int argc, char **argv) {
   eth_init(ETHERNET);
   eth_set_rx_payload_size(ETH_NBYTES);
 
-  //load data
+  //define memory regions
   define_memory_regions();
-  receive_data();
   unsigned int total_time;
 
-  //Reset DDR to zero
+  //load data and reset DDR to zero
 #ifndef SIM
+  receive_data();
   reset_DDR();
 #endif
 
@@ -612,7 +602,7 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //Stores initial address of first yolo layer for sending
-/*  unsigned int data_pos_layer17 = data_pos;
+  unsigned int data_pos_layer17 = data_pos;
 
   //Stores initial address of the output of layer 19
   unsigned int previous_data_pos = data_pos + DATA_LAYER_17;
@@ -662,9 +652,9 @@ int main(int argc, char **argv) {
   total_time += (end-start)/1000;
 
   //return data
-  send_data(data_pos_layer17, data_pos);*/
   uart_printf("\ntotal_time = %d minutes\n", (total_time/1000)/60);
-  send_data();
+  send_data(data_pos_layer17, DATA_LAYER_17);
+  send_data(data_pos, DATA_LAYER_24);
   uart_putc(4);
   return 0;
 }
