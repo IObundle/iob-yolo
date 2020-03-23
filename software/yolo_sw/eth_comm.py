@@ -148,7 +148,7 @@ print("weights transmitted...")
 count_bytes = 0
 print("\nChecking layer output")
 
-layer_file_size = DATA_LAYER_8
+layer_file_size = DATA_LAYER_10
 
 #Frame parameters
 num_frames_layer = int(layer_file_size/eth_nbytes)
@@ -156,7 +156,7 @@ print("layer_file_size: %d" % layer_file_size)
 print("num_frames_layer: %d" % (num_frames_layer+1))
 
 #Check output of layer
-pos = NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7
+pos = NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7 + DATA_LAYER_8
 f_data.seek(pos)
 for j in range(num_frames_layer+1):
     
