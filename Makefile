@@ -39,7 +39,7 @@ ld-hw:
 	make -C $(FPGA_DIR) ld-hw
 
 ld-eth:
-	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py;
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(XILINX);
 
 clean:
 	make -C $(SIM_DIR) clean TEST=$(TEST)

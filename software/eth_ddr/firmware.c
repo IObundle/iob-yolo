@@ -13,10 +13,14 @@
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 #define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
-#define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
+#ifdef SIM
+  #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
+#else
+  #define DDR_MEM ((CACHE_BASE<<(ADDR_W-N_SLAVES_W)) + 0x00100000)
+#endif
 
 //define constants
-#define ETH_NBYTES (256-18) //minimum ethernet payload excluding FCS
+#define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE (418*418*3*2) //16 bits per point
 #define OUTPUT_FILE_SIZE ((13*13*255+26*26*255)*2) //16 bits per point
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
@@ -43,19 +47,18 @@ int main() {
   //Local variables
   int i, j;
   volatile char *ddr_p = (volatile char*) (DDR_MEM);
-  unsigned int count_errors = 0, bytes_to_receive, count_bytes = 0;
+  unsigned int count_errors = 0, bytes_to_send, bytes_to_receive, count_bytes = 0;
   unsigned int start, end;
 
 #ifdef SIM
-  //measure initial time for receiving input.network
   uart_puts("\nStarting input.network reception\n");
-  start = timer_get_count(TIMER);
 
   //Loop to receive input.network frames
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     if(j==0) start = timer_get_count_us(TIMER);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
@@ -71,18 +74,18 @@ int main() {
   }
 
   //measure final time for input.network reception
-  end = timer_get_count(TIMER);
-  uart_printf("input.network transferred in %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("input.network transferred in %d ms\n", (end-start)/1000);
   uart_printf("input.network transferred with %d errors\n", count_errors);
   uart_puts("Starting output.network transfer\n");
 
   //new local variables
-  int ddr_offset = NUM_INPUT_FRAMES*ETH_NBYTES + bytes_to_receive, bytes_to_send;
+  int ddr_offset = NUM_INPUT_FRAMES*ETH_NBYTES + bytes_to_receive;
   count_bytes = 0;
 
   //measure initial time for output.network transmission
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
 
   //Loop to send output.network
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
@@ -103,20 +106,19 @@ int main() {
   }
 
   //measure final time for output.network transmission
-  end = timer_get_count(TIMER);
-  uart_printf("output.network transferred in %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("output.network transferred in %d ms\n", (end-start)/1000);
 
 #else
 
-  //measure initial time for receiving input.network
   uart_puts("\nStarting output.network reception\n");
-  start = timer_get_count(TIMER);
 
   //Loop to receive input.network frames
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     if(j == 0) start = timer_get_count_us(TIMER);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_receive = OUTPUT_FILE_SIZE - count_bytes;
@@ -130,14 +132,14 @@ int main() {
   }
 
   //measure final time for data transmission
-  end = timer_get_count(TIMER);
-  uart_printf("output.network received in %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("output.network received in %d ms\n", (end-start)/1000);
   uart_puts("Starting output.network transfer\n");
   count_bytes = 0;
 
   //measure initial time for output.network transmission
   timer_reset(TIMER);
-  start = timer_get_count(TIMER);
+  start = timer_get_count_us(TIMER);
 
   //Loop to send output.network
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
@@ -157,8 +159,8 @@ int main() {
   }
 
   //measure final time for output.network transmission
-  end = timer_get_count(TIMER);
-  uart_printf("output.network transferred in %d ms\n", ((end-start)*1000)/UART_CLK_FREQ);
+  end = timer_get_count_us(TIMER);
+  uart_printf("output.network transferred in %d ms\n", (end-start)/1000);
 #endif
 
   //end program

@@ -143,16 +143,20 @@ module system (
      //if main memory is being addressed and system not booting
      if (!m_addr[`ADDR_W-1 -: `N_SLAVES_W] && !boot)
        //if DDR being used point to cache
-`ifdef USE_BOOT
- `ifdef USE_DDR
-       m_addr_int = `N_SLAVES_W'd`CACHE_BASE;
- `else
-   //if DDR  not being used point to RAM
-   m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
- `endif
+`ifdef USE_MAINRAM
+  m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
 `else
-   //if DDR  not being used point to RAM
-   m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
+  `ifdef USE_BOOT
+    `ifdef USE_DDR
+       m_addr_int = `N_SLAVES_W'd`CACHE_BASE;
+    `else
+       //if DDR  not being used point to RAM
+       m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
+    `endif
+  `else
+     //if DDR  not being used point to RAM
+     m_addr_int = `N_SLAVES_W'd`MAINRAM_BASE;
+  `endif
 `endif
      else
        //do not modify address prefix
@@ -315,7 +319,7 @@ module system (
                .rst                  (reset_int),
 
                //cpu i/f
-               .addr                 (m_addr[2]),
+               .addr                 (m_addr[3:2]),
                .data_in              (m_wdata),
                .data_out             (s_rdata[`TIMER_BASE]),
                .valid                (s_valid[`TIMER_BASE]),

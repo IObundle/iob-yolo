@@ -4,7 +4,7 @@
 `include "iob-uart.vh"
 `include "iob_eth_defs.vh"
 
-`define ETH_NBYTES (256-18)
+`define ETH_NBYTES (1024-18)
 `define DATA_FILE_SIZE (418*418*3*2) //16 bits per input
 `define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
 `define STRINGIFY(x) `"x`"

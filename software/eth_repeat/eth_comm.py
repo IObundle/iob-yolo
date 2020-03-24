@@ -1,14 +1,26 @@
 #Import libraries
 from socket import socket, AF_PACKET, SOCK_RAW, htons
+import sys
+
+#Check if argument identifying type of board is present
+if len(sys.argv) != 2:
+    print("<usage>: python eth_comm.py <val> ")
+    print("val = 0 (ALTERA), val = 1 (XILINX)")
+    sys.exit()
+
+#Check type of board
+if(int(sys.argv[1]) == 1):
+    BOARD = "XILINX"
+else:
+    BOARD = "ALTERA"
 
 #Ethernet parameters
-BOARD = "XILINX"
 if(BOARD == "ALTERA"):
     interface = "enp0s31f6"
     src_addr = "\x30\x9C\x23\x1E\x62\x4B"   # sender MAC address
 else:
-    interface = "enp0s20u4"
-    src_addr = "\x00\xE0\x4C\x69\x0B\xA0"   # sender MAC address
+    interface = "eno1"
+    src_addr = "\x00\x1E\x37\x3A\xE0\x2E"   # sender MAC address
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
 eth_type = "\x08\x00"                       # ethernet frame type
 ETH_P_ALL = 0x0800                          # ethernet frame type
