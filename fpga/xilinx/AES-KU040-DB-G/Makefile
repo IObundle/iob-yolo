@@ -35,16 +35,11 @@ export RDI_VERBOSE = False
 all: synth_system.bit
 	#scp $(PORT) $< $(REMOTE)
 
-synth_system.bit: rmac *.xdc $(VSRC) firmware.hex boot.hex
+synth_system.bit: *.xdc $(VSRC) firmware.hex boot.hex
 	rm -f $@.log
 	vivado -nojournal -log $@.log -mode batch -source synth_system.tcl -tclargs $(USE_DDR) $(DO_LOOPBACK)
 	-grep -B4 -A10 'CLB LUTs' $@.log
 	-grep -B1 -A9 ^Slack $@.log && echo
-
-rmac:
-	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
-	ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g' | sed "s/^/#define ETH_RMAC_ADDR 0x/" >> $(ETH_DIR)/c-driver/iob-eth.h
-	ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g' | sed "s/^/\`define ETH_RMAC_ADDR 48'h/" >> $(ETH_DIR)/rtl/include/iob_eth_defs.vh
 
 firmware.hex: $(FIRM_DIR)/firmware.hex
 	cp $< .
@@ -75,6 +70,5 @@ clean:
 	make -C $(FIRM_DIR) clean --no-print-directory
 	make -C $(BOOT_DIR) clean --no-print-directory
 	@rm -rf ip
-	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
 
 .PHONY: all clean ld-hw FORCE
