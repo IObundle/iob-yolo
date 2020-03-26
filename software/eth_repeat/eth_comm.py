@@ -7,16 +7,9 @@ if len(sys.argv) != 3:
     print("<usage>: python eth_comm.py <interface> <RMAC> ")
     sys.exit()
 
-#Check type of board
-if(int(sys.argv[1]) == 1):
-    BOARD = "XILINX"
-else:
-    BOARD = "ALTERA"
-
 #Ethernet parameters
 interface = sys.argv[1]
 src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
-
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
 eth_type = "\x08\x00"                       # ethernet frame type
 ETH_P_ALL = 0x0800                          # ethernet frame type
