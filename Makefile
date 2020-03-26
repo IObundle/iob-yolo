@@ -1,7 +1,7 @@
 #configurable parameters
-TEST = eth_weights
+TEST = yolo_sw
 LOOPBACK = 0
-XILINX = 0
+XILINX = 1
 VCD = 0
 
 #directories
