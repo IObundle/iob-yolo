@@ -1,0 +1,113 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CGTFD9E5F35C7
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name TOP_LEVEL_ENTITY top_system
+set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
+
+#verilog sources
+
+#file search paths
+set_global_assignment -name SEARCH_PATH ../../../rtl/src
+set_global_assignment -name SEARCH_PATH ../../../rtl/include
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/rtl/src
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/rtl/include
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/rtl/src/memory/behav
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/fifo
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/iob-rv32
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/iob-cache/rtl/src
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/iob-cache/rtl/header
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/iob-uart/rtl/src
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-soc/submodules/iob-uart/rtl/include
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-eth/rtl/src
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-eth/rtl/include
+set_global_assignment -name SEARCH_PATH ../../../submodules/iob-timer
+
+
+#constraints file
+
+# Pin & Location Assignments
+# ==========================
+
+#System 
+set_location_assignment PIN_H19 -to clk
+set_location_assignment PIN_AN8 -to resetn
+
+set_instance_assignment -name IO_STANDARD LVDS -to clk
+set_instance_assignment -name IO_STANDARD "2.5-V" -to resetn
+
+#Leds
+#set_location_assignment  PIN_AM23 -to led
+#set_instance_assignment -name IO_STANDARD "2.5-V" -to led
+
+set_location_assignment  PIN_AE25 -to trap
+set_instance_assignment -name IO_STANDARD "2.5-V" -to trap
+set_instance_assignment -name SLEW_RATE 1 -to trap
+set_instance_assignment -name CURRENT_STRENGTH_NEW DEFAULT -to trap
+
+#Uart
+set_location_assignment PIN_F10 -to uart_txd
+set_instance_assignment -name IO_STANDARD "2.5-V" -to uart_txd
+set_instance_assignment -name SLEW_RATE 1 -to uart_txd
+set_instance_assignment -name CURRENT_STRENGTH_NEW DEFAULT -to uart_txd
+set_location_assignment PIN_C12 -to uart_rxd
+set_instance_assignment -name IO_STANDARD "2.5-V" -to uart_rxd
+
+#Ethernet
+set_location_assignment PIN_AN9 -to ENET_RESETN
+set_location_assignment PIN_AM10 -to ENET_RX_CLK
+set_location_assignment PIN_AP7 -to ENET_GTX_CLK
+set_location_assignment PIN_AK14 -to ENET_RX_D0
+set_location_assignment PIN_AL10 -to ENET_RX_D1
+set_location_assignment PIN_AJ14 -to ENET_RX_D2
+set_location_assignment PIN_AK12 -to ENET_RX_D3
+set_location_assignment PIN_AH14 -to ENET_RX_DV
+set_location_assignment PIN_AB14 -to ENET_TX_D0
+set_location_assignment PIN_AD15 -to ENET_TX_D1
+set_location_assignment PIN_AB15 -to ENET_TX_D2
+set_location_assignment PIN_AB13 -to ENET_TX_D3
+set_location_assignment PIN_AC14 -to ENET_TX_EN
+
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RESETN
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_CLK
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_GTX_CLK
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_D0
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_D1
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_D2
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_D3
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_RX_DV
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_TX_D0
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_TX_D1
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_TX_D2
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_TX_D3
+set_instance_assignment -name IO_STANDARD "2.5-V" -to ENET_TX_EN
+
+#Force registers into IOBs
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to *
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to *
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to *
+
+set_global_assignment -name LAST_QUARTUS_VERSION "18.0.0 Standard Edition"
+set_global_assignment -name VERILOG_FILE top_system.v
+set_global_assignment -name VERILOG_FILE system.v
+set_global_assignment -name VERILOG_FILE iob_generic_interconnect.v
+set_global_assignment -name VERILOG_FILE int_mem.v
+set_global_assignment -name VERILOG_FILE rom.v
+set_global_assignment -name VERILOG_FILE ram.v
+set_global_assignment -name VERILOG_FILE iob_1p_mem.v
+set_global_assignment -name VERILOG_FILE picorv32.v
+set_global_assignment -name VERILOG_FILE iob-uart.v
+set_global_assignment -name VERILOG_FILE iob_eth.v
+set_global_assignment -name VERILOG_FILE iob_eth_alt_s2p_mem.v
+set_global_assignment -name VERILOG_FILE iob_eth_rx.v
+set_global_assignment -name VERILOG_FILE iob_eth_tx.v
+set_global_assignment -name VERILOG_FILE iob_eth_crc.v
+set_global_assignment -name VERILOG_FILE iob_timer.v
+
+set_global_assignment -name SDC_FILE top_system.sdc
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+
+set_global_assignment -name QIP_FILE components/clk_buf/synthesis/clk_buf.qip
+set_global_assignment -name QIP_FILE components/ddio_out_clkbuf.qip

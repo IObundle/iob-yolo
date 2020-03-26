@@ -54,6 +54,19 @@ void define_memory_regions() {
   fp_weights = (int16_t *) WEIGTHS_BASE_ADDRESS;
 }
 
+void print_cache_status() {
+  //uart_printf("ctrl_cache_hit = %d\n", ctrl_cache_hit(CACHE_CTRL));
+  //uart_printf("ctrl_cache_miss = %d\n", ctrl_cache_miss(CACHE_CTRL));
+  //uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
+  //uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
+  //uart_printf("ctrl_data_hit = %d\n", ctrl_data_hit(CACHE_CTRL));
+  //uart_printf("ctrl_data_miss = %d\n", ctrl_data_miss(CACHE_CTRL));
+  uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
+  uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
+  uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
+  uart_printf("ctrl_data_write_miss = %d\n\n", ctrl_data_write_miss(CACHE_CTRL));
+}
+
 //receive weights and data
 void receive_data() {
 
@@ -154,7 +167,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm
 
   //perform convolution
   for(i = 0; i < num_ker; i++) {                //Number of kernels
-    uart_printf("%d\n", i);
+    //uart_printf("%d\n", i);
     for(j = 0; j < w; j++) {   	        	//Output map size
       for(k = 0; k < w; k++) {
         if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1);
@@ -165,7 +178,21 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm
 	  for(m = 0; m < ker_size; m++) {	//Kernel size
 	    for(n = 0; n < ker_size; n++) {
 	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
+
+  	      /*if(i==0 && j==0 && k==0) {
+                uart_printf("l = %d, m = %d, n = %d, addr_d = %x\n", l, m, n, &in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]);
+		print_cache_status();
+              }*/
 	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
+
+  	      /*if(i==0 && j==0 && k==0) {
+                uart_printf("l = %d, m = %d, n = %d, addr_w = %x\n", l, m, n, &w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]);
+		print_cache_status();
+              }*/
+	      
+              //op1 = j;
+              //op2 = k;
+
 	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
 	      acc += mul; //Q12.20
 	    }
@@ -176,8 +203,10 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm
 	//perform batch normalize
 	if(batch_norm) {
 	  output_conv = (int16_t) ((int32_t) (acc_final << 3) >> 16);//Q12.20 to Q9.7
+  	  //mul = (int32_t) output_conv * (int32_t) op1;//Q9.7 * Q8.8 = Q17.15
   	  mul = (int32_t) output_conv * (int32_t) bias_pos[i];//Q9.7 * Q8.8 = Q17.15
 	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
+	  //mul_16 += op2; //Q8.8
 	  mul_16 += bias_pos[num_ker+i]; //Q8.8
 
 	  //perform leaky activation
@@ -192,13 +221,17 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm
 	else {
 	  output_conv = (int16_t) ((int32_t) (acc_final << 4) >> 16);//Q12.20 to Q8.8
 	  out_d_pos[output_pos] = output_conv + bias_pos[i];
+	  //out_d_pos[output_pos] = output_conv + op2;
 	}
+
+	/*print_cache_status();
+ 	uart_printf("\n --------------------- \n");*/
 
 	//Copy last column and last row if needed
 	if(nextStride) {
-	  if(k == w-1) out_d_pos[output_pos + 1] = out_d_pos[output_pos];
-	  if(j == w-1) out_d_pos[output_pos + new_w] = out_d_pos[output_pos];
-	  if(k == w-1 && j == w-1) out_d_pos[output_pos + 1 + new_w] = out_d_pos[output_pos];
+	  if(k == w-1) out_d_pos[output_pos + 1] = mul_16;
+	  if(j == w-1) out_d_pos[output_pos + new_w] = mul_16;
+	  if(k == w-1 && j == w-1) out_d_pos[output_pos + 1 + new_w] = mul_16;
 	}
       }
     }
@@ -230,6 +263,7 @@ void maxpool_layer(int w, int num_ker, int downsample, int ignorePadding, unsign
 	for(l = 0; l < 2; l++) {		//2x2 block
  	  for(m = 0; m < 2; m++) {
 	    val = in_d_pos[i*new_w*new_w + j*new_w*(1+downsample) + k*(1+downsample) + l*new_w + m + (1 + new_w)*ignorePadding];
+	    //val = (int16_t) k;
 	    if(l == 0 && m == 0) max = val;
 	    else if(max < val) max = val;
 	  }
@@ -265,6 +299,7 @@ void yolo_layer(int w) {
       for(k = 0; k < w; k++) {
 	output_pos = i*w*w + j*w + k;
 	val_in = in_d_pos[output_pos]; //Q8.8
+	//val_in = (int16_t) output_pos;
 	if(i != 2 && i != 3 && i != 87 && i != 88 && i != 172 && i != 173) {
 
 	  //Sigmoid linear approximation
@@ -313,6 +348,7 @@ void upsample_layer(int w, int num_ker) {
   for(i = 0; i < num_ker; i++) { 		//Number of kernels
     for(j = 0; j < w; j++) {   			//Output map size
       for(k = 0; k < w; k++) {
+	//val = (int16_t) j;
 	val = in_d_pos[i*w*w + j*w + k];
 	for(l = 0; l < 2; l++) {		//2x2 block
 	  for(m = 0; m < 2; m++) {
@@ -420,19 +456,6 @@ void reset_DDR() {
   uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
-void print_cache_status() {
-  uart_printf("ctrl_cache_hit = %d\n", ctrl_cache_hit(CACHE_CTRL));
-  uart_printf("ctrl_cache_miss = %d\n", ctrl_cache_miss(CACHE_CTRL));
-  uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
-  uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
-  uart_printf("ctrl_data_hit = %d\n", ctrl_data_hit(CACHE_CTRL));
-  uart_printf("ctrl_data_miss = %d\n", ctrl_data_miss(CACHE_CTRL));
-  uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
-  uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
-  uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
-  uart_printf("ctrl_data_write_miss = %d\n", ctrl_data_write_miss(CACHE_CTRL));
-}
-
 int main(int argc, char **argv) {
 
   //init UART
@@ -450,14 +473,20 @@ int main(int argc, char **argv) {
   define_memory_regions();
   unsigned int total_time;
 
+  //print_cache_status();
+  //ctrl_counter_reset(CACHE_CTRL);
+
   //load data and reset DDR to zero
 #ifndef SIM
   receive_data();
+  //print_cache_status();
+  //ctrl_counter_reset(CACHE_CTRL);
   reset_DDR();
 #endif
 
-  //print_cache_status();
- 
+  //print_cache_status();*/
+  //ctrl_counter_reset(CACHE_CTRL);
+
   //layer1 (418x418x3 -> 416x416x16)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
@@ -465,8 +494,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
-
-  //print_cache_status();
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer2 (416x416x16 -> 210x210x16)
   timer_reset(TIMER);
@@ -475,6 +504,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer3 (210x210x16 -> 208x208x32)
   timer_reset(TIMER);
@@ -483,6 +514,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer4 (208x208x32 -> 106x106x32)
   timer_reset(TIMER);
@@ -491,6 +524,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer5 (106x106x32 -> 104x104x64)
   timer_reset(TIMER);
@@ -499,6 +534,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer6 (104x104x64 -> 54x54x64)
   timer_reset(TIMER);
@@ -507,6 +544,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer7 (54x54x64 -> 52x52x128)
   timer_reset(TIMER);
@@ -515,6 +554,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer8 (52x52x128 -> 28x28x128)
   timer_reset(TIMER);
@@ -523,6 +564,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //Initial address of layer 10 output
   unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
@@ -535,6 +578,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
   timer_reset(TIMER);
@@ -543,6 +588,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
@@ -552,6 +599,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer12 (14x14x512 -> 15x15x512)
   timer_reset(TIMER);
@@ -560,6 +609,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer13 (15x15x512 -> 13x13x1024)
   timer_reset(TIMER);
@@ -568,6 +619,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer14 (13x13x1024 -> 15x15x256)
   timer_reset(TIMER);
@@ -576,6 +629,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //Stores initial address of layer 14 output for first route layer
   unsigned int data_pos_layer14 = data_pos;
@@ -587,6 +642,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer16 (13x13x512 -> 13x13x255)
   timer_reset(TIMER);
@@ -595,6 +652,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer17 (13x13x255 -> 13x13x255)
   timer_reset(TIMER);
@@ -603,6 +662,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //Stores initial address of first yolo layer for sending
   unsigned int data_pos_layer17 = data_pos;
@@ -620,6 +681,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer20 (13x13x128 -> 28x28x128)
   timer_reset(TIMER);
@@ -628,6 +691,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer22 (28x28x128 -> 26x26x256)
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
@@ -637,6 +702,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer23 (26x26x256 -> 26x26x255)
   timer_reset(TIMER);
@@ -645,6 +712,8 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //layer24 (26x26x255 -> 26x26x255)
   timer_reset(TIMER);
@@ -653,9 +722,11 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
 
   //return data
-  uart_printf("\ntotal_time = %d minutes\n", (total_time/1000)/60);
+  uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
   send_data(data_pos_layer17, DATA_LAYER_17);
   send_data(data_pos, DATA_LAYER_24);
   uart_putc(4);

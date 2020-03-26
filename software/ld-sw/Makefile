@@ -2,6 +2,7 @@ FW_DIR = ../$(TEST)
 FW = firmware
 
 CONSOLE_DIR = ../../submodules/iob-soc/software/ld-sw
+ETH_DIR = ../../submodules/iob-eth
 
 SERIAL := /dev/ttyUSB0
 BAUD := 115200

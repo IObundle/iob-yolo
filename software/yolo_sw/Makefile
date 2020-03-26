@@ -5,6 +5,7 @@ UART_DIR = ../../submodules/iob-soc/submodules/iob-uart/c-driver
 ETH_DIR = ../../submodules/iob-eth/c-driver
 TIMER_DIR = ../../submodules/iob-timer
 CACHE_DIR = ../../submodules/iob-soc/submodules/iob-cache/c-driver
+IOB_SOC_FIRM_DIR = ../../submodules/iob-soc/software/firmware
 
 INCLUDE = -I. -I$(UART_DIR) -I$(ETH_DIR) -I$(TIMER_DIR) -I$(CACHE_DIR)
 
@@ -21,14 +22,14 @@ ifeq ($(SIM),1)
     DEFINE += -DSIM
 endif
 
-SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c
+SRC = firmware.c $(UART_DIR)/iob-uart.c $(IOB_SOC_FIRM_DIR)/firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c
 
 all: firmware.hex
 
-firmware.hex: firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h firmware.h $(CACHE_DIR)/iob-cache.h
-	$(TOOLCHAIN_PREFIX)gcc -Os -ffreestanding  -nostdlib -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
+firmware.hex: $(IOB_SOC_FIRM_DIR)/firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h firmware.h $(CACHE_DIR)/iob-cache.h
+	$(TOOLCHAIN_PREFIX)gcc -O3 -ffreestanding  -nostdlib -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,$(IOB_SOC_FIRM_DIR)/firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary firmware.elf firmware.bin
-	$(eval MEM_SIZE=`./get_firmsize.sh`)
+	$(eval MEM_SIZE=`$(IOB_SOC_FIRM_DIR)/get_firmsize.sh`)
 	$(PYTHON_DIR)/makehex.py firmware.bin $(MEM_SIZE) > progmem.hex
 	$(eval MEM_SIZE=`$(PYTHON_DIR)/get_memsize.py MAINRAM_ADDR_W`)
 	$(PYTHON_DIR)/makehex.py firmware.bin $(MEM_SIZE) > firmware.hex
