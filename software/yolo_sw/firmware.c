@@ -288,10 +288,9 @@ void yolo_layer(int w) {
   //local variables
   int i, j, k;
   unsigned int output_pos;
-  int32_t mul;
-  int16_t fp2375 = 0x260, fp003125 = 0x8, fp084375 = 0xD8, fp0125 = 0x20, fp0625 = 0xA0, fp025 = 0x40, fp05 = 0x80; //Q8.8
-  int16_t val_in, val_out, minus_one = 0xFF00; //-1 in Q8.8
-  int16_t fp5 = 0x500, fp1 = 0x100, mul_16; //Q8.8
+  int16_t fp2375 = 0x260, fp084375 = 0xD8, fp0625 = 0xA0, fp05 = 0x80; //Q8.8
+  int16_t val_in, val_out;
+  int16_t fp5 = 0x500, fp1 = 0x100; //Q8.8
 
   //perform yolo layer
   for(i = 0; i < 255; i++) {            //Number of kernels
@@ -304,23 +303,16 @@ void yolo_layer(int w) {
 
 	  //Sigmoid linear approximation
 	  if(val_in < 0.) {
-	    mul = (int32_t)val_in * (int32_t)minus_one; //Q8.8 * Q8.8 = Q16.16
-	    val_out = ((int16_t) ((int32_t)(mul << 8) >> 16)); //Q16.16 to Q8.8
+	    val_out = ~val_in + 1; //emulates multiplying by -1
 	  } else val_out = val_in;
 
 	  if(val_out >= fp5) val_out = fp1;
 	  else if(val_out >= fp2375) {
-	    mul = (int32_t)val_out * (int32_t)fp003125; //Q8.8 * Q8.8 = Q16.16
-	    mul_16 = ((int16_t) ((int32_t)(mul << 8) >> 16)); //Q16.16 to Q8.8
-	    val_out = mul_16 + fp084375;
+	    val_out = fp084375 + (val_out >> 5); //emulates multiplying by 0.03125 = 2^(-5)
 	  } else if(val_out >= fp1) {
-	    mul = (int32_t)val_out * (int32_t)fp0125; //Q8.8 * Q8.8 = Q16.16
-	    mul_16 = ((int16_t) ((int32_t)(mul << 8) >> 16)); //Q16.16 to Q8.8
-	    val_out = mul_16 + fp0625;
+	    val_out = fp0625 + (val_out >> 3); //emulates multiplying by 0.125 = 2^(-3)
 	  } else {
-	    mul = (int32_t)val_out * (int32_t)fp025; //Q8.8 * Q8.8 = Q16.16
-	    mul_16 = ((int16_t) ((int32_t)(mul << 8) >> 16)); //Q16.16 to Q8.8
-	    val_out = mul_16 + fp05;
+	    val_out = fp05 + (val_out >> 2); //emulates multiplying by 0.25 = 2^(-2); 
 	  }
 	  if(val_in > 0.) out_d_pos[output_pos] = val_out;
 	  else out_d_pos[output_pos] = fp1 - val_out;
@@ -471,6 +463,21 @@ int main(int argc, char **argv) {
 
   //define memory regions
   define_memory_regions();
+
+
+/*  int16_t arr[1024], aux_var = 0;
+  int i;
+  timer_reset(TIMER);
+  start = timer_get_count_us(TIMER);
+  for (i = 0; i < 1024; i++) arr[i] = fp_data[i];
+  end = timer_get_count_us(TIMER);
+  uart_printf("\ntime:%d us\n", (end-start));
+  print_cache_status();
+  for (i = 0; i < 1024; i++) aux_var += arr[i];
+  uart_printf("%x\n", aux_var);*/
+
+
+
   unsigned int total_time;
 
   //print_cache_status();
@@ -484,7 +491,7 @@ int main(int argc, char **argv) {
   reset_DDR();
 #endif
 
-  //print_cache_status();*/
+  //print_cache_status();
   //ctrl_counter_reset(CACHE_CTRL);
 
   //layer1 (418x418x3 -> 416x416x16)

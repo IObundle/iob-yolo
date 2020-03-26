@@ -96,7 +96,8 @@ module system (
    picorv32 #(
               .ENABLE_PCPI(1), //enables the following 2 parameters
 	      .ENABLE_FAST_MUL(1),
-	      .ENABLE_DIV(1)
+	      .ENABLE_DIV(1),
+	      .BARREL_SHIFTER(1)
 	      )
    picorv32_core (
 		  .clk           (clk),
@@ -334,6 +335,9 @@ module system (
    iob_cache #(
                .ADDR_W(`ADDR_W),
                .DATA_W(`DATA_W)
+	       //.OFFSET_W(4)
+	       //.NLINE_W(1)
+	       //.NWAY_W(3)
                )
    cache (
 
