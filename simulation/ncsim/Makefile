@@ -50,7 +50,7 @@ EFLAGS = -errormax 15 -access +wc -status
 SFLAGS = -errormax 15 -status -CMDFILE $(RTL_DIR)/testbench
 
 #simulate
-all: firmware.hex boot.hex $(VSRC)
+all: default_rmac firmware.hex boot.hex $(VSRC)
 	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" TEST=$(TEST) ./run_ncsim.sh
 
 #make firmware
@@ -66,6 +66,12 @@ boot.hex:
 	cp $(BOOT_DIR)/boot.hex .
 	$(PYTHON_DIR)/hex_split.py boot
 	cp boot.hex boot.dat
+
+#insert default RMAC for ethernet module
+default_rmac:
+	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
+	echo "#define ETH_RMAC_ADDR 0x0123456789AB" >> $(ETH_DIR)/c-driver/iob-eth.h
+	echo "\`define ETH_RMAC_ADDR 48'h0123456789AB" >> $(ETH_DIR)/rtl/include/iob_eth_defs.vh
 
 clean:
 	@rm -f *# *~ *.vcd *.dat *.hex firmware.bin xmsim.key *.log

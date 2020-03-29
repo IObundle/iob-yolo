@@ -27,7 +27,7 @@ all:
 	@echo "ld-eth -> communicate through FPGA via Ethernet"
 	@echo "clean  -> clean repo"
 
-sim: rmac
+sim: 
 	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
 
 fpga: rmac
