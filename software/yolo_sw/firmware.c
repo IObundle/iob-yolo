@@ -54,9 +54,10 @@ void define_memory_regions() {
   fp_weights = (int16_t *) WEIGTHS_BASE_ADDRESS;
 }
 
+//check number of cache hits and misses
 void print_cache_status() {
-  //uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
-  //uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
+  uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
+  uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
   uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
   uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
   uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
@@ -69,9 +70,9 @@ void receive_data() {
   uart_printf("\nReady to receive input.network and weights\n");
 
   //char file pointers
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS;
-  char * fp_weights_char = (char *) WEIGTHS_BASE_ADDRESS;
-  int i, j;
+  uint16_t * fp_data_aux = (uint16_t *) DATA_BASE_ADDRESS;
+  uint16_t * fp_weights_aux = (uint16_t *) WEIGTHS_BASE_ADDRESS;
+  int i, j, k;
 
   //Loop to receive input.network frames
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
@@ -91,9 +92,10 @@ void receive_data() {
      else bytes_to_receive = ETH_NBYTES;
 
      //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) {
-       fp_data_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     for(k = 0, i = 0; i < bytes_to_receive; i+=2, k++) {
+       fp_data_aux[j*(ETH_NBYTES/2) + k] = (uint16_t) (data_rcv[14+i+1] << 8 | data_rcv[14+i]);
        data_to_send[i] = data_rcv[14+i];
+       data_to_send[i+1] = data_rcv[14+i+1];
      }
 
      //send data back as ack
@@ -125,9 +127,10 @@ void receive_data() {
      else bytes_to_receive = ETH_NBYTES;
 
      //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) {
-       fp_weights_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     for(i = 0, k = 0; i < bytes_to_receive; i+=2, k++) {
+       fp_weights_aux[j*(ETH_NBYTES/2) + k] = (uint16_t) (data_rcv[14+i+1] << 8 | data_rcv[14+i]);
        data_to_send[i] = data_rcv[14+i];
+       data_to_send[i+1] = data_rcv[14+i+1];
      }
 
      //send data back as ack
@@ -858,7 +861,7 @@ void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
 
   //char file pointers
   unsigned int pos = 2*data_pos_yolo;
-  char * fp_data_char = (char *) (DATA_BASE_ADDRESS + pos) ;
+  char * fp_data_aux = (char *) (DATA_BASE_ADDRESS + pos) ;
   int i, j;
 
   //layer parameters
@@ -880,7 +883,7 @@ void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
+     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_aux[j*ETH_NBYTES + i];
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
