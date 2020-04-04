@@ -1,5 +1,5 @@
 #configurable parameters
-TEST = yolo_sw
+TEST = yolo_sw_full
 LOOPBACK = 0
 XILINX = 1
 VCD = 0
@@ -27,7 +27,7 @@ all:
 	@echo "ld-eth -> communicate through FPGA via Ethernet"
 	@echo "clean  -> clean repo"
 
-sim: rmac
+sim: 
 	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
 
 fpga: rmac
