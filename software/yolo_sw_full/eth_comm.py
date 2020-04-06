@@ -2,7 +2,7 @@
 from socket import socket, AF_PACKET, SOCK_RAW, htons
 from os.path import getsize
 import sys
-from definitions import IMAGE_INPUT, DATA_LAYER_17, DATA_LAYER_24, NTW_IN_NUM_KER, NETWORK_INPUT, NTW_IN_W, NEW_H, EXTRA_H
+from definitions import *
 
 #Check if argument identifying type of board is present
 if len(sys.argv) != 3:
@@ -120,13 +120,7 @@ count_bytes = 0
 count_errors = 0
 print("\nStarting interm data transmission...")
 
-#Frame parameters
-interm_data_size = 51*416*2
-num_frames_interm_data = int(interm_data_size/eth_nbytes)
-print("interm_data_size: %d" % interm_data_size)     
-print("num_frames_interm_data: %d" % (num_frames_interm_data+1))
-
-def interm_data():
+def interm_data(num_frames_interm_data, interm_data_size):
     
     count_bytes = 0
     count_errors = 0
@@ -156,17 +150,52 @@ def interm_data():
                 count_errors += 1
     return count_errors
 
-# Loop to send interm data frames
+#Initial position
 pos = NETWORK_INPUT
-f_all_data.seek(pos)
+   
+#Send layer 1 intermediate data
+layer1_int_size = NTW_IN_W*2
+num_frames_layer1 = int(layer1_int_size/eth_nbytes)
+print("layer1_int_size: %d" % layer1_int_size)     
+print("num_frames_layer1: %d" % (num_frames_layer1+1))
 for k in range(NTW_IN_NUM_KER):
-    count_errors += interm_data()
-    pos += (NTW_IN_W*(NEW_H+2+EXTRA_H-1))*2
+    pos += (NTW_IN_W*(EXTRA_H-2))*2
     f_all_data.seek(pos)
-    count_errors += interm_data()
+    count_errors += interm_data(num_frames_layer1, layer1_int_size)
+    pos += (NTW_IN_W*(NEW_H+2+1))*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer1, layer1_int_size)
     pos += (NTW_IN_W*(EXTRA_H-1))*2
-    f_all_data.seek(pos)
+print("layer 1 interm data transmitted with %d errors...\n" %(count_errors))
 
+#Send layer 2 intermediate data
+layer2_int_size = (LAYER_3_W+2)*2*2
+num_frames_layer2 = int(layer2_int_size/eth_nbytes)
+print("layer2_int_size: %d" % layer2_int_size)     
+print("num_frames_layer2: %d" % (num_frames_layer2+1))
+for k in range(LAYER_2_NUM_KER):
+    pos += (LAYER_3_W+2)*(EXTRA_H/2-2)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer2, layer2_int_size)
+    pos += (LAYER_3_W+2)*160*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer2, layer2_int_size)
+    pos += (LAYER_3_W+2)*(EXTRA_H/2)*2
+print("layer 2 interm data transmitted with %d errors...\n" %(count_errors))
+
+#Send layer 3 intermediate data
+layer3_int_size = LAYER_3_W*24*2
+num_frames_layer3 = int(layer3_int_size/eth_nbytes)
+print("layer3_int_size: %d" % layer3_int_size)     
+print("num_frames_layer3: %d" % (num_frames_layer3+1))
+for k in range(LAYER_3_NUM_KER):
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer3, layer3_int_size)
+    pos += LAYER_3_W*(24+160)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer3, layer3_int_size)
+    pos += LAYER_3_W*24*2
+print("layer 3 interm data transmitted with %d errors...\n" %(count_errors))
 print("interm data transmitted with %d errors..." %(count_errors))
 
 ################################# RECEIVE YOLO LAYERS ##############################################
