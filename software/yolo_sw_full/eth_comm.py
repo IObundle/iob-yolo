@@ -200,18 +200,48 @@ for k in range(LAYER_4_NUM_KER):
 print("layer 4 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 5 intermediate data
-layer5_int_size = LAYER_5_W*11*2
+layer5_int_size = LAYER_5_W*2
 num_frames_layer5 = int(layer5_int_size/eth_nbytes)
 print("layer5_int_size: %d" % layer5_int_size)     
 print("num_frames_layer5: %d" % (num_frames_layer5+1))
 for k in range(LAYER_5_NUM_KER):
+    pos += LAYER_5_W*10*2
     f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer5, layer5_int_size)
-    pos += LAYER_5_W*(11+82)*2
+    pos += LAYER_5_W*(1+82)*2
     f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer5, layer5_int_size)
     pos += LAYER_5_W*11*2
 print("layer 5 interm data transmitted with %d errors...\n" %(count_errors))
+
+#Send layer 6 intermediate data
+layer6_int_size = (LAYER_7_W+2)*2*2 
+num_frames_layer6 = int(layer6_int_size/eth_nbytes)
+print("layer6_int_size: %d" % layer6_int_size)     
+print("num_frames_layer6: %d" % (num_frames_layer6+1))
+for k in range(LAYER_6_NUM_KER):
+    pos += (LAYER_7_W+2)*4*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer6, layer6_int_size)
+    pos += (LAYER_7_W+2)*(2+42)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer6, layer6_int_size)
+    pos += (LAYER_7_W+2)*6*2
+print("layer 6 interm data transmitted with %d errors...\n" %(count_errors))
+
+#Send layer 7 intermediate data
+layer7_int_size = LAYER_7_W*4*2 
+num_frames_layer7 = int(layer7_int_size/eth_nbytes)
+print("layer7_int_size: %d" % layer7_int_size)     
+print("num_frames_layer7: %d" % (num_frames_layer7+1))
+for k in range(LAYER_7_NUM_KER):
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer7, layer7_int_size)
+    pos += LAYER_7_W*(4+44)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer7, layer7_int_size)
+    pos += LAYER_7_W*4*2
+print("layer 7 interm data transmitted with %d errors...\n" %(count_errors))
 
 print("interm data transmitted with %d errors..." %(count_errors))
 
