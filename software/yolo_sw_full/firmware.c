@@ -33,9 +33,11 @@
 #define NUM_INTERM_LAYER1_FRAMES (INTERM_LAYER1_SIZE/ETH_NBYTES)
 #define INTERM_LAYER2_SIZE ((LAYER_3_W+2)*2*2) //16 bits per input
 #define NUM_INTERM_LAYER2_FRAMES (INTERM_LAYER2_SIZE/ETH_NBYTES)
+#define INTERM_LAYER4_SIZE ((LAYER_5_W+2)*2*2) //16 bits per input
+#define NUM_INTERM_LAYER4_FRAMES (INTERM_LAYER4_SIZE/ETH_NBYTES)
 
-#define INTERM_LAYER3_SIZE (LAYER_3_W*24*2) //16 bits per input
-#define NUM_INTERM_LAYER3_FRAMES (INTERM_LAYER3_SIZE/ETH_NBYTES)
+#define INTERM_LAYER5_SIZE (LAYER_5_W*11*2) //16 bits per input
+#define NUM_INTERM_LAYER5_FRAMES (INTERM_LAYER5_SIZE/ETH_NBYTES)
 
 //weights and data base address pointers
 int16_t *fp_weights;
@@ -205,12 +207,21 @@ void receive_data() {
     pos += (LAYER_3_W+2)*2;
   }
 
+  //loop to receive intermediate layer 4 data
+  pos += DATA_LAYER_3;
+  for(i = 0; i < LAYER_4_NUM_KER; i++) {
+    interm_data(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE); //1st line
+    pos += (LAYER_5_W+2)*(2+80);
+    interm_data(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE); //2nd line
+    pos += (LAYER_5_W+2)*2; 
+  }
+
   //loop to receive intermediate layer 3 data
-  for(i = 0; i < LAYER_3_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER3_FRAMES, INTERM_LAYER3_SIZE); //1st line
-    pos += LAYER_3_W*(24+160);
-    interm_data(pos, NUM_INTERM_LAYER3_FRAMES, INTERM_LAYER3_SIZE); //2nd line
-    pos += LAYER_3_W*24;
+  for(i = 0; i < LAYER_5_NUM_KER; i++) {
+    interm_data(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE); //1st line
+    pos += LAYER_5_W*(11+82);
+    interm_data(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE); //2nd line
+    pos += LAYER_5_W*11;
   }
 
   //measure transference time
@@ -536,7 +547,7 @@ void conv_layer(int w, int h, int c, int num_ker, int ker_size, int pad, int bat
 }
 
 //perform maxpool layer
-void maxpool_layer(int w, int h, int num_ker, int downsample, int ignorePadding, unsigned int new_output_pos, unsigned int h_out) {
+void maxpool_layer(int w, int h, int num_ker, int downsample, int ignorePadding, unsigned int new_output_pos, unsigned int h_out, unsigned int offset) {
 
   //locate data pointers
   unsigned int new_h, out_offset, output_w = (w/(1+downsample))+2, new_h_output;
@@ -546,7 +557,7 @@ void maxpool_layer(int w, int h, int num_ker, int downsample, int ignorePadding,
     new_h_output = output_w;
   } else { 
     new_h = h;
-    out_offset = 1;
+    out_offset = offset;
     new_h_output = h_out;
   }
   int16_t * in_d_pos = (int16_t *) fp_data + data_pos;
@@ -738,7 +749,7 @@ int main(int argc, char **argv) {
   //layer2 (416x416x16 -> 210x210x16)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_2_W, NEW_H+4, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0, 162);
+  maxpool_layer(LAYER_2_W, NEW_H+4, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0, 162, 1);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -748,7 +759,7 @@ int main(int argc, char **argv) {
   //layer3 (210x210x16 -> 208x208x32)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer(LAYER_3_W, 160, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0, 24, LAYER_3_W);
+  conv_layer(LAYER_3_W, 160, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0, 0, 160);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -758,7 +769,7 @@ int main(int argc, char **argv) {
   //layer4 (208x208x32 -> 106x106x32)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_4_W, LAYER_4_W, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0, 0);
+  maxpool_layer(LAYER_4_W, 160, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0, 84, 1);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -768,7 +779,7 @@ int main(int argc, char **argv) {
   //layer5 (106x106x32 -> 104x104x64)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer(LAYER_5_W, LAYER_5_W, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0, 0, 0);
+  conv_layer(LAYER_5_W, 82, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0, 11, 104);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -778,7 +789,7 @@ int main(int argc, char **argv) {
   //layer6 (104x104x64 -> 54x54x64)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_6_W, LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0, 0);
+  maxpool_layer(LAYER_6_W, LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0, 0, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -798,7 +809,7 @@ int main(int argc, char **argv) {
   //layer8 (52x52x128 -> 28x28x128)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_8_W, LAYER_8_W, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0, 0);
+  maxpool_layer(LAYER_8_W, LAYER_8_W, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0, 0, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -822,7 +833,7 @@ int main(int argc, char **argv) {
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_10_W, LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8, 0);
+  maxpool_layer(LAYER_10_W, LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8, 0, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -843,7 +854,7 @@ int main(int argc, char **argv) {
   //layer12 (14x14x512 -> 15x15x512)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_12_W, LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0, 0);
+  maxpool_layer(LAYER_12_W, LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0, 0, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;

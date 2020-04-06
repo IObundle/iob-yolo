@@ -183,19 +183,36 @@ for k in range(LAYER_2_NUM_KER):
     pos += (LAYER_3_W+2)*(EXTRA_H/2)*2
 print("layer 2 interm data transmitted with %d errors...\n" %(count_errors))
 
-#Send layer 3 intermediate data
-layer3_int_size = LAYER_3_W*24*2
-num_frames_layer3 = int(layer3_int_size/eth_nbytes)
-print("layer3_int_size: %d" % layer3_int_size)     
-print("num_frames_layer3: %d" % (num_frames_layer3+1))
-for k in range(LAYER_3_NUM_KER):
+#Send layer 4 intermediate data
+pos += DATA_LAYER_3
+layer4_int_size = (LAYER_5_W+2)*2*2
+num_frames_layer4 = int(layer4_int_size/eth_nbytes)
+print("layer4_int_size: %d" % layer4_int_size)     
+print("num_frames_layer4: %d" % (num_frames_layer4+1))
+for k in range(LAYER_4_NUM_KER):
+    pos += (11*(LAYER_5_W+2)*2)
     f_all_data.seek(pos)
-    count_errors += interm_data(num_frames_layer3, layer3_int_size)
-    pos += LAYER_3_W*(24+160)*2
+    count_errors += interm_data(num_frames_layer4, layer4_int_size)
+    pos += (LAYER_5_W+2)*(2+80)*2
     f_all_data.seek(pos)
-    count_errors += interm_data(num_frames_layer3, layer3_int_size)
-    pos += LAYER_3_W*24*2
-print("layer 3 interm data transmitted with %d errors...\n" %(count_errors))
+    count_errors += interm_data(num_frames_layer4, layer4_int_size)
+    pos += (LAYER_5_W+2)*13*2
+print("layer 4 interm data transmitted with %d errors...\n" %(count_errors))
+
+#Send layer 5 intermediate data
+layer5_int_size = LAYER_5_W*11*2
+num_frames_layer5 = int(layer5_int_size/eth_nbytes)
+print("layer5_int_size: %d" % layer5_int_size)     
+print("num_frames_layer5: %d" % (num_frames_layer5+1))
+for k in range(LAYER_5_NUM_KER):
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer5, layer5_int_size)
+    pos += LAYER_5_W*(11+82)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer5, layer5_int_size)
+    pos += LAYER_5_W*11*2
+print("layer 5 interm data transmitted with %d errors...\n" %(count_errors))
+
 print("interm data transmitted with %d errors..." %(count_errors))
 
 ################################# RECEIVE YOLO LAYERS ##############################################
