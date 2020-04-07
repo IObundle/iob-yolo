@@ -14,7 +14,7 @@
 //Input network
 #define NTW_IN_W NEW_W
 #define NTW_IN_H (NEW_H+2)
-#define NTW_IN_C 3
+#define NTW_IN_C IMG_C
 #define NTW_IN_NUM_KER 16
 #define NTW_IN_KER_SIZE 3
 #define NTW_IN_PAD 1

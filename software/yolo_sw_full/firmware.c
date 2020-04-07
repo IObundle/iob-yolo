@@ -83,21 +83,29 @@ void print_cache_status() {
   uart_printf("ctrl_data_write_miss = %d\n\n", ctrl_data_write_miss(CACHE_CTRL));
 }
 
-void interm_data(unsigned int pos, unsigned int NUM_INTERM_DATA_FRAMES, unsigned int INTERM_DATA_SIZE) {
+void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, int interm_flag, char * data_p) {
 
   //Local variables
   int i, j;
-  char * fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + 2*NETWORK_INPUT + 2*pos);
+  char * fp_data_char;
+  if(interm_flag) fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + 2*NETWORK_INPUT + 2*pos);
+  else fp_data_char = (char *) data_p;
   count_bytes = 0;
 
   //Loop to receive intermediate data frames
-  for(j = 0; j < NUM_INTERM_DATA_FRAMES+1; j++) {
+  for(j = 0; j < NUM_DATA_FRAMES+1; j++) {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
+     // start timer
+     if(interm_flag == 0 && j == 0) {
+       timer_reset(TIMER);
+       start = timer_get_count_us(TIMER);
+     }   
+
      //check if it is last packet (has less data that full payload size)
-     if(j == NUM_INTERM_DATA_FRAMES) bytes_to_receive = INTERM_DATA_SIZE - count_bytes;
+     if(j == NUM_DATA_FRAMES) bytes_to_receive = DATA_SIZE - count_bytes;
      else bytes_to_receive = ETH_NBYTES;
 
      //save in DDR
@@ -119,130 +127,69 @@ void receive_data() {
 
   uart_printf("\nReady to receive input image and weights\n");
 
-  //char file pointers
-  char * fp_weights_char = (char *) WEIGTHS_BASE_ADDRESS;
-  int i, j;
-
-  //Loop to receive input.network frames
-  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
-
-     //wait to receive frame
-     while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
-
-     // start timer
-     if(j == 0) {
-       count_bytes = 0;
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
-     }
-
-     //check if it is last packet (has less data that full payload size)
-     if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
-     else bytes_to_receive = ETH_NBYTES;
-
-     //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) {
-       fp_image[j*ETH_NBYTES + i] = data_rcv[14+i];
-       data_to_send[i] = data_rcv[14+i];
-     }
-
-     //send data back as ack
-     eth_send_frame(data_to_send, ETH_NBYTES);
-
-     //update byte counter
-     count_bytes += ETH_NBYTES;
-  }
-
-  //measure transference time
+  //Receive input image
+  rcv_frame(0, NUM_INPUT_FRAMES, INPUT_FILE_SIZE, 0, fp_image);
   end = timer_get_count_us(TIMER);
   uart_printf("image transferred in %d ms\n", (end-start)/1000);
-
-  //Loop to receive weight frames
-  for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
-
-     //wait to receive frame
-     while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
-
-     // start timer
-     if(j == 0) {
-       count_bytes = 0;
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
-     }
-
-     //check if it is last packet (has less data that full payload size)
-     if(j == NUM_WEIGHT_FRAMES) bytes_to_receive = WEIGHTS_FILE_SIZE - count_bytes;
-     else bytes_to_receive = ETH_NBYTES;
-
-     //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) {
-       fp_weights_char[j*ETH_NBYTES + i] = data_rcv[14+i];
-       data_to_send[i] = data_rcv[14+i];
-     }
-
-     //send data back as ack
-     eth_send_frame(data_to_send, ETH_NBYTES);
-
-     //update byte counter
-     count_bytes += ETH_NBYTES;
-  }
-
-  //measure transference time
+  
+  //Receive weights
+  char * fp_weights_char = (char *) WEIGTHS_BASE_ADDRESS;
+  rcv_frame(0, NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, 0, fp_weights_char);
   end = timer_get_count_us(TIMER);
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 
   //restart timer
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  unsigned int pos = 0;
+  unsigned int pos = 0, i;
 
   //loop to receive intermediate layer 1 data
   for(i = 0; i < NTW_IN_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE); //1st line
-    pos += (NTW_IN_W*(NEW_H+2+1));
-    interm_data(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0); //1st line
+    pos += (NTW_IN_W*(NTW_IN_H+1));
+    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0); //2nd line
     pos += NTW_IN_W;
   }
 
   //loop to receive intermediate layer 2 data
   for(i = 0; i < LAYER_2_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE); //1st line
-    pos += (LAYER_3_W+2)*160;
-    interm_data(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0); //1st line
+    pos += (LAYER_3_W+2)*LAYER_3_H;
+    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0); //2nd line
     pos += (LAYER_3_W+2)*2;
   }
 
   //loop to receive intermediate layer 4 data
   pos += DATA_LAYER_3;
   for(i = 0; i < LAYER_4_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE); //1st line
-    pos += (LAYER_5_W+2)*(2+80);
-    interm_data(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0); //1st line
+    pos += (LAYER_5_W+2)*LAYER_5_H;
+    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0); //2nd line
     pos += (LAYER_5_W+2)*2; 
   }
 
   //loop to receive intermediate layer 5 data
   for(i = 0; i < LAYER_5_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE); //1st line
-    pos += LAYER_5_W*(1+82);
-    interm_data(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0); //1st line
+    pos += LAYER_5_W*(1+LAYER_5_H);
+    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0); //2nd line
     pos += LAYER_5_W;
   }
 
   //loop to receive intermediate layer 6 data
   for(i = 0; i < LAYER_6_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE); //1st line
-    pos += (LAYER_7_W+2)*(2+42);
-    interm_data(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0); //1st line
+    pos += (LAYER_7_W+2)*LAYER_7_H;
+    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0); //2nd line
     pos += (LAYER_7_W+2)*2;
   }
 
   //loop to receive intermediate layer 8 data
   pos += DATA_LAYER_7;
   for(i = 0; i < LAYER_8_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE); //1st line
-    pos += (LAYER_9_W+2)*(2+22);
-    interm_data(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0); //1st line
+    pos += (LAYER_9_W+2)*LAYER_9_H;
+    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0); //2nd line
     pos += (LAYER_9_W+2)*2;
   }
 
@@ -250,9 +197,9 @@ void receive_data() {
   pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
   for(i = 0; i < LAYER_9_NUM_KER; i++) {
     pos += LAYER_9_W+2;
-    interm_data(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE); //1st line
-    pos += (LAYER_9_W+2)*(1+24);
-    interm_data(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0); //1st line
+    pos += (LAYER_9_W+2)*(1+LAYER_9_H);
+    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0); //2nd line
     pos += (LAYER_9_W+2)*2;
   }
 
@@ -322,12 +269,12 @@ void fill_grey() {
   uart_printf("\nFilling part of 416x416 region with grey\n");
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  for(i = 0; i < IMG_C; i++) {
+  for(i = 0; i < NTW_IN_C; i++) {
     for(j = 0; j < 2; j++) {
-      for(k = 0; k < NEW_W; k++) {
-	fp_data[i*(NEW_W+2)*(NEW_H+4) + j*(NEW_W+2) + (k+1)] = 0x0080; //1st region
-	fp_data[i*(NEW_W+2)*(NEW_H+4) + j*(NEW_W+2) + (k+1) + ((NEW_W+2)*(2+NEW_H))] = 0x0080; //2nd region
-      }
+      for(k = 0; k < NTW_IN_W; k++) {
+	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + j*(NTW_IN_W+2) + (k+1)] = 0x0080; //1st region
+	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + j*(NTW_IN_W+2) + (k+1) + ((NTW_IN_W+2)*NTW_IN_H)] = 0x0080; //2nd region
+      }   
     }
   }
   end = timer_get_count_us(TIMER);
@@ -348,12 +295,12 @@ void resize_image() {
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
 			
-  for(k = 0; k < IMG_C; k++) { 					// 3
-    for(c = 0; c < NEW_W; c++) {				// 416
+  for(k = 0; k < NTW_IN_C; k++) { 			// 3
+    for(c = 0; c < NTW_IN_W; c++) {			// 416
       new_r = 1;
 			
       //Width index calculation
-      if(c == NEW_W-1) val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + (IMG_W-1)]); //Q0.8 to Q0.12
+      if(c == NTW_IN_W-1) val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + (IMG_W-1)]); //Q0.8 to Q0.12
       else {
       	sx = (uint32_t)((uint32_t)c*w_scale); //9.0 * Q1.22 = Q10.22			
 	ix = (sx >> 22);
@@ -366,7 +313,7 @@ void resize_image() {
       for(r = 0; r < NEW_H; r++) {			// 312
 
         //Width reduction (to 416)	
-	if(c == NEW_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
+	if(c == NTW_IN_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
 	else {
 	  mul = (uint32_t)((uint32_t)((1<<22)- dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + ix])); //Q0.22 * Q0.8 = Q0.30
 	  mul += (uint32_t)((uint32_t)(dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (ix+1)])); //Q0.30
@@ -383,7 +330,7 @@ void resize_image() {
 	  if( (iy+1) != new_r) {
 	    new_r++;
 	    val_w = next_val_w;					
-	    if(c == NEW_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
+	    if(c == NTW_IN_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
 	    else {
 	      mul = (uint32_t)((uint32_t)((1<<22)- dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + ix])); //Q0.22 * Q0.8 = Q0.30
 	      mul += (uint32_t)((uint32_t)(dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (ix+1)])); //Q0.30
@@ -398,7 +345,7 @@ void resize_image() {
 	} else val_h = (next_val_w >> 4); //Q0.12 to Q8.8
 				
 	//Save new value
-	fp_data[k*(NEW_W+2)*(NEW_H+4) + r*(NEW_W+2) + (c+1) + ((NEW_W+2)*2)] = val_h;
+	fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + r*(NTW_IN_W+2) + (c+1) + ((NTW_IN_W+2)*2)] = val_h;
 				
 	//Update variables
 	new_r++;
