@@ -229,20 +229,37 @@ for k in range(LAYER_6_NUM_KER):
     pos += (LAYER_7_W+2)*6*2
 print("layer 6 interm data transmitted with %d errors...\n" %(count_errors))
 
-#Send layer 7 intermediate data
-layer7_int_size = LAYER_7_W*4*2 
-num_frames_layer7 = int(layer7_int_size/eth_nbytes)
-print("layer7_int_size: %d" % layer7_int_size)     
-print("num_frames_layer7: %d" % (num_frames_layer7+1))
-for k in range(LAYER_7_NUM_KER):
+#Send layer 8 intermediate data
+pos += DATA_LAYER_7
+layer8_int_size = (LAYER_9_W+2)*2*2 
+num_frames_layer8 = int(layer8_int_size/eth_nbytes)
+print("layer8_int_size: %d" % layer8_int_size)     
+print("num_frames_layer8: %d" % (num_frames_layer8+1))
+for k in range(LAYER_8_NUM_KER):
+    pos += (LAYER_9_W+2)*2
     f_all_data.seek(pos)
-    count_errors += interm_data(num_frames_layer7, layer7_int_size)
-    pos += LAYER_7_W*(4+44)*2
+    count_errors += interm_data(num_frames_layer8, layer8_int_size)
+    pos += (LAYER_9_W+2)*(2+22)*2
     f_all_data.seek(pos)
-    count_errors += interm_data(num_frames_layer7, layer7_int_size)
-    pos += LAYER_7_W*4*2
-print("layer 7 interm data transmitted with %d errors...\n" %(count_errors))
+    count_errors += interm_data(num_frames_layer8, layer8_int_size)
+    pos += (LAYER_9_W+2)*3*2
+print("layer 8 interm data transmitted with %d errors...\n" %(count_errors))
 
+#Send layer 9 intermediate data
+pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20
+layer9_int_size = (LAYER_9_W+2)*2 
+num_frames_layer9 = int(layer9_int_size/eth_nbytes)
+print("layer9_int_size: %d" % layer9_int_size)     
+print("num_frames_layer9: %d" % (num_frames_layer9+1))
+for k in range(LAYER_9_NUM_KER):
+    pos += (LAYER_9_W+2)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer9, layer9_int_size)
+    pos += (LAYER_9_W+2)*(1+24)*2
+    f_all_data.seek(pos)
+    count_errors += interm_data(num_frames_layer9, layer9_int_size)
+    pos += (LAYER_9_W+2)*2*2
+print("layer 9 interm data transmitted with %d errors..." %(count_errors))
 print("interm data transmitted with %d errors..." %(count_errors))
 
 ################################# RECEIVE YOLO LAYERS ##############################################

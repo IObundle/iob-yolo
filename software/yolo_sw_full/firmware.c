@@ -39,9 +39,10 @@
 #define NUM_INTERM_LAYER5_FRAMES (INTERM_LAYER5_SIZE/ETH_NBYTES)
 #define INTERM_LAYER6_SIZE ((LAYER_7_W+2)*2*2) //16 bits per input
 #define NUM_INTERM_LAYER6_FRAMES (INTERM_LAYER6_SIZE/ETH_NBYTES)
-
-#define INTERM_LAYER7_SIZE (LAYER_7_W*4*2) //16 bits per input
-#define NUM_INTERM_LAYER7_FRAMES (INTERM_LAYER7_SIZE/ETH_NBYTES)
+#define INTERM_LAYER8_SIZE ((LAYER_9_W+2)*2*2) //16 bits per input
+#define NUM_INTERM_LAYER8_FRAMES (INTERM_LAYER8_SIZE/ETH_NBYTES)
+#define INTERM_LAYER9_SIZE ((LAYER_9_W+2)*2) //16 bits per input
+#define NUM_INTERM_LAYER9_FRAMES (INTERM_LAYER9_SIZE/ETH_NBYTES)
 
 //weights and data base address pointers
 int16_t *fp_weights;
@@ -236,12 +237,23 @@ void receive_data() {
     pos += (LAYER_7_W+2)*2;
   }
 
-  //loop to receive intermediate layer 7 data
-  for(i = 0; i < LAYER_7_NUM_KER; i++) {
-    interm_data(pos, NUM_INTERM_LAYER7_FRAMES, INTERM_LAYER7_SIZE); //1st line
-    pos += LAYER_7_W*(4+44);
-    interm_data(pos, NUM_INTERM_LAYER7_FRAMES, INTERM_LAYER7_SIZE); //2nd line
-    pos += LAYER_7_W*4;
+  //loop to receive intermediate layer 8 data
+  pos += DATA_LAYER_7;
+  for(i = 0; i < LAYER_8_NUM_KER; i++) {
+    interm_data(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE); //1st line
+    pos += (LAYER_9_W+2)*(2+22);
+    interm_data(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE); //2nd line
+    pos += (LAYER_9_W+2)*2;
+  }
+
+  //loop to receive intermediate layer 9 data
+  pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
+  for(i = 0; i < LAYER_9_NUM_KER; i++) {
+    pos += LAYER_9_W+2;
+    interm_data(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE); //1st line
+    pos += (LAYER_9_W+2)*(1+24);
+    interm_data(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE); //2nd line
+    pos += (LAYER_9_W+2)*2;
   }
 
   //measure transference time
@@ -439,10 +451,10 @@ void conv_layer(int w, int h, int c, int num_ker, int ker_size, int pad, int bat
     for(j = 0; j < h; j++) {   	        	//Output map size
       for(k = 0; k < w; k++) {
         if(nextPadding) {
-	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos2 = (i+1)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos3 = (i+2)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos4 = (i+3)*new_w*new_w + (j+1)*new_w + (k+1);
+	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
+	  output_pos2 = (i+1)*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
+	  output_pos3 = (i+2)*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
+	  output_pos4 = (i+3)*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
 	} else { 
 	  output_pos = i*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 	  output_pos2 = (i+1)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
@@ -819,7 +831,7 @@ int main(int argc, char **argv) {
   //layer7 (54x54x64 -> 52x52x128)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer(LAYER_7_W, 44, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, 4, 52);
+  conv_layer(LAYER_7_W, 44, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, 0, 44);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -829,7 +841,7 @@ int main(int argc, char **argv) {
   //layer8 (52x52x128 -> 28x28x128)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  maxpool_layer(LAYER_8_W, LAYER_8_W, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0, 0, 0);
+  maxpool_layer(LAYER_8_W, 44, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0, 26, 1);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -843,7 +855,7 @@ int main(int argc, char **argv) {
   //Result of layer 9 goes after result of layer 20
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer(LAYER_9_W, LAYER_9_W, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20, 0, 0);
+  conv_layer(LAYER_9_W, 24, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20, 1, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
