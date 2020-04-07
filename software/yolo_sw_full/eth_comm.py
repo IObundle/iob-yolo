@@ -2,7 +2,7 @@
 from socket import socket, AF_PACKET, SOCK_RAW, htons
 from os.path import getsize
 import sys
-from definitions import *
+import definitions
 
 #Check if argument identifying type of board is present
 if len(sys.argv) != 3:
@@ -20,13 +20,13 @@ ETH_P_ALL = 0x0800
 input_ntw_filename = "../dog.bin"
 weights_filename = "../yolov3-tiny_batch-fixed.weights"
 output_ntw_filename = '../output_fixed_full.network'
-all_data_filename = '../all_data_fixed_full.network'
+interm_data_filename = '../interm_data.network'
 f_in = open(input_ntw_filename, 'rb')
 f_in.read(12) #ignore image size info (3 int values)
 f_weights = open(weights_filename, 'rb')
-f_all_data = open(all_data_filename, 'rb')
+f_interm_data = open(interm_data_filename, 'rb')
 f_out = open(output_ntw_filename, "rb")
-input_ntw_file_size = IMAGE_INPUT
+input_ntw_file_size = definitions.IMAGE_INPUT
 weights_file_size = getsize(weights_filename)
 
 #Frame parameters
@@ -135,7 +135,7 @@ def interm_data(num_frames_interm_data, interm_data_size):
             padding = ''
     
         #form frame
-        payload = f_all_data.read(bytes_to_send)
+        payload = f_interm_data.read(bytes_to_send)
             
         # accumulate sent bytes
         count_bytes += eth_nbytes
@@ -149,116 +149,75 @@ def interm_data(num_frames_interm_data, interm_data_size):
             if sent_byte != rcv_byte:
                 count_errors += 1
     return count_errors
-
-#Initial position
-pos = NETWORK_INPUT
    
 #Send layer 1 intermediate data
-layer1_int_size = NTW_IN_W*2
+layer1_int_size = definitions.NTW_IN_W*2
 num_frames_layer1 = int(layer1_int_size/eth_nbytes)
-print("layer1_int_size: %d" % layer1_int_size)     
-print("num_frames_layer1: %d" % (num_frames_layer1+1))
-for k in range(NTW_IN_NUM_KER):
-    pos += (NTW_IN_W*(EXTRA_H-2))*2
-    f_all_data.seek(pos)
+print("layer1_int_size: %d (x%d)" % (layer1_int_size, definitions.NTW_IN_NUM_KER*2))    
+print("num_frames_layer1: %d (x%d)" % (num_frames_layer1+1, definitions.NTW_IN_NUM_KER*2))
+for k in range(definitions.NTW_IN_NUM_KER):
     count_errors += interm_data(num_frames_layer1, layer1_int_size)
-    pos += (NTW_IN_W*(NEW_H+2+1))*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer1, layer1_int_size)
-    pos += (NTW_IN_W*(EXTRA_H-1))*2
 print("layer 1 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 2 intermediate data
-layer2_int_size = (LAYER_3_W+2)*2*2
+layer2_int_size = (definitions.LAYER_3_W+2)*2*2
 num_frames_layer2 = int(layer2_int_size/eth_nbytes)
-print("layer2_int_size: %d" % layer2_int_size)     
-print("num_frames_layer2: %d" % (num_frames_layer2+1))
-for k in range(LAYER_2_NUM_KER):
-    pos += (LAYER_3_W+2)*(EXTRA_H/2-2)*2
-    f_all_data.seek(pos)
+print("layer2_int_size: %d (x%d)" % (layer2_int_size, definitions.LAYER_2_NUM_KER*2))    
+print("num_frames_layer2: %d (x%d)" % (num_frames_layer2+1, definitions.LAYER_2_NUM_KER*2))
+for k in range(definitions.LAYER_2_NUM_KER):
     count_errors += interm_data(num_frames_layer2, layer2_int_size)
-    pos += (LAYER_3_W+2)*160*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer2, layer2_int_size)
-    pos += (LAYER_3_W+2)*(EXTRA_H/2)*2
 print("layer 2 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 4 intermediate data
-pos += DATA_LAYER_3
-layer4_int_size = (LAYER_5_W+2)*2*2
+layer4_int_size = (definitions.LAYER_5_W+2)*2*2
 num_frames_layer4 = int(layer4_int_size/eth_nbytes)
-print("layer4_int_size: %d" % layer4_int_size)     
-print("num_frames_layer4: %d" % (num_frames_layer4+1))
-for k in range(LAYER_4_NUM_KER):
-    pos += (11*(LAYER_5_W+2)*2)
-    f_all_data.seek(pos)
+print("layer4_int_size: %d (x%d)" % (layer4_int_size, definitions.LAYER_4_NUM_KER*2))    
+print("num_frames_layer4: %d (x%d)" % (num_frames_layer4+1, definitions.LAYER_4_NUM_KER*2))
+for k in range(definitions.LAYER_4_NUM_KER):
     count_errors += interm_data(num_frames_layer4, layer4_int_size)
-    pos += (LAYER_5_W+2)*(2+80)*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer4, layer4_int_size)
-    pos += (LAYER_5_W+2)*13*2
 print("layer 4 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 5 intermediate data
-layer5_int_size = LAYER_5_W*2
+layer5_int_size = definitions.LAYER_5_W*2
 num_frames_layer5 = int(layer5_int_size/eth_nbytes)
-print("layer5_int_size: %d" % layer5_int_size)     
-print("num_frames_layer5: %d" % (num_frames_layer5+1))
-for k in range(LAYER_5_NUM_KER):
-    pos += LAYER_5_W*10*2
-    f_all_data.seek(pos)
+print("layer5_int_size: %d (x%d)" % (layer5_int_size, definitions.LAYER_5_NUM_KER*2))    
+print("num_frames_layer5: %d (x%d)" % (num_frames_layer5+1, definitions.LAYER_5_NUM_KER*2))
+for k in range(definitions.LAYER_5_NUM_KER):
     count_errors += interm_data(num_frames_layer5, layer5_int_size)
-    pos += LAYER_5_W*(1+82)*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer5, layer5_int_size)
-    pos += LAYER_5_W*11*2
 print("layer 5 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 6 intermediate data
-layer6_int_size = (LAYER_7_W+2)*2*2 
+layer6_int_size = (definitions.LAYER_7_W+2)*2*2 
 num_frames_layer6 = int(layer6_int_size/eth_nbytes)
-print("layer6_int_size: %d" % layer6_int_size)     
-print("num_frames_layer6: %d" % (num_frames_layer6+1))
-for k in range(LAYER_6_NUM_KER):
-    pos += (LAYER_7_W+2)*4*2
-    f_all_data.seek(pos)
+print("layer6_int_size: %d (x%d)" % (layer6_int_size, definitions.LAYER_6_NUM_KER*2))    
+print("num_frames_layer6: %d (x%d)" % (num_frames_layer6+1, definitions.LAYER_6_NUM_KER*2))
+for k in range(definitions.LAYER_6_NUM_KER):
     count_errors += interm_data(num_frames_layer6, layer6_int_size)
-    pos += (LAYER_7_W+2)*(2+42)*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer6, layer6_int_size)
-    pos += (LAYER_7_W+2)*6*2
 print("layer 6 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 8 intermediate data
-pos += DATA_LAYER_7
-layer8_int_size = (LAYER_9_W+2)*2*2 
+layer8_int_size = (definitions.LAYER_9_W+2)*2*2 
 num_frames_layer8 = int(layer8_int_size/eth_nbytes)
-print("layer8_int_size: %d" % layer8_int_size)     
-print("num_frames_layer8: %d" % (num_frames_layer8+1))
-for k in range(LAYER_8_NUM_KER):
-    pos += (LAYER_9_W+2)*2
-    f_all_data.seek(pos)
+print("layer8_int_size: %d (x%d)" % (layer8_int_size, definitions.LAYER_8_NUM_KER*2))    
+print("num_frames_layer8: %d (x%d)" % (num_frames_layer8+1, definitions.LAYER_8_NUM_KER*2))
+for k in range(definitions.LAYER_8_NUM_KER):
     count_errors += interm_data(num_frames_layer8, layer8_int_size)
-    pos += (LAYER_9_W+2)*(2+22)*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer8, layer8_int_size)
-    pos += (LAYER_9_W+2)*3*2
 print("layer 8 interm data transmitted with %d errors...\n" %(count_errors))
 
 #Send layer 9 intermediate data
-pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20
-layer9_int_size = (LAYER_9_W+2)*2 
+layer9_int_size = (definitions.LAYER_9_W+2)*2 
 num_frames_layer9 = int(layer9_int_size/eth_nbytes)
-print("layer9_int_size: %d" % layer9_int_size)     
-print("num_frames_layer9: %d" % (num_frames_layer9+1))
-for k in range(LAYER_9_NUM_KER):
-    pos += (LAYER_9_W+2)*2
-    f_all_data.seek(pos)
+print("layer9_int_size: %d (x%d)" % (layer9_int_size, definitions.LAYER_9_NUM_KER*2))    
+print("num_frames_layer9: %d (x%d)" % (num_frames_layer9+1, definitions.LAYER_9_NUM_KER*2))
+for k in range(definitions.LAYER_9_NUM_KER):
     count_errors += interm_data(num_frames_layer9, layer9_int_size)
-    pos += (LAYER_9_W+2)*(1+24)*2
-    f_all_data.seek(pos)
     count_errors += interm_data(num_frames_layer9, layer9_int_size)
-    pos += (LAYER_9_W+2)*2*2
 print("layer 9 interm data transmitted with %d errors..." %(count_errors))
 print("interm data transmitted with %d errors..." %(count_errors))
 
@@ -267,7 +226,7 @@ print("interm data transmitted with %d errors..." %(count_errors))
 #Reset error counter
 count_errors = 0
 print("\nStarting reception of yolo layers...")
-yolo_layer_file_size_arr = [DATA_LAYER_17, DATA_LAYER_24]
+yolo_layer_file_size_arr = [definitions.DATA_LAYER_17, definitions.DATA_LAYER_24]
 
 #Loop to receive yolo layers output frames 
 for k in range(len(yolo_layer_file_size_arr)):
