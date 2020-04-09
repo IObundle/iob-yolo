@@ -19,7 +19,7 @@ ETH_P_ALL = 0x0800
 #Open files
 input_ntw_filename = "../dog.bin"
 weights_filename = "../yolov3-tiny_batch-fixed.weights"
-output_ntw_filename = '../output_fixed_full.network'
+output_ntw_filename = '../candidate_boxes_fixed.network'
 interm_data_filename = '../interm_data.network'
 f_in = open(input_ntw_filename, 'rb')
 f_in.read(12) #ignore image size info (3 int values)
@@ -28,6 +28,7 @@ f_interm_data = open(interm_data_filename, 'rb')
 f_out = open(output_ntw_filename, "rb")
 input_ntw_file_size = definitions.IMAGE_INPUT
 weights_file_size = getsize(weights_filename)
+output_file_size = getsize(output_ntw_filename)
 
 #Frame parameters
 eth_nbytes = 1024-18
@@ -221,47 +222,41 @@ for k in range(definitions.LAYER_9_NUM_KER):
 print("layer 9 interm data transmitted with %d errors..." %(count_errors))
 print("interm data transmitted with %d errors..." %(count_errors))
 
-################################# RECEIVE YOLO LAYERS ##############################################
+################################# RECEIVE CANDIDATE BOXES ##############################################
 
-#Reset error counter
+#Reset counters
 count_errors = 0
-print("\nStarting reception of yolo layers...")
-yolo_layer_file_size_arr = [definitions.DATA_LAYER_17, definitions.DATA_LAYER_24]
+count_bytes = 0
+print("\nStarting reception of candidate boxes...")
 
-#Loop to receive yolo layers output frames 
-for k in range(len(yolo_layer_file_size_arr)):
+#Frame parameters
+num_frames_yolo_layer = 0 #int(output_file_size/eth_nbytes)
+print("layer_file_size: %d" % output_file_size)     
+print("num_frames_yolo_layer: %d" % (num_frames_yolo_layer+1))
+
+#Loop to receive one yolo layer output
+for j in range(num_frames_yolo_layer+1):
+
+    #Check if it is last packet (not enough for full payload)
+    if j == num_frames_yolo_layer:
+        bytes_to_receive = output_file_size - count_bytes
+    else:
+        bytes_to_receive = eth_nbytes
+
+    #Form frames
+    payload = f_out.read(bytes_to_receive)
+
+    #Accumulate sent bytes
+    count_bytes += eth_nbytes
     
-    #Reset byte counter
-    count_bytes = 0
+    #Receve frame
+    rcv = s.recv(4096)
     
-    #Frame parameters
-    num_frames_yolo_layer = int(yolo_layer_file_size_arr[k]/eth_nbytes)
-    print("layer_file_size: %d" % yolo_layer_file_size_arr[k])     
-    print("num_frames_yolo_layer: %d" % (num_frames_yolo_layer+1))
-    
-    #Loop to receive one yolo layer output
-    for j in range(num_frames_yolo_layer+1):
-    
-        #Check if it is last packet (not enough for full payload)
-        if j == num_frames_yolo_layer:
-            bytes_to_receive = yolo_layer_file_size_arr[k] - count_bytes
-        else:
-            bytes_to_receive = eth_nbytes
-    
-        #Form frames
-        payload = f_out.read(bytes_to_receive)
-    
-        #Accumulate sent bytes
-        count_bytes += eth_nbytes
-        
-        #Receve frame
-        rcv = s.recv(4096)
-        
-        #Check if data is correct
-        for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
-            if sent_byte != rcv_byte:
-                count_errors += 1  
-print("Number of errors in yolo layers output: " + str(count_errors))
+    #Check if data is correct
+    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
+        if sent_byte != rcv_byte:
+            count_errors += 1  
+print("Number of errors in candidate boxes output: " + str(count_errors))
 
 #Close files
 f_in.close()

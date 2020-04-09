@@ -12,6 +12,18 @@
 #include <string.h>
 #include <stdlib.h>
 
+//Constants for candidate boxes
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define yolo1_div ((int16_t)(((float)1/LAYER_17_W)*((int32_t)1<<15))) //Q1.15
+#define yolo2_div ((int16_t)(((float)1/26)*((int32_t)1<<15))) //Q1.15
+#define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define y_bias ((int16_t)(((float)(NEW_W-NEW_H)/(NEW_H*2))*((int32_t)1<<14))) //Q2.14
+#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
+#define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
+uint8_t nboxes = 0;
+
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
@@ -289,11 +301,6 @@ void resize_image() {
   uint16_t iy, ix, new_r;
   uint32_t sx, sy, mul, dy, dx;
   uint16_t val_h, val_w, next_val_w;
-
-  //measure initial time
-  uart_printf("\nResizing input image to 416x416\n");
-  timer_reset(TIMER);
-  start = timer_get_count_us(TIMER);
 			
   for(k = 0; k < NTW_IN_C; k++) { 			// 3
     for(c = 0; c < NTW_IN_W; c++) {			// 416
@@ -353,10 +360,6 @@ void resize_image() {
       }     
     }
   }
-
-  //measure final time
-  end = timer_get_count_us(TIMER);
-  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
 }
 
 //perform convolutional layer
@@ -646,17 +649,109 @@ void upsample_layer(int w, int num_ker) {
   data_pos += w*w*num_ker;
 }
 
+//Polynomial approximation of exponential function
+int16_t exp_poly_appr(int16_t val) {
+  int16_t val_16, exp_val_fixed;
+  int32_t val_32;
+  exp_val_fixed = val + 0x0100; //1+w -> Q8.8
+  exp_val_fixed = exp_val_fixed << 6; //Q8.8 to Q2.14
+  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q8.8*Q8.8 = Q16.16
+  val_16 = (int16_t)(val_32 >> 2); //w^2 -> Q16.16 to Q2.14
+  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^3 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^4 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q4.28 to Q2.14
+  return exp_val_fixed; //Q2.14
+}
+
+//Get candidate boxes from yolo layers output
+void get_boxes(int w, int16_t xy_div, int first_yolo, unsigned int in_pos, unsigned int out_pos) {
+
+  //locate data pointers
+  int16_t * in_d_pos = (int16_t *) fp_data + in_pos;
+  int16_t * out_d_pos = (int16_t *) fp_data + out_pos;
+
+  //local variables
+  int16_t i, j, k, m;
+  int16_t val_16, obj_score, pred_score;
+  int32_t val_32;
+  int16_t yolo_bias[12] = {0x0280, 0x0380, 0x05C0, 0x06C0, 0x0940, 0x0E80, 0x1440, 0x1480, 0x21C0, 0x2A40, 0x5600, 0x4FC0}; //Q10.6
+
+  //loops to go through yolo layer output
+  for(i = 0; i < 3; i++) {
+    for(j = 0; j < w; j++) {
+      for(k = 0; k < w; k++) {
+	if(in_d_pos[(85*i+4)*w*w + j*w + k] > threshold) {
+
+  	  //Calculate x
+	  val_16 = in_d_pos[85*i*w*w + j*w + k]; //Q8.8
+	  val_32 = (int32_t)((int32_t)(val_16 + (k<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+	  val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+	  out_d_pos[85*nboxes] = val_16; //x
+
+	  //Calculate y
+	  val_16 = in_d_pos[(85*i+1)*w*w + j*w + k]; //Q8.8
+	  val_32 = (int32_t)((int32_t)(val_16 + (j<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+	  val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_16 -= (int16_t)y_bias; //Q2.14
+	  out_d_pos[85*nboxes+1] = val_16; //y
+
+	  //Calculate w
+	  val_16 = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k]); //Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  out_d_pos[85*nboxes+2] = val_16; //w
+
+	  //Calculate h
+	  val_16 = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k]); //Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  out_d_pos[85*nboxes+3] = val_16; //h
+
+	  //Objectness score
+	  obj_score = in_d_pos[(85*i+4)*w*w + j*w + k]; //Q8.8
+	  obj_score = obj_score << 6; //Q8.8 to Q2.14
+	  out_d_pos[85*nboxes+4] = obj_score;
+
+	  //Calculate probability scores
+	  for(m = 0; m < 80; m++) {
+ 	    val_16 = in_d_pos[(85*i+5+m)*w*w + j*w + k]; //Q8.8
+	    val_32 = (int32_t)((int32_t)val_16*(int32_t)obj_score); //Q8.8 * Q2.14 = Q10.22
+	    pred_score = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
+	    if(pred_score <= (threshold << 6)) pred_score = 0; //Q2.14
+	    out_d_pos[85*nboxes+5+m] = pred_score; // prediction scores
+	  }
+
+	  //Update number of candidate boxes
+	  nboxes++;
+        }
+      }
+    }
+  }
+}
+
 //send detection results back
-void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
+void send_data(unsigned int pos) {
 
   //char file pointers
-  unsigned int pos = 2*data_pos_yolo;
-  char * fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + pos) ;
+  char * fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + 2*pos) ;
   int i, j;
 
   //layer parameters
-  unsigned int LAYER_FILE_SIZE = data_amount*2;
-  unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
+  unsigned int LAYER_FILE_SIZE = 85*nboxes*2+1;
+  unsigned int NUM_LAYER_FRAMES = 0; //LAYER_FILE_SIZE/ETH_NBYTES;
 
   //Loop to send output of yolo layer
   for(j = 0; j < NUM_LAYER_FRAMES+1; j++) {
@@ -673,7 +768,8 @@ void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
+     data_to_send[0] = nboxes;
+     for(i = 1; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + (i-1)];
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
@@ -712,7 +808,13 @@ int main(int argc, char **argv) {
 
   //resize input image to 418x316x3
   fill_grey();
+  uart_printf("\nResizing input image to 416x416\n");
+  timer_reset(TIMER);
+  start = timer_get_count_us(TIMER);
   resize_image();
+  end = timer_get_count_us(TIMER);
+  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
+  total_time = (end-start)/1000;
   ctrl_counter_reset(CACHE_CTRL);
 
   //layer1 (418x316x3 -> 416x316x16)
@@ -721,7 +823,7 @@ int main(int argc, char **argv) {
   conv_layer(NTW_IN_W, NTW_IN_H, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0, NTW_IN_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
-  total_time = (end-start)/1000;
+  total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
 
@@ -953,10 +1055,21 @@ int main(int argc, char **argv) {
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
 
+  //get candidate boxes
+  uart_printf("\nGetting candidate boxes...\n");
+  timer_reset(TIMER);
+  start = timer_get_count_us(TIMER);
+  get_boxes(LAYER_17_W, yolo1_div, 1, data_pos_layer17, data_pos+DATA_LAYER_24);
+  get_boxes(LAYER_24_W, yolo2_div, 0, data_pos, data_pos+DATA_LAYER_24);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Candidate boxes selected in %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
+  ctrl_counter_reset(CACHE_CTRL);
+
   //return data
   uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
-  send_data(data_pos_layer17, DATA_LAYER_17);
-  send_data(data_pos, DATA_LAYER_24);
+  send_data(data_pos+DATA_LAYER_24);
   uart_putc(4);
   return 0;
 }
