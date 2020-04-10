@@ -14,6 +14,7 @@
 
 //Constants for candidate boxes
 #define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
 #define yolo1_div ((int16_t)(((float)1/LAYER_17_W)*((int32_t)1<<15))) //Q1.15
 #define yolo2_div ((int16_t)(((float)1/26)*((int32_t)1<<15))) //Q1.15
 #define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
@@ -742,6 +743,92 @@ void get_boxes(int w, int16_t xy_div, int first_yolo, unsigned int in_pos, unsig
   }
 }
 
+//Calculate overlapp between 2 boxes
+int16_t overlap(int16_t x1, int16_t w1, int16_t x2, int16_t w2) {
+  int16_t l1, l2, left, r1, r2, right;
+  l1 = x1 - (w1>>1);
+  l2 = x2 - (w2>>1);
+  left = l1 > l2 ? l1 : l2;
+  r1 = x1 + (w1>>1);
+  r2 = x2 + (w2>>1);
+  right = r1 < r2 ? r1 : r2;
+  return right - left;
+}
+
+//Apply non-maximum-suppresion to filter repeated boxes
+void filter_boxes(unsigned int pos) {
+
+  //locate data pointers
+  int16_t * in_d_pos = (int16_t *) fp_data + pos;
+  uint8_t * out_d_pos = (uint8_t *) fp_data + (pos + 85*nboxes)*2;
+
+  //Local variables
+  int i, j, k, l;
+  int obj_cnt;
+  int16_t w, h, b_union, b_iou;
+  int16_t x1, y1, w1, h1, x2, y2, w2, h2;
+  int32_t mul_32, b_inter;
+	
+  //Loop to go through classes from candidate boxes
+  for(i = 0; i < 80; i++) {
+
+    //Count number of candidate boxes for given class
+    obj_cnt = 0;
+    for(j = 0; j < nboxes; j++) {
+      if(in_d_pos[85*j+5+i] != 0) {
+
+        //Store box ID in descending order of prob score
+	if(obj_cnt == 0) out_d_pos[0] = j;
+	else {
+
+	  //Search for position of new box ID
+	  for(k = 0; k < obj_cnt; k++) if(in_d_pos[85*j+5+i] > in_d_pos[85*out_d_pos[k]+5+i]) break;
+
+	  //Store box ID
+	  if(k < obj_cnt) for(l = obj_cnt; l > k; l--) out_d_pos[l] = out_d_pos[l-1];
+	  out_d_pos[k] = j; //min prob score
+	}
+
+	//Update object counter
+	obj_cnt++;
+      }
+    }
+
+    //Apply NMS if more than 1 object from same class was detected
+    if(obj_cnt > 1) {
+      for(j = 0; j < obj_cnt; j++) {
+ 	if(in_d_pos[85*out_d_pos[j]+5+i] == 0) continue;
+	for(k = j+1; k < obj_cnt; k++) {
+
+	  //Get boxes coordinates
+	  x1 = in_d_pos[85*out_d_pos[j]];
+	  y1 = in_d_pos[85*out_d_pos[j]+1];
+	  w1 = in_d_pos[85*out_d_pos[j]+2];
+	  h1 = in_d_pos[85*out_d_pos[j]+3];
+	  x2 = in_d_pos[85*out_d_pos[k]];
+	  y2 = in_d_pos[85*out_d_pos[k]+1];
+	  w2 = in_d_pos[85*out_d_pos[k]+2];
+	  h2 = in_d_pos[85*out_d_pos[k]+3];
+
+	  //Calculate IoU (intersection over union)
+	  w = overlap(x1, w1, x2, w2); //Q2.14
+	  h = overlap(y1, h1, y2, h2); //Q2.14
+	  if(w > 0 && h > 0) {
+	    b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q2.14 * Q2.14 = Q4.28
+	    mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q2.14 * Q2.14 = Q4.28
+	    b_union = (int16_t)(mul_32 >> 14); //w1*h1 -> Q4.28 to Q2.14
+	    mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q2.14 * Q2.14 = Q4.28
+	    b_union += (int16_t)(mul_32 >> 14); //w1*h1+w2*h2 -> Q4.28 to Q2.14
+	    b_union -= (int16_t)(b_inter >> 14); //w1*h1+w2*h2-inter -> Q4.28 to Q2.14
+	    b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q4.28 / Q2.14 = Q2.14
+	    if(b_iou > nms_threshold) in_d_pos[85*out_d_pos[k]+5+i] = 0;
+	  }
+	}
+      }
+    }
+  }					
+}
+
 //send detection results back
 void send_data(unsigned int pos) {
 
@@ -1061,8 +1148,9 @@ int main(int argc, char **argv) {
   start = timer_get_count_us(TIMER);
   get_boxes(LAYER_17_W, yolo1_div, 1, data_pos_layer17, data_pos+DATA_LAYER_24);
   get_boxes(LAYER_24_W, yolo2_div, 0, data_pos, data_pos+DATA_LAYER_24);
+  filter_boxes(data_pos+DATA_LAYER_24);
   end = timer_get_count_us(TIMER);
-  uart_printf("Candidate boxes selected in %d ms\n", (end-start)/1000);
+  uart_printf("Candidate boxes selected in %d us\n", (end-start));
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
