@@ -3,10 +3,11 @@ from socket import socket, AF_PACKET, SOCK_RAW, htons
 from os.path import getsize
 import sys
 import definitions
+import struct
 
 #Check if argument identifying type of board is present
-if len(sys.argv) != 3:
-    print("<usage>: python eth_comm.py <interface> <RMAC> ")
+if len(sys.argv) != 4:
+    print("<usage>: python eth_comm.py <interface> <RMAC> <filename_path>")
     sys.exit()
 
 #Ethernet parameters
@@ -19,16 +20,22 @@ ETH_P_ALL = 0x0800
 #Open files
 input_ntw_filename = "../dog.bin"
 weights_filename = "../yolov3-tiny_batch-fixed.weights"
-output_ntw_filename = '../candidate_boxes_fixed.network'
 interm_data_filename = '../interm_data.network'
+labels_filename = '../classes.bin'
+output_filename = '../dog_det.bin'
+output_image_filename = sys.argv[3]+'/detections.bin'
 f_in = open(input_ntw_filename, 'rb')
-f_in.read(12) #ignore image size info (3 int values)
+image_w = struct.unpack('i', f_in.read(4))[0]
+image_h = struct.unpack('i', f_in.read(4))[0]
+image_c = struct.unpack('i', f_in.read(4))[0]
+print("Input image is %dx%dx%d .." %(image_w, image_h, image_c))
 f_weights = open(weights_filename, 'rb')
 f_interm_data = open(interm_data_filename, 'rb')
-f_out = open(output_ntw_filename, "rb")
+f_labels = open(labels_filename, 'rb')
+f_output = open(output_filename, "rb")
+f_output_image =  open(output_image_filename, "wb")
 input_ntw_file_size = definitions.IMAGE_INPUT
 weights_file_size = getsize(weights_filename)
-output_file_size = getsize(output_ntw_filename)
 
 #Frame parameters
 eth_nbytes = 1024-18
@@ -113,6 +120,53 @@ for j in range(num_frames_weights+1):
             count_errors += 1
 
 print("weights transmitted with %d errors..." %(count_errors))
+
+################################# SEND LABELS ##############################################
+
+#Reset byte counter
+count_bytes = 0
+count_errors = 0
+label_height = 20
+w_arr = []
+print("\nStarting labels transmission...")
+
+def label_data(num_frames_label_data, label_data_size):
+    
+    count_bytes = 0
+    count_errors = 0
+    for j in range(num_frames_label_data+1):
+    
+        # check if it is last packet (not enough for full payload)
+        if j == num_frames_label_data:
+            bytes_to_send = label_data_size - count_bytes
+            padding = '\x00' * (eth_nbytes-bytes_to_send)
+        else:
+            bytes_to_send = eth_nbytes
+            padding = ''
+    
+        #form frame
+        payload = f_labels.read(bytes_to_send)
+            
+        # accumulate sent bytes
+        count_bytes += eth_nbytes
+    
+        #Send packet
+        s.send(dst_addr + src_addr + eth_type + payload + padding)
+        
+        #receive data back as ack
+        rcv = s.recv(4096)
+        for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_send+14]):
+            if sent_byte != rcv_byte:
+                count_errors += 1
+            if label_data_size == 81:
+                w_arr.append(rcv_byte)
+    return count_errors
+
+count_errors += label_data(0, 81)
+for i in range(81):
+    label_size = ord(w_arr[i])*label_height
+    count_errors += label_data(int(label_size/eth_nbytes), label_size)
+print("labels data transmitted with %d errors..." %(count_errors))
 
 ################################# SEND INTERM DATA ##############################################
 
@@ -222,43 +276,59 @@ for k in range(definitions.LAYER_9_NUM_KER):
 print("layer 9 interm data transmitted with %d errors..." %(count_errors))
 print("interm data transmitted with %d errors..." %(count_errors))
 
-################################# RECEIVE CANDIDATE BOXES ##############################################
+################################# RECEIVE IMAGE WITH DETECTIONS ##############################################
 
 #Reset counters
 count_errors = 0
 count_bytes = 0
-print("\nStarting reception of candidate boxes...")
+print("\nStarting reception of image with detections...")
 
 #Frame parameters
-num_frames_yolo_layer = 0 #int(output_file_size/eth_nbytes)
-print("layer_file_size: %d" % output_file_size)     
-print("num_frames_yolo_layer: %d" % (num_frames_yolo_layer+1))
+print("input_ntw_file_size: %d" % input_ntw_file_size)     
+print("num_frames_input_ntw: %d" % (num_frames_input_ntw+1))
+
+#Create image
+image_w = struct.unpack('i', f_output.read(4))[0]
+image_h = struct.unpack('i', f_output.read(4))[0]
+image_c = struct.unpack('i', f_output.read(4))[0]
+print("Output image is %dx%dx%d .." %(image_w, image_h, image_c))
+f_output_image.write(struct.pack('i', image_w))
+f_output_image.write(struct.pack('i', image_h))
+f_output_image.write(struct.pack('i', image_c))
 
 #Loop to receive one yolo layer output
-for j in range(num_frames_yolo_layer+1):
+for j in range(num_frames_input_ntw+1):
 
     #Check if it is last packet (not enough for full payload)
-    if j == num_frames_yolo_layer:
-        bytes_to_receive = output_file_size - count_bytes
+    if j == num_frames_input_ntw:
+        bytes_to_receive = input_ntw_file_size - count_bytes
+        padding = '\x00' * (eth_nbytes-bytes_to_send)
     else:
         bytes_to_receive = eth_nbytes
+        padding = ''
 
-    #Form frames
-    payload = f_out.read(bytes_to_receive)
-
-    #Accumulate sent bytes
+    #Accumulate rcv bytes
     count_bytes += eth_nbytes
     
-    #Receve frame
-    rcv = s.recv(4096)
+    #form frame
+    payload = f_output.read(bytes_to_receive)
     
     #Check if data is correct
+    rcv = s.recv(4096)
     for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
+        f_output_image.write(struct.pack('B', ord(rcv_byte)))
         if sent_byte != rcv_byte:
-            count_errors += 1  
-print("Number of errors in candidate boxes output: " + str(count_errors))
+            count_errors += 1
+            
+    #Send data back as ack
+    s.send(dst_addr + src_addr + eth_type + payload + padding)
+        
+print("Detections received with %d errors..." %(count_errors))
 
 #Close files
 f_in.close()
 f_weights.close()
-f_out.close()
+f_interm_data.close()
+f_labels.close()
+f_output.close()
+f_output_image.close()

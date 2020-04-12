@@ -41,6 +41,7 @@ clean:
 	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.dat
 	@rm -rf uart_loader system.h
 	@rm -rf ../uart_loader
+	@rm -rf detections.*
 	@rm -rf *.pyc
 
 .PHONY: all clean
