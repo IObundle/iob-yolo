@@ -4,8 +4,8 @@
 .global main
 
 /* set stack pointer */
-lui sp, %hi(3<<(MAINRAM_ADDR_W-2))
-addi sp, sp, %lo(3<<(MAINRAM_ADDR_W-2))
+lui sp, %hi(13<<(MAINRAM_ADDR_W-4))
+addi sp, sp, %lo(13<<(MAINRAM_ADDR_W-4))
 
 /* call main */
 jal ra, main

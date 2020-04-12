@@ -121,7 +121,6 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
 
      // start timer
      if(interm_flag == 0 && j == 0 && label_flag == 0) {
-       timer_reset(TIMER);
        start = timer_get_count_us(TIMER);
      }   
 
@@ -162,7 +161,6 @@ void receive_data() {
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 
   //Receive labels
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   rcv_frame(0, 0, 81, 0, fp_labels, 1);
   for(i = 0; i < 81; i++) {
@@ -173,7 +171,6 @@ void receive_data() {
   uart_printf("labels transferred in %d ms\n", (end-start)/1000);
 
   //restart timer
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
 
   //loop to receive intermediate layer 1 data
@@ -249,7 +246,6 @@ void reset_DDR() {
 
   //measure initial time
   uart_printf("\nSetting DDR positions to zero\n");
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
 
   //input network
@@ -299,9 +295,6 @@ void reset_DDR() {
 //fill part of 416x316 region of resized image with grey (0.5 = 0x0080 in Q8.8)
 void fill_grey() {
   int i, j, k;
-  //uart_printf("\nFilling part of 416x416 region with grey\n");
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
   for(i = 0; i < NTW_IN_C; i++) {
     for(j = 0; j < 2; j++) {
       for(k = 0; k < NTW_IN_W; k++) {
@@ -310,8 +303,6 @@ void fill_grey() {
       }   
     }
   }
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("Fill grey done in %d ms\n", (end-start)/1000);
 }
 
 //resize input image to 416x312
@@ -886,12 +877,9 @@ void draw_class(int label_w, int j, int top_width, int left, int previous_w, uin
   int l, k;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++){
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++){
-      mul_16 = (uint16_t)((uint16_t)r * (uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j) + l*label_w + k]); //Q8.0 * Q8.0 = Q16.0
-      fp_image[(l+top_width)*IMG_W + (k+left+previous_w)] = (uint8_t)(mul_16 >> 8); //red
-      mul_16 = (uint16_t) ((uint16_t)g * (uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j) + l*label_w + k]); //Q8.0 * Q8.0 = Q16.0
-      fp_image[IMG_W*IMG_H + (l+top_width)*IMG_W + (k+left+previous_w)] = (uint8_t)(mul_16 >> 8); //green
-      mul_16 = (uint16_t) ((uint16_t)b * (uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j) + l*label_w + k]); //Q8.0 * Q8.0 = Q16.0
-      fp_image[2*IMG_W*IMG_H + (l+top_width)*IMG_W + (k+left+previous_w)] = (uint8_t)(mul_16 >> 8); //blue
+      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //Q8.0*Q8.0 to Q8.0 -> red
+      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g *(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //green
+      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b *(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //blue
     }
   }	
 }
@@ -983,14 +971,11 @@ void send_data() {
 
   //Loop to send output of yolo layer
   int i, j;
+  count_bytes = 0;
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      // start timer
-     if(j == 0) {
-       count_bytes = 0;
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
-     }
+     if(j == 0) start = timer_get_count_us(TIMER);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
@@ -1040,174 +1025,156 @@ int main(int argc, char **argv) {
   //resize input image to 418x316x3
   fill_grey();
   uart_printf("\nResizing input image to 416x416\n");
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   resize_image();
   end = timer_get_count_us(TIMER);
   uart_printf("Resize image done in %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer1 (418x316x3 -> 416x316x16)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(NTW_IN_W, NTW_IN_H, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0, NTW_IN_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer2 (416x316x16 -> 210x162x16)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_2_W, LAYER_2_H, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer3 (210x162x16 -> 208x160x32)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_3_W, LAYER_3_H, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0, LAYER_3_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer4 (208x160x32 -> 106x84x32)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_4_W, LAYER_4_H, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer5 (106x84x32 -> 104x84x64)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_5_W, LAYER_5_H, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0, LAYER_5_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer6 (104x84x64 -> 54x46x64)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_H, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer7 (54x46x64 -> 52x44x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_7_W, LAYER_7_H, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, LAYER_7_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer8 (52x44x128 -> 28x26x128)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_8_W, LAYER_8_H, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //Initial address of layer 10 output
   unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
 
   //layer9 (28x26x128 -> 28x28x256) -> Zero-padding
   //Result of layer 9 goes after result of layer 20
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_9_W, LAYER_9_H, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20, LAYER_9_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_10_W, LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_11_W, LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0, LAYER_11_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer12 (14x14x512 -> 15x15x512)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_12_W, LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer13 (15x15x512 -> 13x13x1024)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_13_W, LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0, LAYER_13_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer14 (13x13x1024 -> 15x15x256)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_14_W, LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0, LAYER_14_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //Stores initial address of layer 14 output for first route layer
   unsigned int data_pos_layer14 = data_pos;
 
   //layer15 (15x15x256 -> 13x13x512)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_15_W, LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0, LAYER_15_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer16 (13x13x512 -> 13x13x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_16_W, LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0, LAYER_16_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer17 (13x13x255 -> 13x13x255)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_17_W);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //Stores initial address of first yolo layer for sending
   unsigned int data_pos_layer17 = data_pos;
@@ -1219,55 +1186,49 @@ int main(int argc, char **argv) {
   data_pos = data_pos_layer14;
 
   //layer19 (15x15x256 -> 13x13x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_19_W, LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos, LAYER_19_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer20 (13x13x128 -> 28x28x128)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   upsample_layer(LAYER_20_W, LAYER_20_NUM_KER);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //layer22 (28x28x128 -> 26x26x256)
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_22_W, LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9, LAYER_22_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer23 (26x26x256 -> 26x26x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_23_W, LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0, LAYER_23_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //layer24 (26x26x255 -> 26x26x255)
-  //timer_reset(TIMER);
-  //start = timer_get_count_us(TIMER);
+  start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_24_W);
-  //end = timer_get_count_us(TIMER);
-  //uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
-  //total_time += (end-start)/1000;
-  //print_cache_status();
+  end = timer_get_count_us(TIMER);
+  uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
+  total_time += (end-start)/1000;
+  print_cache_status();
 
   //get candidate boxes
   uart_printf("\nGetting candidate boxes...\n");
   unsigned int box_pos = data_pos+DATA_LAYER_24;
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   get_boxes(LAYER_17_W, yolo1_div, 1, data_pos_layer17, box_pos);
   get_boxes(LAYER_24_W, yolo2_div, 0, data_pos, box_pos);
@@ -1275,27 +1236,21 @@ int main(int argc, char **argv) {
   end = timer_get_count_us(TIMER);
   uart_printf("Candidate boxes selected in %d us\n", (end-start));
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //draw detections
   uart_printf("\nDrawing detections...\n");
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   draw_detections(box_pos);
   end = timer_get_count_us(TIMER);
   uart_printf("Detection drawn in %d us\n", (end-start));
   total_time += (end-start)/1000;
-  //print_cache_status();
+  print_cache_status();
 
   //print results
   int i, j;
   uint32_t pred_32;
-  const char *class_names[80];
-  class_names[1] = "bicycle";
-  class_names[2] = "car";
-  class_names[7] = "truck";
-  class_names[16] = "dog";
-  /*const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};*/
+  const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};
   for(i = 0; i < nboxes; i++) {
     for(j = 0; j < 80; j++) {
       if(fp_data[box_pos+85*i+5+j] != 0) {
