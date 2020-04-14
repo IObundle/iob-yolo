@@ -12,6 +12,21 @@
 #include <string.h>
 #include <stdlib.h>
 
+//Constants for candidate boxes
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
+#define yolo1_div ((int16_t)(((float)1/LAYER_17_W)*((int32_t)1<<15))) //Q1.15
+#define yolo2_div ((int16_t)(((float)1/26)*((int32_t)1<<15))) //Q1.15
+#define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define y_bias ((int16_t)(((float)(NEW_W-NEW_H)/(NEW_H*2))*((int32_t)1<<14))) //Q2.14
+#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
+#define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
+#define box_width 3
+#define label_height 20
+uint8_t nboxes = 0;
+
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
@@ -27,6 +42,7 @@
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
 #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
 #define DATA_BASE_ADDRESS (DDR_MEM + 0x01408000)
+#define LABEL_BASE_ADDRESS (DDR_MEM + 0x01132880)
 
 //define intermediate data constants
 #define INTERM_LAYER1_SIZE (NTW_IN_W*2) //16 bits per input
@@ -48,6 +64,7 @@
 int16_t *fp_weights;
 int16_t *fp_data;
 uint8_t * fp_image;
+uint8_t * fp_labels;
 
 //weights and data updatable pointers
 unsigned int weight_pos = 0, data_pos = 0;
@@ -72,6 +89,9 @@ void define_memory_regions() {
 
   //weights
   fp_weights = (int16_t *) WEIGTHS_BASE_ADDRESS;
+
+  //labels
+  fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
 }
 
 void print_cache_status() {
@@ -81,9 +101,10 @@ void print_cache_status() {
   uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
   uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
   uart_printf("ctrl_data_write_miss = %d\n\n", ctrl_data_write_miss(CACHE_CTRL));
+  ctrl_counter_reset(CACHE_CTRL);
 }
 
-void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, int interm_flag, char * data_p) {
+void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, int interm_flag, char * data_p, int label_flag) {
 
   //Local variables
   int i, j;
@@ -99,8 +120,7 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      // start timer
-     if(interm_flag == 0 && j == 0) {
-       timer_reset(TIMER);
+     if(interm_flag == 0 && j == 0 && label_flag == 0) {
        start = timer_get_count_us(TIMER);
      }   
 
@@ -125,71 +145,81 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
 //receive weights and data
 void receive_data() {
 
-  uart_printf("\nReady to receive input image and weights\n");
+  //local variables
+  unsigned int pos = 0, i, label_size;
+  uart_printf("\nReady to receive input image, weights, labels and intermediate data\n");
 
   //Receive input image
-  rcv_frame(0, NUM_INPUT_FRAMES, INPUT_FILE_SIZE, 0, fp_image);
+  rcv_frame(0, NUM_INPUT_FRAMES, INPUT_FILE_SIZE, 0, fp_image, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("image transferred in %d ms\n", (end-start)/1000);
   
   //Receive weights
   char * fp_weights_char = (char *) WEIGTHS_BASE_ADDRESS;
-  rcv_frame(0, NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, 0, fp_weights_char);
+  rcv_frame(0, NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, 0, fp_weights_char, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 
-  //restart timer
-  timer_reset(TIMER);
+  //Receive labels
   start = timer_get_count_us(TIMER);
-  unsigned int pos = 0, i;
+  rcv_frame(0, 0, 81, 0, fp_labels, 1);
+  for(i = 0; i < 81; i++) {
+    label_size = fp_labels[i]*label_height;
+    rcv_frame(0, label_size/ETH_NBYTES, label_size, 0, fp_labels+81+MAX_LABEL_SIZE*i, 1);
+  }
+  end = timer_get_count_us(TIMER);
+  uart_printf("labels transferred in %d ms\n", (end-start)/1000);
+
+  //restart timer
+  start = timer_get_count_us(TIMER);
 
   //loop to receive intermediate layer 1 data
   for(i = 0; i < NTW_IN_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0, 0); //1st line
     pos += (NTW_IN_W*(NTW_IN_H+1));
-    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER1_FRAMES, INTERM_LAYER1_SIZE, 1, 0, 0); //2nd line
     pos += NTW_IN_W;
   }
 
   //loop to receive intermediate layer 2 data
   for(i = 0; i < LAYER_2_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0, 0); //1st line
     pos += (LAYER_3_W+2)*LAYER_3_H;
-    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER2_FRAMES, INTERM_LAYER2_SIZE, 1, 0, 0); //2nd line
     pos += (LAYER_3_W+2)*2;
   }
 
   //loop to receive intermediate layer 4 data
   pos += DATA_LAYER_3;
   for(i = 0; i < LAYER_4_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0, 0); //1st line
     pos += (LAYER_5_W+2)*LAYER_5_H;
-    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER4_FRAMES, INTERM_LAYER4_SIZE, 1, 0, 0); //2nd line
     pos += (LAYER_5_W+2)*2; 
   }
 
   //loop to receive intermediate layer 5 data
   for(i = 0; i < LAYER_5_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0, 0); //1st line
     pos += LAYER_5_W*(1+LAYER_5_H);
-    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER5_FRAMES, INTERM_LAYER5_SIZE, 1, 0, 0); //2nd line
     pos += LAYER_5_W;
   }
 
   //loop to receive intermediate layer 6 data
   for(i = 0; i < LAYER_6_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0, 0); //1st line
     pos += (LAYER_7_W+2)*LAYER_7_H;
-    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER6_FRAMES, INTERM_LAYER6_SIZE, 1, 0, 0); //2nd line
     pos += (LAYER_7_W+2)*2;
   }
 
   //loop to receive intermediate layer 8 data
   pos += DATA_LAYER_7;
   for(i = 0; i < LAYER_8_NUM_KER; i++) {
-    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0, 0); //1st line
     pos += (LAYER_9_W+2)*LAYER_9_H;
-    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER8_FRAMES, INTERM_LAYER8_SIZE, 1, 0, 0); //2nd line
     pos += (LAYER_9_W+2)*2;
   }
 
@@ -197,9 +227,9 @@ void receive_data() {
   pos += DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20;
   for(i = 0; i < LAYER_9_NUM_KER; i++) {
     pos += LAYER_9_W+2;
-    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0); //1st line
+    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0, 0); //1st line
     pos += (LAYER_9_W+2)*(1+LAYER_9_H);
-    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0); //2nd line
+    rcv_frame(pos, NUM_INTERM_LAYER9_FRAMES, INTERM_LAYER9_SIZE, 1, 0, 0); //2nd line
     pos += (LAYER_9_W+2)*2;
   }
 
@@ -216,7 +246,6 @@ void reset_DDR() {
 
   //measure initial time
   uart_printf("\nSetting DDR positions to zero\n");
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
 
   //input network
@@ -266,9 +295,6 @@ void reset_DDR() {
 //fill part of 416x316 region of resized image with grey (0.5 = 0x0080 in Q8.8)
 void fill_grey() {
   int i, j, k;
-  uart_printf("\nFilling part of 416x416 region with grey\n");
-  timer_reset(TIMER);
-  start = timer_get_count_us(TIMER);
   for(i = 0; i < NTW_IN_C; i++) {
     for(j = 0; j < 2; j++) {
       for(k = 0; k < NTW_IN_W; k++) {
@@ -277,8 +303,6 @@ void fill_grey() {
       }   
     }
   }
-  end = timer_get_count_us(TIMER);
-  uart_printf("Fill grey done in %d ms\n", (end-start)/1000);
 }
 
 //resize input image to 416x312
@@ -289,11 +313,6 @@ void resize_image() {
   uint16_t iy, ix, new_r;
   uint32_t sx, sy, mul, dy, dx;
   uint16_t val_h, val_w, next_val_w;
-
-  //measure initial time
-  uart_printf("\nResizing input image to 416x416\n");
-  timer_reset(TIMER);
-  start = timer_get_count_us(TIMER);
 			
   for(k = 0; k < NTW_IN_C; k++) { 			// 3
     for(c = 0; c < NTW_IN_W; c++) {			// 416
@@ -353,10 +372,6 @@ void resize_image() {
       }     
     }
   }
-
-  //measure final time
-  end = timer_get_count_us(TIMER);
-  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
 }
 
 //perform convolutional layer
@@ -646,37 +661,334 @@ void upsample_layer(int w, int num_ker) {
   data_pos += w*w*num_ker;
 }
 
+//Polynomial approximation of exponential function
+int16_t exp_poly_appr(int16_t val) {
+  int16_t val_16, exp_val_fixed;
+  int32_t val_32;
+  exp_val_fixed = val + 0x0100; //1+w -> Q8.8
+  exp_val_fixed = exp_val_fixed << 6; //Q8.8 to Q2.14
+  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q8.8*Q8.8 = Q16.16
+  val_16 = (int16_t)(val_32 >> 2); //w^2 -> Q16.16 to Q2.14
+  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^3 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^4 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q4.28 to Q2.14
+  return exp_val_fixed; //Q2.14
+}
+
+//Get candidate boxes from yolo layers output
+void get_boxes(int w, int16_t xy_div, int first_yolo, unsigned int in_pos, unsigned int out_pos) {
+
+  //locate data pointers
+  int16_t * in_d_pos = (int16_t *) fp_data + in_pos;
+  int16_t * out_d_pos = (int16_t *) fp_data + out_pos;
+
+  //local variables
+  int16_t i, j, k, m;
+  int16_t val_16, obj_score, pred_score;
+  int32_t val_32;
+  int16_t yolo_bias[12] = {0x0280, 0x0380, 0x05C0, 0x06C0, 0x0940, 0x0E80, 0x1440, 0x1480, 0x21C0, 0x2A40, 0x5600, 0x4FC0}; //Q10.6
+
+  //loops to go through yolo layer output
+  for(i = 0; i < 3; i++) {
+    for(j = 0; j < w; j++) {
+      for(k = 0; k < w; k++) {
+	if(in_d_pos[(85*i+4)*w*w + j*w + k] > threshold) {
+
+  	  //Calculate x
+	  val_16 = in_d_pos[85*i*w*w + j*w + k]; //Q8.8
+	  val_32 = (int32_t)((int32_t)(val_16 + (k<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+	  val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+	  out_d_pos[85*nboxes] = val_16; //x
+
+	  //Calculate y
+	  val_16 = in_d_pos[(85*i+1)*w*w + j*w + k]; //Q8.8
+	  val_32 = (int32_t)((int32_t)(val_16 + (j<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+	  val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_16 -= (int16_t)y_bias; //Q2.14
+	  out_d_pos[85*nboxes+1] = val_16; //y
+
+	  //Calculate w
+	  val_16 = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k]); //Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  out_d_pos[85*nboxes+2] = val_16; //w
+
+	  //Calculate h
+	  val_16 = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k]); //Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  out_d_pos[85*nboxes+3] = val_16; //h
+
+	  //Objectness score
+	  obj_score = in_d_pos[(85*i+4)*w*w + j*w + k]; //Q8.8
+	  obj_score = obj_score << 6; //Q8.8 to Q2.14
+	  out_d_pos[85*nboxes+4] = obj_score;
+
+	  //Calculate probability scores
+	  for(m = 0; m < 80; m++) {
+ 	    val_16 = in_d_pos[(85*i+5+m)*w*w + j*w + k]; //Q8.8
+	    val_32 = (int32_t)((int32_t)val_16*(int32_t)obj_score); //Q8.8 * Q2.14 = Q10.22
+	    pred_score = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
+	    if(pred_score <= (threshold << 6)) pred_score = 0; //Q2.14
+	    out_d_pos[85*nboxes+5+m] = pred_score; // prediction scores
+	  }
+
+	  //Update number of candidate boxes
+	  nboxes++;
+        }
+      }
+    }
+  }
+}
+
+//Calculate overlapp between 2 boxes
+int16_t overlap(int16_t x1, int16_t w1, int16_t x2, int16_t w2) {
+  int16_t l1, l2, left, r1, r2, right;
+  l1 = x1 - (w1>>1);
+  l2 = x2 - (w2>>1);
+  left = l1 > l2 ? l1 : l2;
+  r1 = x1 + (w1>>1);
+  r2 = x2 + (w2>>1);
+  right = r1 < r2 ? r1 : r2;
+  return right - left;
+}
+
+//Apply non-maximum-suppresion to filter repeated boxes
+void filter_boxes(unsigned int pos) {
+
+  //locate data pointers
+  int16_t * in_d_pos = (int16_t *) fp_data + pos;
+  uint8_t * out_d_pos = (uint8_t *) fp_data + (pos + 85*nboxes)*2;
+
+  //Local variables
+  int i, j, k, l;
+  int obj_cnt;
+  int16_t w, h, b_union, b_iou;
+  int16_t x1, y1, w1, h1, x2, y2, w2, h2;
+  int32_t mul_32, b_inter;
+	
+  //Loop to go through classes from candidate boxes
+  for(i = 0; i < 80; i++) {
+
+    //Count number of candidate boxes for given class
+    obj_cnt = 0;
+    for(j = 0; j < nboxes; j++) {
+      if(in_d_pos[85*j+5+i] != 0) {
+
+        //Store box ID in descending order of prob score
+	if(obj_cnt == 0) out_d_pos[0] = j;
+	else {
+
+	  //Search for position of new box ID
+	  for(k = 0; k < obj_cnt; k++) if(in_d_pos[85*j+5+i] > in_d_pos[85*out_d_pos[k]+5+i]) break;
+
+	  //Store box ID
+	  if(k < obj_cnt) for(l = obj_cnt; l > k; l--) out_d_pos[l] = out_d_pos[l-1];
+	  out_d_pos[k] = j; //min prob score
+	}
+
+	//Update object counter
+	obj_cnt++;
+      }
+    }
+
+    //Apply NMS if more than 1 object from same class was detected
+    if(obj_cnt > 1) {
+      for(j = 0; j < obj_cnt; j++) {
+ 	if(in_d_pos[85*out_d_pos[j]+5+i] == 0) continue;
+	for(k = j+1; k < obj_cnt; k++) {
+
+	  //Get boxes coordinates
+	  x1 = in_d_pos[85*out_d_pos[j]];
+	  y1 = in_d_pos[85*out_d_pos[j]+1];
+	  w1 = in_d_pos[85*out_d_pos[j]+2];
+	  h1 = in_d_pos[85*out_d_pos[j]+3];
+	  x2 = in_d_pos[85*out_d_pos[k]];
+	  y2 = in_d_pos[85*out_d_pos[k]+1];
+	  w2 = in_d_pos[85*out_d_pos[k]+2];
+	  h2 = in_d_pos[85*out_d_pos[k]+3];
+
+	  //Calculate IoU (intersection over union)
+	  w = overlap(x1, w1, x2, w2); //Q2.14
+	  h = overlap(y1, h1, y2, h2); //Q2.14
+	  if(w > 0 && h > 0) {
+	    b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q2.14 * Q2.14 = Q4.28
+	    mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q2.14 * Q2.14 = Q4.28
+	    b_union = (int16_t)(mul_32 >> 14); //w1*h1 -> Q4.28 to Q2.14
+	    mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q2.14 * Q2.14 = Q4.28
+	    b_union += (int16_t)(mul_32 >> 14); //w1*h1+w2*h2 -> Q4.28 to Q2.14
+	    b_union -= (int16_t)(b_inter >> 14); //w1*h1+w2*h2-inter -> Q4.28 to Q2.14
+	    b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q4.28 / Q2.14 = Q2.14
+	    if(b_iou > nms_threshold) in_d_pos[85*out_d_pos[k]+5+i] = 0;
+	  }
+	}
+      }
+    }
+  }					
+}
+
+//Draw bounding box in input image
+void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green, uint8_t blue) {
+
+  //Limit box coordinates
+  if(left < 0) left = 0; else if(left >= IMG_W) left = IMG_W-1;
+  if(right < 0) right = 0; else if(right >= IMG_W) right = IMG_W-1;
+  if(top < 0) top = 0; else if(top >= IMG_H) top = IMG_H-1;
+  if(bot < 0) bot = 0; else if(bot >= IMG_H) bot = IMG_H-1;
+
+  //Draw horizontally
+  int i;
+  for(i = left; i <= right; i++) {
+    fp_image[top*IMG_W + i] = red;
+    fp_image[bot*IMG_W + i] = red;
+    fp_image[IMG_W*IMG_H + top*IMG_W + i] = green;
+    fp_image[IMG_W*IMG_H + bot*IMG_W + i] = green;
+    fp_image[IMG_W*IMG_H*2 + top*IMG_W + i] = blue;
+    fp_image[IMG_W*IMG_H*2 + bot*IMG_W + i] = blue;
+  }
+
+  //Draw vertically
+  for(i = top; i <= bot; i++) {
+    fp_image[i*IMG_W + left] = red;
+    fp_image[i*IMG_W + right] = red;
+    fp_image[IMG_W*IMG_H + i*IMG_W + left] = green;
+    fp_image[IMG_W*IMG_H + i*IMG_W + right] = green;
+    fp_image[IMG_W*IMG_H*2 + i*IMG_W + left] = blue;
+    fp_image[IMG_W*IMG_H*2 + i*IMG_W + right] = blue;
+  }
+}
+
+//Draw class label in input image
+void draw_class(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b) {
+  uint16_t mul_16;
+  int l, k;
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++){
+    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++){
+      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //Q8.0*Q8.0 to Q8.0 -> red
+      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g *(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //green
+      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b *(uint16_t)fp_labels[(81+MAX_LABEL_SIZE*j)+l*label_w+k])) >> 8; //blue
+    }
+  }	
+}
+
+//Draw detections (bounding boxes and class labels) in input image
+void draw_detections(unsigned int pos) {
+
+  //locate data pointers
+  int16_t * in_d_pos = (int16_t *) fp_data + pos;
+
+  //local variables
+  int i, j, k;
+  uint8_t colors[6][3] = { {255,0,255}, {0,0,255},{0,255,255},{0,255,0},{255,255,0},{255,0,0} }; //Q8.0
+  uint8_t ratio, red, green, blue, label_w;
+  uint16_t mul_16;
+  int32_t mul_32;
+  int offset, ratio_min, ratio_max;
+  int left, right, top, bot, top_width, previous_w;
+
+  //Check valid detections
+  for(i = 0; i < nboxes; i++) {
+
+    //Find detected classes
+    previous_w = 0;
+    for(j = 0; j < 80; j++) {
+      if(in_d_pos[85*i+5+j] != 0) {
+
+	//Check if this was the first class detected for given box
+	if(previous_w == 0) {
+
+	  //Randomly pick rgb colors for the box
+	  offset = j*123457 % 80;
+  	  mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8
+	  ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6
+	  ratio_min = (ratio >> 6);
+	  ratio_max = ratio_min + 1;
+	  ratio = ratio & 0x3F; //Q2.6
+	  mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6
+	  mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6
+	  red = (mul_16 >> 6); //Q10.6 to Q8.0
+	  mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6
+	  mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6
+	  green = (mul_16 >> 6); //Q10.6 to Q8.0
+	  mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6
+	  mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6
+	  blue = (mul_16 >> 6); //Q10.6 to Q8.0
+
+	  //Calculate box coordinates in image frame
+	  mul_16 = in_d_pos[85*i] - (in_d_pos[85*i+2]>>1); //Q2.14
+	  mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+	  left = (mul_32 >> 14);					
+	  mul_16 = in_d_pos[85*i] + (in_d_pos[85*i+2]>>1); //Q2.14
+	  mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+	  right = (mul_32 >> 14);
+	  mul_16 = in_d_pos[85*i+1] - (in_d_pos[85*i+3]>>1); //Q2.14
+	  mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+	  top = (mul_32 >> 14);
+	  mul_16 = in_d_pos[85*i+1] + (in_d_pos[85*i+3]>>1); //Q2.14
+	  mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+	  bot = (mul_32 >> 14);					
+
+	  //Draw box
+	  for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue);
+
+	  //Limit top and left box coordinates
+	  if(top < 0) top = 0;
+    	  if(left < 0) left = 0;
+	  top_width = top + box_width;
+	  if(top_width - label_height >= 0) top_width -= label_height;
+
+	//Otherwise, add comma and space
+	} else {
+	  label_w = fp_labels[80];
+	  draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
+	  previous_w += label_w;
+	}
+
+	//Draw class labels
+	label_w = fp_labels[j];
+	draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
+	previous_w += label_w;
+      }
+    }
+  }	
+}
+
 //send detection results back
-void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
-
-  //char file pointers
-  unsigned int pos = 2*data_pos_yolo;
-  char * fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + pos) ;
-  int i, j;
-
-  //layer parameters
-  unsigned int LAYER_FILE_SIZE = data_amount*2;
-  unsigned int NUM_LAYER_FRAMES = LAYER_FILE_SIZE/ETH_NBYTES;
+void send_data() {
 
   //Loop to send output of yolo layer
-  for(j = 0; j < NUM_LAYER_FRAMES+1; j++) {
+  int i, j;
+  count_bytes = 0;
+  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      // start timer
-     if(j == 0) {
-       count_bytes = 0;
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
-     }
+     if(j == 0) start = timer_get_count_us(TIMER);
 
      //check if it is last packet (has less data that full payload size)
-     if(j == NUM_LAYER_FRAMES) bytes_to_send = LAYER_FILE_SIZE - count_bytes;
+     if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
+     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_image[j*ETH_NBYTES + i];
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
+
+     //wait to receive frame as ack
+     if(j != NUM_INPUT_FRAMES) while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      //update byte counter
      count_bytes += ETH_NBYTES;
@@ -712,186 +1024,157 @@ int main(int argc, char **argv) {
 
   //resize input image to 418x316x3
   fill_grey();
+  uart_printf("\nResizing input image to 416x416\n");
+  start = timer_get_count_us(TIMER);
   resize_image();
-  ctrl_counter_reset(CACHE_CTRL);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
+  total_time = (end-start)/1000;
+  print_cache_status();
 
   //layer1 (418x316x3 -> 416x316x16)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(NTW_IN_W, NTW_IN_H, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0, NTW_IN_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
-  total_time = (end-start)/1000;
+  total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer2 (416x316x16 -> 210x162x16)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_2_W, LAYER_2_H, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer3 (210x162x16 -> 208x160x32)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_3_W, LAYER_3_H, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0, LAYER_3_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer4 (208x160x32 -> 106x84x32)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_4_W, LAYER_4_H, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer5 (106x84x32 -> 104x84x64)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_5_W, LAYER_5_H, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0, LAYER_5_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer6 (104x84x64 -> 54x46x64)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_H, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer7 (54x46x64 -> 52x44x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_7_W, LAYER_7_H, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, LAYER_7_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer8 (52x44x128 -> 28x26x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_8_W, LAYER_8_H, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //Initial address of layer 10 output
   unsigned int data_pos_layer8 = data_pos + DATA_LAYER_8;
 
   //layer9 (28x26x128 -> 28x28x256) -> Zero-padding
   //Result of layer 9 goes after result of layer 20
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_9_W, LAYER_9_H, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20, LAYER_9_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_10_W, LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_11_W, LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0, LAYER_11_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer12 (14x14x512 -> 15x15x512)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_12_W, LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer13 (15x15x512 -> 13x13x1024)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_13_W, LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0, LAYER_13_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer14 (13x13x1024 -> 15x15x256)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_14_W, LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0, LAYER_14_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //Stores initial address of layer 14 output for first route layer
   unsigned int data_pos_layer14 = data_pos;
 
   //layer15 (15x15x256 -> 13x13x512)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_15_W, LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0, LAYER_15_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer16 (13x13x512 -> 13x13x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_16_W, LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0, LAYER_16_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer17 (13x13x255 -> 13x13x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_17_W);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //Stores initial address of first yolo layer for sending
   unsigned int data_pos_layer17 = data_pos;
@@ -903,60 +1186,84 @@ int main(int argc, char **argv) {
   data_pos = data_pos_layer14;
 
   //layer19 (15x15x256 -> 13x13x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_19_W, LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos, LAYER_19_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer20 (13x13x128 -> 28x28x128)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   upsample_layer(LAYER_20_W, LAYER_20_NUM_KER);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer22 (28x28x128 -> 26x26x256)
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_22_W, LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9, LAYER_22_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer23 (26x26x256 -> 26x26x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_23_W, LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0, LAYER_23_OFFSET);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
 
   //layer24 (26x26x255 -> 26x26x255)
-  timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_24_W);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
-  ctrl_counter_reset(CACHE_CTRL);
+
+  //get candidate boxes
+  uart_printf("\nGetting candidate boxes...\n");
+  unsigned int box_pos = data_pos+DATA_LAYER_24;
+  start = timer_get_count_us(TIMER);
+  get_boxes(LAYER_17_W, yolo1_div, 1, data_pos_layer17, box_pos);
+  get_boxes(LAYER_24_W, yolo2_div, 0, data_pos, box_pos);
+  filter_boxes(box_pos);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Candidate boxes selected in %d us\n", (end-start));
+  total_time += (end-start)/1000;
+  print_cache_status();
+
+  //draw detections
+  uart_printf("\nDrawing detections...\n");
+  start = timer_get_count_us(TIMER);
+  draw_detections(box_pos);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Detection drawn in %d us\n", (end-start));
+  total_time += (end-start)/1000;
+  print_cache_status();
+
+  //print results
+  int i, j;
+  uint32_t pred_32;
+  const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};
+  for(i = 0; i < nboxes; i++) {
+    for(j = 0; j < 80; j++) {
+      if(fp_data[box_pos+85*i+5+j] != 0) {
+	pred_32 = (uint32_t)((uint32_t)fp_data[box_pos+85*i+5+j]*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
+	if( (pred_32&0x3FFF) > 0x2000) uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14)+1);
+	else uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14));
+      }
+    }
+  } 
 
   //return data
   uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
-  send_data(data_pos_layer17, DATA_LAYER_17);
-  send_data(data_pos, DATA_LAYER_24);
+  send_data();
   uart_putc(4);
   return 0;
 }

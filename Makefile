@@ -27,6 +27,7 @@ all:
 	@echo "ld-eth -> communicate through FPGA via Ethernet"
 	@echo "clean  -> clean repo"
 
+
 sim: 
 	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
 
@@ -42,7 +43,13 @@ ld-hw:
 ld-eth:
 	$(eval INTERFACE := $(shell ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep ^"en" | awk '{print $$1}' | sed 's/://g'))
 	$(eval RMAC := $(shell ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g'))
-	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(INTERFACE) $(RMAC);
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
+ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
+	@echo "Creating image file with detections...\n"
+	@python $(FIRM_DIR)/write_image.py $(FIRM_DIR)/detections.bin
+	@echo "Opening image file...\n"
+	@display $(FIRM_DIR)/detections.png
+endif
 
 rmac:
 	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
