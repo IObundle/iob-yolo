@@ -1,3 +1,6 @@
+#File parameters
+INTERM_DATA = 1
+
 TOOLCHAIN_PREFIX = riscv32-unknown-elf-
 
 PYTHON_DIR = ../../submodules/iob-soc/software/python/
@@ -21,10 +24,21 @@ endif
 ifeq ($(SIM),1)
     DEFINE += -DSIM
 endif
+ifeq ($(INTERM_DATA),1)
+    DEFINE += -DINTERM_DATA
+endif
 
 SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c
  
-all: firmware.hex
+all: eth_comm firmware.hex
+
+eth_comm:
+	@sed -i "/interm_data_flag =/d" eth_comm.py
+ifeq ($(INTERM_DATA),1)
+	@sed '1 i interm_data_flag = 1' -i eth_comm.py
+else
+	@sed '1 i interm_data_flag = 0' -i eth_comm.py
+endif
 
 firmware.hex: $(IOB_SOC_FIRM_DIR)/firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h firmware.h $(CACHE_DIR)/iob-cache.h
 	$(TOOLCHAIN_PREFIX)gcc -O3 -ffreestanding  -nostdlib -march=rv32im -mabi=ilp32 -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,$(IOB_SOC_FIRM_DIR)/firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
@@ -43,5 +57,6 @@ clean:
 	@rm -rf ../uart_loader
 	@rm -rf detections.*
 	@rm -rf *.pyc
+	@sed -i "/interm_data_flag =/d" eth_comm.py
 
 .PHONY: all clean

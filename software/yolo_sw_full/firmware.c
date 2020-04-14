@@ -12,7 +12,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-//Constants for candidate boxes
+//Constants for image resize
+#define w_scale ((uint32_t)(((float)(IMG_W-1)/(NEW_W-1))*((uint32_t)1<<22))) // Q1.22
+#define h_scale ((uint32_t)(((float)(IMG_H-1)/(NEW_H-1))*((uint32_t)1<<20))) // Q1.20
+
+//Constants for bounding boxes
 #define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
 #define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
 #define yolo1_div ((int16_t)(((float)1/LAYER_17_W)*((int32_t)1<<15))) //Q1.15
@@ -170,6 +174,7 @@ void receive_data() {
   end = timer_get_count_us(TIMER);
   uart_printf("labels transferred in %d ms\n", (end-start)/1000);
 
+#ifdef INTERM_DATA
   //restart timer
   start = timer_get_count_us(TIMER);
 
@@ -236,6 +241,7 @@ void receive_data() {
   //measure transference time
   end = timer_get_count_us(TIMER);
   uart_printf("intermediate data transferred in %d ms\n", (end-start)/1000);
+#endif
 }
 
 //reset certain DDR positions to zero due to padding
@@ -296,10 +302,10 @@ void reset_DDR() {
 void fill_grey() {
   int i, j, k;
   for(i = 0; i < NTW_IN_C; i++) {
-    for(j = 0; j < 2; j++) {
+    for(j = 0; j < EXTRA_H; j++) {
       for(k = 0; k < NTW_IN_W; k++) {
-	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + j*(NTW_IN_W+2) + (k+1)] = 0x0080; //1st region
-	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + j*(NTW_IN_W+2) + (k+1) + ((NTW_IN_W+2)*NTW_IN_H)] = 0x0080; //2nd region
+	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+GREY_PADD)*(NTW_IN_W+2) + (k+1)] = 0x0080; //1st region
+	fp_data[i*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+GREY_PADD)*(NTW_IN_W+2) + (k+1) + ((NTW_IN_W+2)*(EXTRA_H+NEW_H))] = 0x0080; //2nd region
       }   
     }
   }
@@ -364,7 +370,7 @@ void resize_image() {
 	} else val_h = (next_val_w >> 4); //Q0.12 to Q8.8
 				
 	//Save new value
-	fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + r*(NTW_IN_W+2) + (c+1) + ((NTW_IN_W+2)*2)] = val_h;
+	fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + ((NTW_IN_W+2)*EXTRA_H)] = val_h;
 				
 	//Update variables
 	new_r++;
