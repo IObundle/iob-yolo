@@ -19,6 +19,7 @@ module eth_repeat_tb;
    parameter pclk_per = 40;
    reg RX_CLK = 1;
    always #(pclk_per/2) RX_CLK = ~RX_CLK;
+   wire TX_CLK;
    assign TX_CLK = RX_CLK;
 
    // program memory

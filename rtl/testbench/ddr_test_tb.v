@@ -18,6 +18,7 @@ module ddr_test_tb;
    parameter pclk_per = 40;
    reg RX_CLK = 1;
    always #(pclk_per/2) RX_CLK = ~RX_CLK;
+   wire TX_CLK;
    assign TX_CLK = RX_CLK;
 
    // program memory
@@ -294,7 +295,7 @@ module ddr_test_tb;
 
 		           //address read
 		           .s_axi_arid     ({8{ddr_arid}}),
-		           .s_axi_araddr   (ddr_araddr[28:0]),
+		           .s_axi_araddr   (ddr_araddr[`ADDR_W-`N_SLAVES_W-1:0]),
 		           .s_axi_arlen    (ddr_arlen),
 		           .s_axi_arsize   (ddr_arsize),
                    .s_axi_arburst  (ddr_arburst),
