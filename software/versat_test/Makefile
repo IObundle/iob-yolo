@@ -24,7 +24,7 @@ ifeq ($(SIM),1)
     DEFINE += -DSIM
 endif
 
-SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c
+SRC = firmware.c $(UART_DIR)/iob-uart.c $(IOB_SOC_FIRM_DIR)/firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c
 
 all: versat firmware.hex
 
