@@ -25,9 +25,10 @@ CACHE_DIR := $(IOB_SOC_SUBMODULES_DIR)/iob-cache
 AXI_RAM_DIR := $(IOB_SOC_SUBMODULES_DIR)/axi-mem
 ETH_DIR := $(SUBMODULES_DIR)/iob-eth
 TIMER_DIR := $(SUBMODULES_DIR)/iob-timer
+VERSAT_DIR := $(SUBMODULES_DIR)/iob-versat
 
 #hw includes
-HW_INCLUDE := -I. -I$(RTL_DIR)/include -I$(UART_DIR)/rtl/include -I$(CACHE_DIR)/rtl/header -I$(ETH_DIR)/rtl/include -I$(TIMER_DIR)
+HW_INCLUDE := -I. -I$(RTL_DIR)/include -I$(UART_DIR)/rtl/include -I$(CACHE_DIR)/rtl/header -I$(ETH_DIR)/rtl/include -I$(TIMER_DIR) -I$(VERSAT_DIR)/rtl/include
 
 #testbench defines
 TB_DEFINE = -DPROG_SIZE=$(shell wc -c $(FIRM_DIR)/firmware.bin | head -n1 | cut -d " " -f1)
@@ -51,7 +52,7 @@ ifeq ($(VCD),1)
 endif
 
 #hardware sources
-VSRC = $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(TB_DIR)/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM_DIR)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v
+VSRC = $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(TB_DIR)/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM_DIR)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/rtl/src/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v
 
 all: default_rmac $(VSRC) firmware boot
 	$(VLOG) $(HW_INCLUDE) $(TB_DEFINE) $(VSRC)
