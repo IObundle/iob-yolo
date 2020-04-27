@@ -328,6 +328,23 @@ module system (
                );
 
    //
+   // VERSAT
+   //
+
+   xversat # (
+	       .ADDR_W		     (`ADDR_W-2)
+   ) versat (
+	       .clk		     (clk),
+	       .rst                  (reset_int),
+               .valid                (s_valid[`VERSAT_BASE]),
+               .addr                 (m_addr[`ADDR_W-1:2]),
+               .we		     (|m_wstrb),
+	       .wdata		     (s_rdata[`VERSAT_BASE]),
+	       .ready		     (s_ready[`VERSAT_BASE]),
+               .rdata		     (m_wdata)
+               );
+
+   //
    // DDR MAIN MEMORY
    //
 

@@ -14,3 +14,4 @@ Repository for the implementation of an object detection application based on th
 - **eth_ddr:** same as eth_weights, with the addition that the received data is also saved to DDR. Goal: simultaneous verification of DDR and Ethernet working with lot of data.
 - **yolo_sw:** reception of the input image and weights and full execution of the tiny-yolo CNN in RISCV. Goal: baseline for hardware acceleration of tiny-yolo.
 - **yolo_sw_full:** Full execution of the YOLO pipeline (image resize, tiny-yolo CNN and detections). Goal: baseline for hardware acceleration of full YOLO pipeline.
+- **versat_test:** performs one 3D convolution with 5 input FMs of 5x5 and kernels of 3x3. Goal: verify deep_versat pipeline is working.

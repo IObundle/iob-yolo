@@ -1,11 +1,16 @@
 #configurable parameters
-TEST = yolo_sw_full
+TEST = versat_test
 LOOPBACK = 0
 XILINX = 1
 VCD = 0
+ICARUS = 1
 
 #directories
-SIM_DIR = simulation/ncsim
+ifeq ($(ICARUS),1)
+   SIM_DIR = simulation/icarus
+else
+   SIM_DIR = simulation/ncsim
+endif
 LD_SW_DIR = software/ld-sw
 ifeq ($(XILINX),1)
    FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
@@ -62,6 +67,5 @@ clean:
 	make -C $(FPGA_DIR) clean TEST=$(TEST)
 	make -C $(LD_SW_DIR) clean TEST=$(TEST)
 	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
-
 
 .PHONY: sim fpga clean

@@ -19,9 +19,10 @@ CACHE_DIR = ../../submodules/iob-soc/submodules/iob-cache
 AXI_RAM = ../../submodules/iob-soc/submodules/axi-mem
 ETH_DIR = ../../submodules/iob-eth
 TIMER_DIR = ../../submodules/iob-timer
+VERSAT_DIR = ../../submodules/iob-versat
 
 #hardware includes
-HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR)
+HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include
 
 #hardware defines
 ifeq ($(VCD),1)
@@ -42,7 +43,7 @@ endif
 HW_DEFINE += -define FILES_DIR=$(FILES_DIR)
 
 #hardware sources
-VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v
+VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/rtl/src/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v
 
 #simulator flags
 CFLAGS = -errormax 15 -status -update -linedebug -sv $(HW_DEFINE) $(HW_INCLUDE)
@@ -74,7 +75,7 @@ default_rmac:
 	echo "\`define ETH_RMAC_ADDR 48'h0123456789AB" >> $(ETH_DIR)/rtl/include/iob_eth_defs.vh
 
 clean:
-	@rm -f *# *~ *.vcd *.dat *.hex firmware.bin xmsim.key *.log
+	@rm -f *# *~ *.vcd *.dat *.hex firmware.bin xmsim.key *.log *.txt
 	@rm -rf xcelium.d
 	make -C $(FIRM_DIR) clean
 	make -C $(BOOT_DIR) clean

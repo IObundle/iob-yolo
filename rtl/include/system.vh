@@ -11,7 +11,7 @@
 // minimum 3 slaves: boot, uart and reset
 // optional 1 RAM slave for main memory
 // DDR needs 2 slaves: cache and cache controller
-`define N_SLAVES 8
+`define N_SLAVES 9
 
 //bits reserved to identify slave (2**N_SLAVES-1 is reserved)
 `define N_SLAVES_W 4
@@ -25,6 +25,7 @@
 `define CACHE_CTRL_BASE 5
 `define ETHERNET_BASE 6
 `define TIMER_BASE 7
+`define VERSAT_BASE 8
 
 //address width
 `define ADDR_W 32

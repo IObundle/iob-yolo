@@ -2,10 +2,8 @@
 
 `include "system.vh"
 `include "iob-uart.vh"
-`include "iob_eth_defs.vh"
 
-
-module ddr_test_tb;
+module versat_test_tb;
 
    //clock
    reg clk = 1;
@@ -13,13 +11,6 @@ module ddr_test_tb;
 
    //reset
    reg reset = 1;
-
-   //ethernet clocks
-   parameter pclk_per = 40;
-   reg RX_CLK = 1;
-   always #(pclk_per/2) RX_CLK = ~RX_CLK;
-   wire TX_CLK;
-   assign TX_CLK = RX_CLK;
 
    // program memory
    reg [31:0] progmem[`PROG_SIZE/4-1:0];
@@ -45,8 +36,8 @@ module ddr_test_tb;
    initial begin
 
 `ifdef VCD
-      $dumpfile("system.vcd");
-      $dumpvars(2, ddr_test_tb.uut.eth, ddr_test_tb.uut.picorv32_core);
+      $dumpfile("versat_test.vcd");
+      $dumpvars();
 `endif
 
       //init cpu bus signals
@@ -85,8 +76,6 @@ module ddr_test_tb;
 
    end // test procedure
 
-
-
    //
    // INSTANTIATE COMPONENTS
    //
@@ -96,10 +85,6 @@ module ddr_test_tb;
    wire       trap;
 
    // TESTER ETHERNET SIGNALS
-   reg 	      eth_sel, eth_we;
-   reg [`ETH_ADDR_W-1:0] eth_addr;
-   reg [31:0] 	       eth_data_in, eth_data_out;
-
    wire 	       tester_pll_locked;
    wire 	       tester_eth_phy_resetn;
    wire 	       tester_tx_clk;
@@ -114,11 +99,6 @@ module ddr_test_tb;
    wire 	       tester_rx_dv;
 
    wire 	       eth_phy_resetn;
-
-
-   assign tester_pll_locked = 1'b1;
-   assign tester_rx_clk = RX_CLK;
-   assign tester_tx_clk = TX_CLK;
 
 `ifdef USE_DDR
    //Write address
@@ -241,7 +221,6 @@ module ddr_test_tb;
                    .TX_DATA             (tester_rx_data)
 	           );
 
-
    //TESTER UART
    iob_uart test_uart (
 		               .clk       (clk),
@@ -260,17 +239,13 @@ module ddr_test_tb;
 		               .cts       (tester_cts)
 		               );
 
-
 `ifdef USE_DDR
-   axi_ram #(
-	     .ADDR_WIDTH(`ADDR_W-`N_SLAVES_W) //size according to system.vh
-	     )
-   ddr_model_mem(
+   axi_ram ddr_model_mem(
                  //address write
                    .clk            (clk),
                    .rst            (reset),
 		           .s_axi_awid     ({8{ddr_awid}}),
-		           .s_axi_awaddr   (ddr_awaddr[`ADDR_W-`N_SLAVES_W-1:0]),
+		           .s_axi_awaddr   (ddr_awaddr[15:0]),
                    .s_axi_awlen    (ddr_awlen),
                    .s_axi_awsize   (ddr_awsize),
                    .s_axi_awburst  (ddr_awburst),
@@ -295,7 +270,7 @@ module ddr_test_tb;
 
 		           //address read
 		           .s_axi_arid     ({8{ddr_arid}}),
-		           .s_axi_araddr   (ddr_araddr[`ADDR_W-`N_SLAVES_W-1:0]),
+		           .s_axi_araddr   (ddr_araddr[15:0]),
 		           .s_axi_arlen    (ddr_arlen),
 		           .s_axi_arsize   (ddr_arsize),
                    .s_axi_arburst  (ddr_arburst),

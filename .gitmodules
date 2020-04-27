@@ -7,3 +7,6 @@
 [submodule "submodules/iob-timer"]
 	path = submodules/iob-timer
 	url = git@bitbucket.org:jjts/iob-timer.git
+[submodule "submodules/iob-versat"]
+	path = submodules/iob-versat
+	url = https://github.com/jjts/versat.git

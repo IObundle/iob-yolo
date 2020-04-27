@@ -146,7 +146,7 @@ def main(argv):
     f_weights.close()
 
 #Check if argument identifying type of board is present
-if len(sys.argv) != 3:
+if len(sys.argv) < 3:
     print("<usage>: python eth_comm.py <interface> <RMAC> ")
     sys.exit()
 
