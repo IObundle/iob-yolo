@@ -17,6 +17,11 @@
 
 int main(int argc, char **argv) {
 
+  //local variables
+  int i, j, k, l, m;
+  int pixels[25*nSTAGE], weights[9*nSTAGE], bias, res;
+  unsigned int start, end;
+
   //init UART
   uart_init(UART,UART_CLK_FREQ/UART_BAUD_RATE);
 
@@ -25,12 +30,10 @@ int main(int argc, char **argv) {
   uart_txwait();
 
   //init VERSAT
+  start = timer_get_count_us(TIMER);
   versat_init(VERSAT);
-
-  //local variables
-  int i, j, k, l, m;
-  int pixels[25*5], weights[9*5], bias, res;
-  unsigned int start, end;
+  end = timer_get_count_us(TIMER);
+  uart_printf("Deep versat initialized in %d us\n", (end-start));
 
   //write data in versat mems
   start = timer_get_count_us(TIMER);
@@ -55,14 +58,14 @@ int main(int argc, char **argv) {
     }
   }
   end = timer_get_count_us(TIMER);
-  uart_printf("Data stored in versat mems in %d us\n", (end-start));
+  uart_printf("\nData stored in versat mems in %d us\n", (end-start));
 
   //expected result of 3D convolution
   uart_printf("\nExpected result of 3D convolution\n");
   for(i = 0; i < 3; i++) {
     for(j = 0; j < 3; j++) {
       res = bias;
-      for(k = 0; k < 5; k++) {
+      for(k = 0; k < nSTAGE; k++) {
         for(l = 0; l < 3; l++) {
           for(m = 0; m < 3; m++) {
             res += pixels[i*5+j+k*25+l*5+m] * weights[9*k+l*3+m];
@@ -97,13 +100,13 @@ int main(int argc, char **argv) {
     versat[i].alulite[0].writeConf();
 
     //update variables
-    in_1_alulite = sALULITE_p[0];
-    delay += 2;
+    if(i==0) in_1_alulite = sALULITE_p[0];
+    if(i!=nSTAGE-1) delay += 2;
   }
 
   //config mem2A to store ALULite output
-  versat[4].memA[2].setConf(0, 1, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + 8, 1, 1, sALULITE[0], 0, 1);
-  versat[4].memA[2].writeConf();
+  versat[nSTAGE-1].memA[2].setConf(0, 1, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay, 1, 1, sALULITE[0], 0, 1);
+  versat[nSTAGE-1].memA[2].writeConf();
   end = timer_get_count_us(TIMER);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
   
@@ -114,7 +117,7 @@ int main(int argc, char **argv) {
 
       //configure start values of memories
       for(k = 0; k < nSTAGE; k++) versat[k].memA[0].setStart(i*5+j);
-      versat[4].memA[2].setStart(i*3+j);
+      versat[nSTAGE-1].memA[2].setStart(i*3+j);
 
       //run configurations
       run();
@@ -129,7 +132,7 @@ int main(int argc, char **argv) {
   //display results
   uart_printf("\nActual convolution result\n");
   for(i = 0; i < 3; i++) {
-    for(j = 0; j < 3; j++) uart_printf("%d\t", versat[4].memA[2].read(i*3+j));
+    for(j = 0; j < 3; j++) uart_printf("%d\t", versat[nSTAGE-1].memA[2].read(i*3+j));
     uart_printf("\n");
   }
 
