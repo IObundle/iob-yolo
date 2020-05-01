@@ -49,6 +49,7 @@ read_verilog ../../../submodules/iob-timer/iob_timer.v
 
 #versat
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen.v
+read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen2.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xalu.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xalulite.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xbs.v
@@ -66,6 +67,7 @@ read_verilog ../../../submodules/iob-versat/rtl/src/xstage.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xversat.v
 read_verilog ../../../submodules/iob-versat/submodules/mem/tdp_mem/iob_tdp_mem.v
 set_property file_type SystemVerilog [get_files xaddrgen.v]
+set_property file_type SystemVerilog [get_files xaddrgen2.v]
 set_property file_type SystemVerilog [get_files xalu.v]
 set_property file_type SystemVerilog [get_files xalulite.v]
 set_property file_type SystemVerilog [get_files xbs.v]
