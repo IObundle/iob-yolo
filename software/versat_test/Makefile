@@ -29,7 +29,8 @@ SRC = firmware.c $(UART_DIR)/iob-uart.c $(IOB_SOC_FIRM_DIR)/firmware.S $(ETH_DIR
 all: versat firmware.hex
 
 versat:
-	python $(VERSAT_DIR)/mkhdr.py $(VERSAT_INC) .
+	python $(VERSAT_DIR)/mkvhdr.py . .
+	python $(VERSAT_DIR)/mkhdr.py $(VERSAT_INC) . .
 
 firmware.hex: $(IOB_SOC_FIRM_DIR)/firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h $(CACHE_DIR)/iob-cache.h $(VERSAT_DIR)/versat.hpp versat.h
 	$(TOOLCHAIN_PREFIX)g++ -O3 -nostdlib -march=rv32im -mabi=ilp32 -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) -Wl,-Bstatic,-T,$(IOB_SOC_FIRM_DIR)/firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
@@ -43,7 +44,7 @@ system.h: ../../rtl/include/system.vh
 	sed s/\`/\#/g ../../rtl/include/system.vh > system.h
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.dat *.h
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.dat *.h *.vh
 	@rm -rf uart_loader system.h
 	@rm -rf ../uart_loader
 	@rm -rf *.pyc

@@ -13,7 +13,8 @@ read_verilog ../../../submodules/iob-versat/rtl/include/xconfdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
-read_verilog ../../../submodules/iob-versat/rtl/include/xversat.vh
+read_verilog ../../../submodules/iob-versat/rtl/include/xdefs.vh
+read_verilog xversat.vh
 
 #clock
 if { [lindex $argv 0] != {USE_DDR} } {

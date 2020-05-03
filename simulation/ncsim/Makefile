@@ -22,7 +22,7 @@ TIMER_DIR = ../../submodules/iob-timer
 VERSAT_DIR = ../../submodules/iob-versat
 
 #hardware includes
-HW_INCLUDE = -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include
+HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include
 
 #hardware defines
 ifeq ($(VCD),1)
@@ -51,8 +51,11 @@ EFLAGS = -errormax 15 -access +wc -status
 SFLAGS = -errormax 15 -status -CMDFILE $(RTL_DIR)/testbench
 
 #simulate
-all: default_rmac firmware.hex boot.hex $(VSRC)
+all: versat default_rmac firmware.hex boot.hex $(VSRC)
 	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" TEST=$(TEST) ./run_ncsim.sh
+
+versat:
+	python $(VERSAT_DIR)/software/mkvhdr.py $(FIRM_DIR) .
 
 #make firmware
 firmware.hex:
@@ -75,7 +78,7 @@ default_rmac:
 	echo "\`define ETH_RMAC_ADDR 48'h0123456789AB" >> $(ETH_DIR)/rtl/include/iob_eth_defs.vh
 
 clean:
-	@rm -f *# *~ *.vcd *.dat *.hex firmware.bin xmsim.key *.log *.txt
+	@rm -f *# *~ *.vcd *.dat *.hex firmware.bin xmsim.key *.log *.txt *.vh
 	@rm -rf xcelium.d
 	make -C $(FIRM_DIR) clean
 	make -C $(BOOT_DIR) clean

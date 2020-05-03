@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     stage[i].memA[1].writeConf();
 
     //configure muladd0
-    stage[i].muladd[0].setConf(sMEMA[0], sMEMA[1], MULADD_MUL_LOW_MACC, 1, 9, MEMP_LAT + delay);
+    stage[i].muladd[0].setConf(sMEMA[0], sMEMA[1], MULADD_MACC, 1, 9, MEMP_LAT + delay, 32);
     stage[i].muladd[0].writeConf();
 
     //configure ALULite0 to add bias to muladd result

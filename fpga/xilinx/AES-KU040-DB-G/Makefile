@@ -33,8 +33,11 @@ VSRC = verilog/top_system.v $(RTL_DIR)/include/*.vh $(RTL_DIR_IOB_SOC)/src/memor
 # work-around for http://svn.clifford.at/handicraft/2016/vivadosig11
 export RDI_VERBOSE = False
 
-all: synth_system.bit
+all: versat synth_system.bit
 	#scp $(PORT) $< $(REMOTE)
+
+versat:
+	python $(VERSAT_DIR)/software/mkvhdr.py $(FIRM_DIR) .
 
 synth_system.bit: *.xdc $(VSRC) firmware.hex boot.hex
 	rm -f $@.log
@@ -62,7 +65,7 @@ ld-hw:
 	vivado -nojournal -log $@.log -mode batch -source $@.tcl
 
 clean:
-	@rm -rf .Xil/ *.hex *.dat *.map synth_*.log 
+	@rm -rf .Xil/ *.hex *.dat *.map synth_*.log *.vh
 	@rm -rf *~ \#*# *#  ../rtl/*~ ../rtl/\#*# ../rtl/*# ./rtl/
 	@rm -rf synth_*.mmi synth_*.bit synth_system*.v *.vcd *_tb 
 	@rm -rf table.txt tab_*/ *webtalk* *.jou *.log
