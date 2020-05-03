@@ -14,7 +14,12 @@ read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xdefs.vh
-read_verilog xversat.vh
+if { [file exists [lindex $argv $argc-1]] == 1} {
+    #use xversat.vh of firmware folder
+    read_verilog [lindex $argv $argc-1]
+} else {
+    read_verilog ../../../submodules/iob-versat/rtl/include/versat/xversat.vh
+}
 
 #clock
 if { [lindex $argv 0] != {USE_DDR} } {
@@ -161,5 +166,4 @@ report_utilization
 report_timing
 
 write_bitstream -force synth_system.bit
-
 write_verilog -force synth_system.v
