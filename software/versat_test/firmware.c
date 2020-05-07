@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 
   //local variables
   int i, j, k, l, m;
-  int pixels[25*nSTAGE], weights[9*nSTAGE], bias, res;
+  int16_t pixels[25*nSTAGE], weights[9*nSTAGE], bias, res;
   unsigned int start, end;
 
   //init UART
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     stage[i].memA[1].writeConf();
 
     //configure muladd0
-    stage[i].muladd[0].setConf(sMEMA[0], sMEMA[1], MULADD_MACC, 1, 9, MEMP_LAT + delay, 32);
+    stage[i].muladd[0].setConf(sMEMA[0], sMEMA[1], MULADD_MACC, 1, 9, MEMP_LAT + delay, 0);
     stage[i].muladd[0].writeConf();
 
     //configure ALULite0 to add bias to muladd result
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
   //display results
   uart_printf("\nActual convolution result\n");
   for(i = 0; i < 3; i++) {
-    for(j = 0; j < 3; j++) uart_printf("%d\t", stage[nSTAGE-1].memA[2].read(i*3+j));
+    for(j = 0; j < 3; j++) uart_printf("%d\t", (int16_t) stage[nSTAGE-1].memA[2].read(i*3+j));
     uart_printf("\n");
   }
 
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
   }
 
   //config mem2A to store ALULite output
-  stage[nSTAGE-1].memA[2].setConf(50, 9, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay, 9, 1, sALULITE[0], 0, 1);
+  stage[nSTAGE-1].memA[2].setConf(10, 9, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay, 9, 1, sALULITE[0], 0, 1);
   stage[nSTAGE-1].memA[2].writeConf();
   end = timer_get_count_us(TIMER);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
   //display results
   uart_printf("\nActual convolution result\n");
   for(i = 0; i < 3; i++) {
-    for(j = 0; j < 3; j++) uart_printf("%d\t", stage[nSTAGE-1].memA[2].read(i*3+j+50));
+    for(j = 0; j < 3; j++) uart_printf("%d\t", (int16_t) stage[nSTAGE-1].memA[2].read(i*3+j+10));
     uart_printf("\n");
   }
 

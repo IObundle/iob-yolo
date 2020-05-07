@@ -6,6 +6,7 @@
 `define USE_BOOT
 `define USE_DDR
 `define USE_MAINRAM
+`define USE_VERSAT
 
 // slaves
 // minimum 3 slaves: boot, uart and reset
