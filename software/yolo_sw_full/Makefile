@@ -1,6 +1,6 @@
 #File parameters
-INTERM_DATA = 0
-FIXED = 0
+INTERM_DATA = 1
+FIXED = 1
 
 TOOLCHAIN_PREFIX = riscv32-unknown-elf-
 

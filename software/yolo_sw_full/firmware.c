@@ -822,6 +822,22 @@ void print_cache_status() {
  #define LABEL_BASE_ADDRESS (DDR_MEM + 0x02351340)
  #define DATA_BASE_ADDRESS (DDR_MEM + 0x02808000)
 
+ //define intermediate data constants
+ #define INTERM_LAYER1_SIZE (NTW_IN_W*4) //32 bits per input
+ #define NUM_INTERM_LAYER1_FRAMES (INTERM_LAYER1_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER2_SIZE ((LAYER_3_W+2)*2*4) //32 bits per input
+ #define NUM_INTERM_LAYER2_FRAMES (INTERM_LAYER2_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER4_SIZE ((LAYER_5_W+2)*2*4) //32 bits per input
+ #define NUM_INTERM_LAYER4_FRAMES (INTERM_LAYER4_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER5_SIZE (LAYER_5_W*4) //32 bits per input
+ #define NUM_INTERM_LAYER5_FRAMES (INTERM_LAYER5_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER6_SIZE ((LAYER_7_W+2)*2*4) //32 bits per input
+ #define NUM_INTERM_LAYER6_FRAMES (INTERM_LAYER6_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER8_SIZE ((LAYER_9_W+2)*2*4) //32 bits per input
+ #define NUM_INTERM_LAYER8_FRAMES (INTERM_LAYER8_SIZE/ETH_NBYTES)
+ #define INTERM_LAYER9_SIZE ((LAYER_9_W+2)*4) //32 bits per input
+ #define NUM_INTERM_LAYER9_FRAMES (INTERM_LAYER9_SIZE/ETH_NBYTES)
+
  //Constants for bounding boxes
  #define box_width 3
  #define label_height 20

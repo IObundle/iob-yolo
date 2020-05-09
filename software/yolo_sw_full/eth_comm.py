@@ -214,7 +214,10 @@ if(interm_data_flag):
     
     #Open interm data file
     print("\nStarting interm data transmission...")
-    interm_data_filename = '../interm_data.network'
+    if(fixed_flag):
+        interm_data_filename = '../interm_data.network'
+    else:
+        interm_data_filename = '../interm_data-float.network'
     f_interm_data = open(interm_data_filename, 'rb')
 
     #Reset byte counter
@@ -252,7 +255,10 @@ if(interm_data_flag):
         return count_errors
        
     #Send layer 1 intermediate data
-    layer1_int_size = definitions.NTW_IN_W*2
+    if(fixed_flag):
+        layer1_int_size = definitions.NTW_IN_W*2
+    else:
+        layer1_int_size = definitions.NTW_IN_W*4
     num_frames_layer1 = int(layer1_int_size/eth_nbytes)
     print("layer1_int_size: %d (x%d)" % (layer1_int_size, definitions.NTW_IN_NUM_KER*2))    
     print("num_frames_layer1: %d (x%d)" % (num_frames_layer1+1, definitions.NTW_IN_NUM_KER*2))
@@ -262,7 +268,10 @@ if(interm_data_flag):
     print("layer 1 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 2 intermediate data
-    layer2_int_size = (definitions.LAYER_3_W+2)*2*2
+    if(fixed_flag):
+        layer2_int_size = (definitions.LAYER_3_W+2)*2*2
+    else:
+        layer2_int_size = (definitions.LAYER_3_W+2)*2*4
     num_frames_layer2 = int(layer2_int_size/eth_nbytes)
     print("layer2_int_size: %d (x%d)" % (layer2_int_size, definitions.LAYER_2_NUM_KER*2))    
     print("num_frames_layer2: %d (x%d)" % (num_frames_layer2+1, definitions.LAYER_2_NUM_KER*2))
@@ -272,7 +281,10 @@ if(interm_data_flag):
     print("layer 2 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 4 intermediate data
-    layer4_int_size = (definitions.LAYER_5_W+2)*2*2
+    if(fixed_flag):
+        layer4_int_size = (definitions.LAYER_5_W+2)*2*2
+    else:
+        layer4_int_size = (definitions.LAYER_5_W+2)*2*4
     num_frames_layer4 = int(layer4_int_size/eth_nbytes)
     print("layer4_int_size: %d (x%d)" % (layer4_int_size, definitions.LAYER_4_NUM_KER*2))    
     print("num_frames_layer4: %d (x%d)" % (num_frames_layer4+1, definitions.LAYER_4_NUM_KER*2))
@@ -282,7 +294,10 @@ if(interm_data_flag):
     print("layer 4 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 5 intermediate data
-    layer5_int_size = definitions.LAYER_5_W*2
+    if(fixed_flag):
+        layer5_int_size = definitions.LAYER_5_W*2
+    else:
+        layer5_int_size = definitions.LAYER_5_W*4
     num_frames_layer5 = int(layer5_int_size/eth_nbytes)
     print("layer5_int_size: %d (x%d)" % (layer5_int_size, definitions.LAYER_5_NUM_KER*2))    
     print("num_frames_layer5: %d (x%d)" % (num_frames_layer5+1, definitions.LAYER_5_NUM_KER*2))
@@ -292,7 +307,10 @@ if(interm_data_flag):
     print("layer 5 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 6 intermediate data
-    layer6_int_size = (definitions.LAYER_7_W+2)*2*2 
+    if(fixed_flag):
+        layer6_int_size = (definitions.LAYER_7_W+2)*2*2
+    else:
+        layer6_int_size = (definitions.LAYER_7_W+2)*2*4
     num_frames_layer6 = int(layer6_int_size/eth_nbytes)
     print("layer6_int_size: %d (x%d)" % (layer6_int_size, definitions.LAYER_6_NUM_KER*2))    
     print("num_frames_layer6: %d (x%d)" % (num_frames_layer6+1, definitions.LAYER_6_NUM_KER*2))
@@ -302,7 +320,10 @@ if(interm_data_flag):
     print("layer 6 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 8 intermediate data
-    layer8_int_size = (definitions.LAYER_9_W+2)*2*2 
+    if(fixed_flag):
+        layer8_int_size = (definitions.LAYER_9_W+2)*2*2 
+    else:
+        layer8_int_size = (definitions.LAYER_9_W+2)*2*4
     num_frames_layer8 = int(layer8_int_size/eth_nbytes)
     print("layer8_int_size: %d (x%d)" % (layer8_int_size, definitions.LAYER_8_NUM_KER*2))    
     print("num_frames_layer8: %d (x%d)" % (num_frames_layer8+1, definitions.LAYER_8_NUM_KER*2))
@@ -312,7 +333,10 @@ if(interm_data_flag):
     print("layer 8 interm data transmitted with %d errors...\n" %(count_errors))
     
     #Send layer 9 intermediate data
-    layer9_int_size = (definitions.LAYER_9_W+2)*2 
+    if(fixed_flag):
+        layer9_int_size = (definitions.LAYER_9_W+2)*2 
+    else:
+        layer9_int_size = (definitions.LAYER_9_W+2)*4 
     num_frames_layer9 = int(layer9_int_size/eth_nbytes)
     print("layer9_int_size: %d (x%d)" % (layer9_int_size, definitions.LAYER_9_NUM_KER*2))    
     print("num_frames_layer9: %d (x%d)" % (num_frames_layer9+1, definitions.LAYER_9_NUM_KER*2))
