@@ -1,6 +1,7 @@
 #File parameters
 INTERM_DATA = 1
 FIXED = 1
+GEMM = 0
 
 TOOLCHAIN_PREFIX = riscv32-unknown-elf-
 
@@ -30,6 +31,9 @@ ifeq ($(INTERM_DATA),1)
 endif
 ifeq ($(FIXED),1)
     DEFINE += -DFIXED
+endif
+ifeq ($(GEMM),1)
+    DEFINE += -DGEMM
 endif
 
 SRC = firmware.c $(UART_DIR)/iob-uart.c firmware.S $(ETH_DIR)/iob-eth.c $(TIMER_DIR)/iob_timer.c

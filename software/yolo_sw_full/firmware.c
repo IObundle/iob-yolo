@@ -51,9 +51,16 @@ void print_cache_status() {
  #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
  #define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
  #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
+ #define LABELS_FILE_SIZE (82+MAX_LABEL_SIZE*81) //8 bits per input (82 to keep it align)
+ #define GEMM_IN_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*2) //16 bits per input
+ #define GEMM_OUT_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*4) //32 bits per input
+
+ //define DDR mapping
  #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
- #define DATA_BASE_ADDRESS (DDR_MEM + 0x01408000)
- #define LABEL_BASE_ADDRESS (DDR_MEM + 0x01132880)
+ #define LABEL_BASE_ADDRESS (WEIGTHS_BASE_ADDRESS + WEIGHTS_FILE_SIZE)
+ #define GEMM_IN_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
+ #define GEMM_OUT_BASE_ADDRESS (GEMM_IN_BASE_ADDRESS + GEMM_IN_SIZE + 2) //+2 to be aligned
+ #define DATA_BASE_ADDRESS (GEMM_OUT_BASE_ADDRESS + GEMM_OUT_SIZE)
 
  //define intermediate data constants
  #define INTERM_LAYER1_SIZE (NTW_IN_W*2) //16 bits per input
@@ -93,6 +100,11 @@ void print_cache_status() {
  int16_t *fp_data;
  uint8_t * fp_image;
  uint8_t * fp_labels;
+#ifdef GEMM
+ int16_t * fp_gemm_in;
+ int32_t * fp_gemm_out;
+#endif
+
 
  //define base address of weights and data pointers
  void define_memory_regions() {
@@ -108,6 +120,11 @@ void print_cache_status() {
 
   //labels
   fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
+
+ #ifdef GEMM
+  fp_gemm_in = (int16_t *) GEMM_IN_BASE_ADDRESS;
+  fp_gemm_out = (int32_t *) GEMM_OUT_BASE_ADDRESS;
+ #endif
  }
 
  //fill part of 416x316 region of resized image with grey (0.5 = 0x0080 in Q8.8)
@@ -217,13 +234,77 @@ void print_cache_status() {
 
   //local variables
   int i, j, k, l, m, n;
-  unsigned int output_pos, output_pos2, output_pos3, output_pos4;
+  unsigned int output_pos;
+  int16_t output_conv, leaky = 3276; //0.1 in Q1.15;
+  int32_t mul;
+
+ #ifdef GEMM
+
+  //Transformation
+  for(l = 0; l < c; l++)  		//Number of channels
+    for(m = 0; m < ker_size; m++) 	//Kernel size
+      for(n = 0; n < ker_size; n++) 
+	for(j = 0; j < h; j++)   	//Output map size
+	  for(k = 0; k < w; k++) 
+	    fp_gemm_in[l*ker_size*ker_size*h*w + m*ker_size*h*w + n*h*w + j*w + k] = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n];
+
+  //Convolution
+  for(i = 0; i < num_ker; i++) {
+    for(j = 0; j < c*ker_size*ker_size; j++) {
+      for(k = 0; k < w*h; k++) { 
+	//Q4.12 * Q8.8 = Q12.20
+	if(j == 0) fp_gemm_out[i*w*h + k] = (int32_t)((int32_t)w_pos[i*c*ker_size*ker_size + j]*(int32_t)fp_gemm_in[j*w*h + k]);
+	else fp_gemm_out[i*w*h + k] += (int32_t)((int32_t)w_pos[i*c*ker_size*ker_size + j]*(int32_t)fp_gemm_in[j*w*h + k]);
+      }
+    }
+  }  
+
+  //Result
+  for(i = 0; i < num_ker; i++) {
+    for(j = 0; j < h; j++) { 
+      for(k = 0; k < w; k++) {
+
+      //Calculate output position
+      if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
+      else output_pos = i*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
+
+      //perform batch normalize
+      if(batch_norm) {
+	output_conv = (int16_t)((int32_t) (fp_gemm_out[i*w*h + j*w + k] << 3) >> 16); //Q12.20 to Q9.7
+	mul = (int32_t) output_conv * (int32_t) bias_pos[i]; //Q9.7 * Q8.8 = Q17.15
+	output_conv = (int16_t)((int32_t) (mul << 9) >> 16) +  bias_pos[num_ker+i]; //Q17.15 to Q8.8
+	if(output_conv < 0) {
+	  mul = (int32_t) output_conv * (int32_t) leaky; //Q8.8 * Q1.15 = Q9.23
+	  output_conv = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
+	}
+	out_d_pos[output_pos] = output_conv;
+
+	//Copy last column and last row if needed
+	if(nextStride) {
+	  if(k == w-1) out_d_pos[output_pos + 1] = output_conv; 
+	  if(j == w-1) out_d_pos[output_pos + new_w] = output_conv;
+	  if(k == w-1 && j == w-1) out_d_pos[output_pos + 1 + new_w] = output_conv;
+	}
+      } 
+ 
+      //otherwise, only add bias
+      else {
+	output_conv = (int16_t)((int32_t)(fp_gemm_out[i*w*h + j*w + k] << 4) >> 16);//Q12.20 to Q8.8
+	out_d_pos[output_pos] = output_conv + bias_pos[i];
+      }
+    }
+  }
+ }
+
+ #else
+
+  //local variables
+  unsigned int output_pos2, output_pos3, output_pos4;
   int16_t op1, op2, op2_2, op2_3, op2_4;
-  int16_t output_conv, output_conv2, output_conv3, output_conv4; 
-  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4;
-  int16_t leaky = 3276; //0.1 in Q1.15;
+  int16_t output_conv2, output_conv3, output_conv4;
+  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4; //0.1 in Q1.15;
   int32_t acc_final, acc_final2, acc_final3, acc_final4; 
-  int32_t mul, mul2, mul3, mul4;
+  int32_t mul2, mul3, mul4;
 
   //perform convolution
   for(i = 0; i < num_ker; i+=4) {               //Number of kernels
@@ -342,6 +423,7 @@ void print_cache_status() {
       }
     }
   }
+ #endif
 
   //update weights and data pointers
   if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
@@ -818,9 +900,16 @@ void print_cache_status() {
  #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
  #define WEIGHTS_FILE_SIZE (35409464) //32 bits per input
  #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
- #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //32kb for main mem
- #define LABEL_BASE_ADDRESS (DDR_MEM + 0x02351340)
- #define DATA_BASE_ADDRESS (DDR_MEM + 0x02808000)
+ #define LABELS_FILE_SIZE ((82+MAX_LABEL_SIZE*81)*4) //32 bits per input (82 to keep it align)
+ #define GEMM_IN_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*4) //32 bits per input
+ #define GEMM_OUT_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*4) //32 bits per input
+
+ //define DDR mapping
+ #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
+ #define LABEL_BASE_ADDRESS (WEIGTHS_BASE_ADDRESS + WEIGHTS_FILE_SIZE)
+ #define GEMM_IN_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
+ #define GEMM_OUT_BASE_ADDRESS (GEMM_IN_BASE_ADDRESS + GEMM_IN_SIZE)
+ #define DATA_BASE_ADDRESS (GEMM_OUT_BASE_ADDRESS + GEMM_OUT_SIZE)
 
  //define intermediate data constants
  #define INTERM_LAYER1_SIZE (NTW_IN_W*4) //32 bits per input
@@ -860,6 +949,10 @@ void print_cache_status() {
  float *fp_data;
  float * fp_image;
  float * fp_labels;
+#ifdef GEMM
+ float * fp_gemm_in;
+ float * fp_gemm_out;
+#endif
 
  //define base adress of weights and data pointers
  void define_memory_regions() {
@@ -873,8 +966,13 @@ void print_cache_status() {
    //weights
    fp_weights = (float *) WEIGTHS_BASE_ADDRESS;
 
-  //labels
-  fp_labels = (float *) LABEL_BASE_ADDRESS;
+   //labels
+   fp_labels = (float *) LABEL_BASE_ADDRESS;
+ 
+ #ifdef GEMM
+   fp_gemm_in = (float *) GEMM_IN_BASE_ADDRESS;
+   fp_gemm_out = (float *) GEMM_OUT_BASE_ADDRESS;
+ #endif
  }
 
  //fill part of 416x316 region of resized image with grey (0.5)
@@ -972,14 +1070,66 @@ void print_cache_status() {
 		
   //local variables
   int i, j, k, l, m, n;
-  unsigned int output_pos, output_pos2, output_pos3, output_pos4;
+  unsigned int output_pos;
+  float output_conv, leaky = 0.1;
+
+ #ifdef GEMM
+
+  //Transformation
+  for(l = 0; l < c; l++)  		//Number of channels
+    for(m = 0; m < ker_size; m++) 	//Kernel size
+      for(n = 0; n < ker_size; n++) 
+	for(j = 0; j < h; j++)   	//Output map size
+	  for(k = 0; k < w; k++) 
+	    fp_gemm_in[l*ker_size*ker_size*h*w + m*ker_size*h*w + n*h*w + j*w + k] = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n];
+
+  //Convolution
+  for(i = 0; i < num_ker; i++) {
+    for(j = 0; j < c*ker_size*ker_size; j++) {
+      for(k = 0; k < w*h; k++) {
+	if(j == 0) fp_gemm_out[i*w*h + k] = w_pos[i*c*ker_size*ker_size + j]*fp_gemm_in[j*w*h + k];
+	else fp_gemm_out[i*w*h + k] += w_pos[i*c*ker_size*ker_size + j]*fp_gemm_in[j*w*h + k];
+      }
+    }
+  }
+
+  //Result
+  for(i = 0; i < num_ker; i++) {
+    for(j = 0; j < h; j++) { 
+      for(k = 0; k < w; k++) {
+
+	//Calculate output position
+	if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
+	else output_pos = i*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
+
+	//perform batch normalize
+	if(batch_norm) {
+	  output_conv = fp_gemm_out[i*w*h + j*w + k]*bias_pos[i] + bias_pos[num_ker+i];
+	  if(output_conv < 0) output_conv *= leaky;
+	  out_d_pos[output_pos] = output_conv;
+
+	  //Copy last column and last row if needed
+	  if(nextStride) {
+	    if(k == w-1) out_d_pos[output_pos + 1] = output_conv; 
+	    if(j == w-1) out_d_pos[output_pos + new_w] = output_conv;
+	    if(k == w-1 && j == w-1) out_d_pos[output_pos + 1 + new_w] = output_conv;
+	  }
+	} else out_d_pos[output_pos] = fp_gemm_out[i*w*h + j*w + k] + bias_pos[i];
+      }
+    }
+  }
+
+ #else
+	
+  //local variables
+  unsigned int output_pos2, output_pos3, output_pos4;
   float op1, op2, op2_2, op2_3, op2_4;
-  float output_conv, output_conv2, output_conv3, output_conv4;
-  float acc_final, acc_final2, acc_final3, acc_final4, leaky = 0.1;
-		
+  float output_conv2, output_conv3, output_conv4;
+  float acc_final, acc_final2, acc_final3, acc_final4;
+
   //perform convolution
-  for(i = 0; i < num_ker; i+=4) {								//Number of kernels
-    for(j = 0; j < h; j++) {   								//Output map size
+  for(i = 0; i < num_ker; i+=4) {	//Number of kernels
+    for(j = 0; j < h; j++) {   		//Output map size
       for(k = 0; k < w; k++) {
   	if(nextPadding) {
 	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w); 
@@ -996,8 +1146,8 @@ void print_cache_status() {
 	acc_final2 = 0;
 	acc_final3 = 0;
 	acc_final4 = 0;
-	for(l = 0; l < c; l++) { 						//Number of channels
-	  for(m = 0; m < ker_size; m++) {				//Kernel size
+	for(l = 0; l < c; l++) { 		//Number of channels
+	  for(m = 0; m < ker_size; m++) {	//Kernel size
 	    for(n = 0; n < ker_size; n++) {
 	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n];
 	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
@@ -1062,6 +1212,8 @@ void print_cache_status() {
       }
     }
   }
+
+ #endif
 		
   //update weights and data pointers
   if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
