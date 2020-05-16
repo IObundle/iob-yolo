@@ -19,6 +19,10 @@
 #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
 #define CACHE_CTRL (CACHE_CTRL_BASE<<(ADDR_W-N_SLAVES_W))
 
+//Constants for image resize
+#define w_scale ((float)(IMG_W-1)/(NEW_W-1))
+#define h_scale ((float)(IMG_H-1)/(NEW_H-1))
+
 void print_cache_status() {
   uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
   uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
@@ -28,10 +32,6 @@ void print_cache_status() {
 }
 
 #ifdef FIXED
-
- //Constants for image resize
- #define w_scale ((uint32_t)(((float)(IMG_W-1)/(NEW_W-1))*((uint32_t)1<<22))) // Q1.22
- #define h_scale ((uint32_t)(((float)(IMG_H-1)/(NEW_H-1))*((uint32_t)1<<20))) // Q1.20
 
  //Constants for bounding boxes
  #define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
@@ -54,13 +54,21 @@ void print_cache_status() {
  #define LABELS_FILE_SIZE (82+MAX_LABEL_SIZE*81) //8 bits per input (82 to keep it align)
  #define GEMM_IN_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*2) //16 bits per input
  #define GEMM_OUT_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*4) //32 bits per input
+ #define ix_size (NEW_W*4*2) //16 bits
+ #define iy_size (NEW_H*2) //16 bits
+ #define dx_size (NEW_W*2*2) //16 bits
+ #define dy_size (NEW_H*3*2) //16 bits
 
  //define DDR mapping
  #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
  #define LABEL_BASE_ADDRESS (WEIGTHS_BASE_ADDRESS + WEIGHTS_FILE_SIZE)
  #define GEMM_IN_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
  #define GEMM_OUT_BASE_ADDRESS (GEMM_IN_BASE_ADDRESS + GEMM_IN_SIZE + 2) //+2 to be aligned
- #define DATA_BASE_ADDRESS (GEMM_OUT_BASE_ADDRESS + GEMM_OUT_SIZE)
+ #define ix_BASE_ADDRESS (GEMM_OUT_BASE_ADDRESS + GEMM_OUT_SIZE)
+ #define iy_BASE_ADDRESS (ix_BASE_ADDRESS + ix_size)
+ #define dx_BASE_ADDRESS (iy_BASE_ADDRESS + iy_size)
+ #define dy_BASE_ADDRESS (dx_BASE_ADDRESS + dx_size)
+ #define DATA_BASE_ADDRESS (dy_BASE_ADDRESS + dy_size)
 
  //define intermediate data constants
  #define INTERM_LAYER1_SIZE (NTW_IN_W*2) //16 bits per input
@@ -104,7 +112,7 @@ void print_cache_status() {
  int16_t * fp_gemm_in;
  int32_t * fp_gemm_out;
 #endif
-
+ int16_t * ix, * iy, * dx, * dy;
 
  //define base address of weights and data pointers
  void define_memory_regions() {
@@ -120,6 +128,12 @@ void print_cache_status() {
 
   //labels
   fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
+
+  //resize
+  ix = (int16_t *) ix_BASE_ADDRESS;
+  iy = (int16_t *) iy_BASE_ADDRESS;
+  dx = (int16_t *) dx_BASE_ADDRESS;
+  dy = (int16_t *) dy_BASE_ADDRESS;
 
  #ifdef GEMM
   fp_gemm_in = (int16_t *) GEMM_IN_BASE_ADDRESS;
@@ -140,71 +154,70 @@ void print_cache_status() {
   }
  }
 
+ //initializes ix, iy, dx and dy variables
+ void prepare_resize() {
+
+  //local variables
+  int i, val_i;
+  float val, val_d;
+
+  //loop to initialize ix and dx
+  for(i = 0; i < NEW_W; i++) {
+    val = i*w_scale;
+    val_i = (int) val;
+    val_d = val - val_i;
+    //for iy  
+    ix[2*i] = val_i;
+    ix[2*i+1] = val_i + 1;
+    //for iy+1
+    ix[2*i+2*NEW_W] = val_i + IMG_W;
+    ix[2*i+1+2*NEW_W] = val_i + 1 + IMG_W;
+    //dx
+    dx[2*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+    dx[2*i+1] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+  }
+
+  //loop to initialize iy and dy
+  for(i = 0; i < NEW_H; i++) {
+    val = i*h_scale;
+    iy[i] = (int) val;
+    val_d = val - iy[i];
+    //dy
+    dy[3*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+    dy[3*i+1] = 0;
+    dy[3*i+2] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+  }
+ }
+
  //resize input image to 416x312
  void resize_image() {
 
   //local variables
   uint16_t r, c, k;
-  uint16_t iy, ix, new_r;
-  uint32_t sx, sy, mul, dy, dx;
-  uint16_t val_h, val_w, next_val_w;
-			
-  for(k = 0; k < NTW_IN_C; k++) { 			// 3
-    for(c = 0; c < NTW_IN_W; c++) {			// 416
-      new_r = 1;
-			
-      //Width index calculation
-      if(c == NTW_IN_W-1) val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + (IMG_W-1)]); //Q0.8 to Q0.12
-      else {
-      	sx = (uint32_t)((uint32_t)c*w_scale); //9.0 * Q1.22 = Q10.22			
-	ix = (sx >> 22);
-	dx = (sx & 0x3FFFFF); //Q0.22
-	mul = (uint32_t)((uint32_t)((1<<22)- dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + ix])); //Q0.22 * Q0.8 = Q0.30
-	mul += (uint32_t)((uint32_t)(dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + (ix+1)])); //Q0.30
-	val_w = (uint16_t) (mul >> 18); //Q0.30 to Q0.12
-      }
-			
-      for(r = 0; r < NEW_H; r++) {			// 312
+  int32_t mul;
+  int16_t val_w, next_val_w, val_h;
+ 
+  //perform resize
+  for(k = 0; k < NTW_IN_C; k++) { 
+    for(r = 0; r < NEW_H; r++) {	// 312
+      for(c = 0; c < NEW_W; c++) {	// 416
+	
+	//Width reduction
+	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c]])); //Q2.14 * Q8.8 = Q10.22
+	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1]])); //Q10.22
+	val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15
+	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+2*NEW_W]])); //Q2.14 * Q8.8 = Q10.22
+	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1+2*NEW_W]])); //Q10.22
+	next_val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15	  
 
-        //Width reduction (to 416)	
-	if(c == NTW_IN_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
-	else {
-	  mul = (uint32_t)((uint32_t)((1<<22)- dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + ix])); //Q0.22 * Q0.8 = Q0.30
-	  mul += (uint32_t)((uint32_t)(dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (ix+1)])); //Q0.30
-	  next_val_w = (uint16_t) (mul >> 18); //Q0.30 to Q0.12
-	}
-				
-	//Height index calculation
-	if(r != NEW_H-1) {
-	  sy = (uint32_t)((uint32_t)r*h_scale); //Q9.0 * Q1.20 = Q10.20
-	  iy = (sy >> 20);
-	  dy = (sy & 0xFFFFF); //Q0.20
-					
-	  //Check if to calculate next width
-	  if( (iy+1) != new_r) {
-	    new_r++;
-	    val_w = next_val_w;					
-	    if(c == NTW_IN_W-1) next_val_w = (uint16_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (IMG_W-1)]); //Q0.8 to Q0.12
-	    else {
-	      mul = (uint32_t)((uint32_t)((1<<22)- dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + ix])); //Q0.22 * Q0.8 = Q0.30
-	      mul += (uint32_t)((uint32_t)(dx)*(uint32_t)(fp_image[k*IMG_W*IMG_H + new_r*IMG_W + (ix+1)])); //Q0.30
-	      next_val_w = (uint16_t) (mul >> 18); //Q0.30 to Q0.12
- 	    }
-          }
-					
-	  //Height reduction (to 312)
-	  mul = (uint32_t)((uint32_t)((1<<20)- dy)*(uint32_t)val_w); //Q0.20 * Q0.12 = Q0.32
-	  mul += (uint32_t)((uint32_t)(dy)*(uint32_t)next_val_w); //Q0.32
-	  val_h = (uint16_t) (mul >> 24); //Q0.32 to Q8.8
-	} else val_h = (next_val_w >> 4); //Q0.12 to Q8.8
-				
+	//Height reduction
+	mul = (int32_t)((int32_t)dy[3*r]*(int32_t)val_w); //Q2.14 * Q1.15 = Q3.29
+	mul += (int32_t)((int32_t)dy[3*r+2]*(int32_t)next_val_w); //Q3.29
+	val_h = (int16_t)(mul >> 21); //Q3.29 to Q8.8
+
 	//Save new value
 	fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + ((NTW_IN_W+2)*EXTRA_H)] = val_h;
-				
-	//Update variables
-	new_r++;
-	val_w = next_val_w;
-      }     
+      }
     }
   }
  }
@@ -270,12 +283,12 @@ void print_cache_status() {
 
       //perform batch normalize
       if(batch_norm) {
-	output_conv = (int16_t)((int32_t) (fp_gemm_out[i*w*h + j*w + k] << 3) >> 16); //Q12.20 to Q9.7
-	mul = (int32_t) output_conv * (int32_t) bias_pos[i]; //Q9.7 * Q8.8 = Q17.15
-	output_conv = (int16_t)((int32_t) (mul << 9) >> 16) +  bias_pos[num_ker+i]; //Q17.15 to Q8.8
+	output_conv = (int16_t)(fp_gemm_out[i*w*h + j*w + k] >> 14); //Q12.20 to Q10.6
+	mul = (int32_t) output_conv * (int32_t) bias_pos[i]; //Q10.6 * Q8.8 = Q18.14
+	output_conv = (int16_t)(mul >> 6) +  bias_pos[num_ker+i]; //Q18.14 to Q8.8
 	if(output_conv < 0) {
 	  mul = (int32_t) output_conv * (int32_t) leaky; //Q8.8 * Q1.15 = Q9.23
-	  output_conv = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
+	  output_conv = (int16_t) (mul >> 15); //Convert to Q8.8
 	}
 	out_d_pos[output_pos] = output_conv;
 
@@ -289,7 +302,7 @@ void print_cache_status() {
  
       //otherwise, only add bias
       else {
-	output_conv = (int16_t)((int32_t)(fp_gemm_out[i*w*h + j*w + k] << 4) >> 16);//Q12.20 to Q8.8
+	output_conv = (int16_t)(fp_gemm_out[i*w*h + j*w + k] >> 12);//Q12.20 to Q8.8
 	out_d_pos[output_pos] = output_conv + bias_pos[i];
       }
     }
@@ -347,42 +360,42 @@ void print_cache_status() {
 
 	//perform batch normalize
 	if(batch_norm) {
-	  output_conv = (int16_t) ((int32_t) (acc_final << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i];//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
+	  output_conv = (int16_t) (acc_final >> 14);//Q12.20 to Q10.6
+  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i];//Q10.6 * Q8.8 = Q18.14
+	  mul_16 = (int16_t) (mul >> 6);//Q18.14 to Q8.8
 	  mul_16 += bias_pos[num_ker+i]; //Q8.8
-	  output_conv2 = (int16_t) ((int32_t) (acc_final2 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul2 = (int32_t) output_conv2 * (int32_t) bias_pos[i+1];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_2 = (int16_t) ((int32_t) (mul2 << 9) >> 16);//Q17.15 to Q8.8
+	  output_conv2 = (int16_t) (acc_final2 >> 14);//Q12.20 to Q10.6
+  	  mul2 = (int32_t) output_conv2 * (int32_t) bias_pos[i+1];//Q10.6 * Q8.8 = Q18.14
+	  mul_16_2 = (int16_t) (mul2 >> 6);//Q18.14 to Q8.8
 	  mul_16_2 += bias_pos[num_ker+i+1]; //Q8.8
-	  output_conv3 = (int16_t) ((int32_t) (acc_final3 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul3 = (int32_t) output_conv3 * (int32_t) bias_pos[i+2];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_3 = (int16_t) ((int32_t) (mul3 << 9) >> 16);//Q17.15 to Q8.8
+	  output_conv3 = (int16_t) (acc_final3 >> 14);//Q12.20 to Q10.6
+  	  mul3 = (int32_t) output_conv3 * (int32_t) bias_pos[i+2];//Q10.6 * Q8.8 = Q18.14
+	  mul_16_3 = (int16_t) (mul3 >> 6);//Q18.14 to Q8.8
 	  mul_16_3 += bias_pos[num_ker+i+2]; //Q8.8
-	  output_conv4 = (int16_t) ((int32_t) (acc_final4 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul4 = (int32_t) output_conv4 * (int32_t) bias_pos[i+3];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_4 = (int16_t) ((int32_t) (mul4 << 9) >> 16);//Q17.15 to Q8.8
+	  output_conv4 = (int16_t) (acc_final4 >> 14);//Q12.20 to Q10.6
+  	  mul4 = (int32_t) output_conv4 * (int32_t) bias_pos[i+3];//Q10.6 * Q8.8 = Q18.14
+	  mul_16_4 = (int16_t) (mul4 >> 6);//Q18.14 to Q8.8
 	  mul_16_4 += bias_pos[num_ker+i+3]; //Q8.8
 
 	  //perform leaky activation
 	  if(mul_16 < 0) {
 	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
+	    mul_16 = (int16_t) (mul >> 15); //Convert to Q8.8
 	  }
 	  out_d_pos[output_pos] = mul_16;
 	  if(mul_16_2 < 0) {
 	    mul2 = (int32_t) mul_16_2 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_2 = (int16_t) ((int32_t)(mul2 << 1 ) >> 16); //Convert to Q8.8
+	    mul_16_2 = (int16_t) (mul2 >> 15); //Convert to Q8.8
 	  }
 	  out_d_pos[output_pos2] = mul_16_2;
 	  if(mul_16_3 < 0) {
 	    mul3 = (int32_t) mul_16_3 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_3 = (int16_t) ((int32_t)(mul3 << 1 ) >> 16); //Convert to Q8.8
+	    mul_16_3 = (int16_t) (mul3 >> 15); //Convert to Q8.8
 	  }
 	  out_d_pos[output_pos3] = mul_16_3;
 	  if(mul_16_4 < 0) {
 	    mul4 = (int32_t) mul_16_4 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_4 = (int16_t) ((int32_t)(mul4 << 1 ) >> 16); //Convert to Q8.8
+	    mul_16_4 = (int16_t) (mul4 >> 15); //Convert to Q8.8
 	  }
 	  out_d_pos[output_pos4] = mul_16_4;
 
@@ -411,13 +424,13 @@ void print_cache_status() {
 
 	//otherwise, only add bias
 	else {
-	  output_conv = (int16_t) ((int32_t) (acc_final << 4) >> 16);//Q12.20 to Q8.8
+	  output_conv = (int16_t) (acc_final >> 12);//Q12.20 to Q8.8
 	  out_d_pos[output_pos] = output_conv + bias_pos[i];
-	  output_conv2 = (int16_t) ((int32_t) (acc_final2 << 4) >> 16);//Q12.20 to Q8.8
+	  output_conv2 = (int16_t) (acc_final2 >> 12);//Q12.20 to Q8.8
 	  out_d_pos[output_pos2] = output_conv2 + bias_pos[i+1];
-	  output_conv3 = (int16_t) ((int32_t) (acc_final3 << 4) >> 16);//Q12.20 to Q8.8
+	  output_conv3 = (int16_t) (acc_final3 >> 12);//Q12.20 to Q8.8
 	  out_d_pos[output_pos3] = output_conv3 + bias_pos[i+2];
-	  output_conv4 = (int16_t) ((int32_t) (acc_final4 << 4) >> 16);//Q12.20 to Q8.8
+	  output_conv4 = (int16_t) (acc_final4 >> 12);//Q12.20 to Q8.8
 	  out_d_pos[output_pos4] = output_conv4 + bias_pos[i+3];
 	}
       }
@@ -877,10 +890,6 @@ void print_cache_status() {
 #else
 
  #include <math.h>
-
- //Constants for image resize
- #define w_scale ((float)(IMG_W-1)/(NEW_W-1))
- #define h_scale ((float)(IMG_H-1)/(NEW_H-1))
 
  //Constants for bounding boxes
  #define threshold ((float)0.5)
@@ -1866,6 +1875,11 @@ int main(int argc, char **argv) {
 #ifndef SIM
   reset_DDR();
   receive_data();
+#endif
+
+#ifdef FIXED
+  //initialize ix, iy, dx and dy arrays
+  prepare_resize();
 #endif
 
   //resize input image to 418x316x3
