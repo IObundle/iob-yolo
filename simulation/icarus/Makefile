@@ -29,6 +29,11 @@ VERSAT_DIR := $(SUBMODULES_DIR)/iob-versat
 
 #hw includes
 HW_INCLUDE := -I. -I$(RTL_DIR)/include -I$(UART_DIR)/rtl/include -I$(CACHE_DIR)/rtl/header -I$(ETH_DIR)/rtl/include -I$(TIMER_DIR) -I$(VERSAT_DIR)/rtl/include
+ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
+    HW_INCLUDE += -I$(FIRM_DIR)
+else
+    HW_INCLUDE += -I$(VERSAT_DIR)/rtl/include/versat
+endif
 
 #testbench defines
 TB_DEFINE = -DPROG_SIZE=$(shell wc -c $(FIRM_DIR)/firmware.bin | head -n1 | cut -d " " -f1)
@@ -54,12 +59,9 @@ endif
 #hardware sources
 VSRC = $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(TB_DIR)/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM_DIR)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/rtl/src/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v
 
-all: versat default_rmac $(VSRC) firmware boot
+all: default_rmac $(VSRC) firmware boot 
 	$(VLOG) $(HW_INCLUDE) $(TB_DEFINE) $(VSRC)
 	./a.out
-
-versat:
-	python $(VERSAT_DIR)/software/mkvhdr.py $(FIRM_DIR) .
 
 firmware:
 	make -C $(FIRM_DIR) BAUD=$(BAUD) FREQ=$(FREQ) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) SIM=1

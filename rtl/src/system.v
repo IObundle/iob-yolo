@@ -254,8 +254,10 @@ module system (
    //
    // RESTART CONTROLLER
    //
+   
    reg        rst_ctrl_rdy;
    reg [15:0] soft_reset_cnt;
+   reg	      soft_rst_int;
 
    always @(posedge clk, posedge reset)
      if(reset) begin
@@ -266,16 +268,20 @@ module system (
 `endif
         soft_reset_cnt <= 16'h0;
         rst_ctrl_rdy <= 1'b0;
-     end else if( s_valid[`SOFT_RESET_BASE] && m_wstrb ) begin
-        soft_reset_cnt <= 16'hFFFF;
-        boot <=  m_wdata[0];
-        rst_ctrl_rdy <= 1'b1;
-     end else if (soft_reset_cnt) begin
-        soft_reset_cnt <= soft_reset_cnt - 1'b1;
-        rst_ctrl_rdy <= 1'b0;
+	soft_rst_int <= 1'b0;
+     end else begin
+        if( s_valid[`SOFT_RESET_BASE] && m_wstrb ) begin
+           soft_reset_cnt <= 16'hFFFF;
+           boot <=  m_wdata[0];
+           rst_ctrl_rdy <= 1'b1;
+        end else if (soft_reset_cnt != 16'h0) begin
+           soft_reset_cnt <= soft_reset_cnt - 1'b1;
+           rst_ctrl_rdy <= 1'b0;
+        end
+	soft_rst_int <= (soft_reset_cnt != 16'h0);
      end
 
-   assign soft_reset = (soft_reset_cnt != 16'h0);
+   assign soft_reset = soft_rst_int;
    assign s_ready[`SOFT_RESET_BASE] = rst_ctrl_rdy;
    assign s_rdata[`SOFT_RESET_BASE] = 0;
 
@@ -331,18 +337,38 @@ module system (
    // VERSAT
    //
 
+`ifdef USE_VERSAT
+
+   //register output
+   reg [15:0] versat_wdata_reg;
+   reg versat_ready_reg;
+   wire [15:0] versat_wdata;
+   wire versat_ready;
+   always @ (posedge clk, posedge reset_int)
+     if(reset_int) begin
+        versat_wdata_reg <= 16'b0;
+  	versat_ready_reg <= 1'b0;
+     end else begin
+        versat_wdata_reg <= versat_wdata;
+	versat_ready_reg <= versat_ready;
+     end
+   assign s_rdata[`VERSAT_BASE] = {{`DATA_W/2{1'b0}}, versat_wdata_reg};
+   assign s_ready[`VERSAT_BASE] = versat_ready_reg;
+
    xversat # (
-	       .ADDR_W		     (`ADDR_W-2)
+	       .ADDR_W		     (`ADDR_W-2),
+	       .DATA_W		     (16)
    ) versat (
 	       .clk		     (clk),
 	       .rst                  (reset_int),
                .valid                (s_valid[`VERSAT_BASE]),
                .addr                 (m_addr[`ADDR_W-1:2]),
                .we		     (|m_wstrb),
-	       .wdata		     (s_rdata[`VERSAT_BASE]),
-	       .ready		     (s_ready[`VERSAT_BASE]),
-               .rdata		     (m_wdata)
+	       .wdata		     (versat_wdata),
+	       .ready		     (versat_ready),
+               .rdata		     (m_wdata[15:0])
                );
+`endif
 
    //
    // DDR MAIN MEMORY

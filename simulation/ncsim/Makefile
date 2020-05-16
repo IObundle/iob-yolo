@@ -23,6 +23,11 @@ VERSAT_DIR = ../../submodules/iob-versat
 
 #hardware includes
 HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include
+ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
+    HW_INCLUDE += -incdir $(FIRM_DIR)
+else
+    HW_INCLUDE += -incdir $(VERSAT_DIR)/rtl/include/versat
+endif
 
 #hardware defines
 ifeq ($(VCD),1)
@@ -51,11 +56,8 @@ EFLAGS = -errormax 15 -access +wc -status
 SFLAGS = -errormax 15 -status -CMDFILE $(RTL_DIR)/testbench
 
 #simulate
-all: versat default_rmac firmware.hex boot.hex $(VSRC)
+all: default_rmac firmware.hex boot.hex $(VSRC)
 	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" TEST=$(TEST) ./run_ncsim.sh
-
-versat:
-	python $(VERSAT_DIR)/software/mkvhdr.py $(FIRM_DIR) .
 
 #make firmware
 firmware.hex:

@@ -1,13 +1,13 @@
 {
 	"nSTAGE" : 			5,
-	"nMEM" : 			6,
+	"nMEM" : 			3,
 	"nALU" : 			0,
-	"nALULITE": 			2,
+	"nALULITE": 			1,
 	"nMUL":				0,
-	"nMULADD":			2,
+	"nMULADD":			1,
 	"nBS":				0,
-	"MEM_ADDR_W":			10,
-	"PERIOD_W":			10,
+	"MEM_ADDR_W":			5,
+	"PERIOD_W":			5,
 	"CONF_MEM_ADDR_W": 		3,
 	"CONF_MEM_USE": 		false,
 	"MULADD_COMB":			false
