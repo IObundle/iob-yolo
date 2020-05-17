@@ -104,9 +104,9 @@ void print_cache_status() {
  unsigned int start, end;
 
  //weights and data base address pointers
- int16_t *fp_weights;
- int16_t *fp_data;
- uint8_t * fp_image;
+ int16_t * fp_weights;
+ int16_t * fp_data;
+ int16_t * fp_image;
  uint8_t * fp_labels;
 #ifdef GEMM
  int16_t * fp_gemm_in;
@@ -118,10 +118,10 @@ void print_cache_status() {
  void define_memory_regions() {
 
   //image
-  fp_image = (uint8_t *) DATA_BASE_ADDRESS;
+  fp_image = (int16_t *) DATA_BASE_ADDRESS;
 
   //data
-  fp_data = (int16_t *) (DATA_BASE_ADDRESS + IMAGE_INPUT);
+  fp_data = (int16_t *) (DATA_BASE_ADDRESS + 2*IMAGE_INPUT);
 
   //weights
   fp_weights = (int16_t *) WEIGTHS_BASE_ADDRESS;
@@ -201,13 +201,13 @@ void print_cache_status() {
   for(k = 0; k < NTW_IN_C; k++) { 
     for(r = 0; r < NEW_H; r++) {	// 312
       for(c = 0; c < NEW_W; c++) {	// 416
-	
+
 	//Width reduction
-	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c]])); //Q2.14 * Q8.8 = Q10.22
-	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1]])); //Q10.22
+	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c]])); //Q2.14 * Q8.8 = Q10.22
+	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1]])); //Q10.22
 	val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+2*NEW_W]])); //Q2.14 * Q8.8 = Q10.22
-	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(uint8_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1+2*NEW_W]])); //Q10.22
+	mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+2*NEW_W]])); //Q2.14 * Q8.8 = Q10.22
+	mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1+2*NEW_W]])); //Q10.22
 	next_val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15	  
 
 	//Height reduction
@@ -1626,6 +1626,9 @@ void reset_DDR() {
   uart_printf("\nSetting DDR positions to zero\n");
   start = timer_get_count_us(TIMER);
 
+  //resized image
+  for(i = 0; i < IMAGE_INPUT; i++) fp_image[i] = 0;
+
   //input network
   for(i = 0; i < NETWORK_INPUT; i++) fp_data[i] = 0;
 
@@ -1676,9 +1679,9 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
   int i, j;
   char * fp_data_char;
  #ifdef FIXED
-  if(interm_flag) fp_data_char = (char *) (DATA_BASE_ADDRESS + IMAGE_INPUT + 2*NETWORK_INPUT + 2*pos);
+  if(interm_flag) fp_data_char = (char *) (DATA_BASE_ADDRESS + 2*(IMAGE_INPUT + NETWORK_INPUT + pos));
  #else
-  if(interm_flag) fp_data_char = (char *) (DATA_BASE_ADDRESS + 4*IMAGE_INPUT + 4*NETWORK_INPUT + 4*pos);
+  if(interm_flag) fp_data_char = (char *) (DATA_BASE_ADDRESS + 4*(IMAGE_INPUT + NETWORK_INPUT + pos));
  #endif
   else fp_data_char = (char *) data_p;
   count_bytes = 0;
@@ -1700,7 +1703,13 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
 
      //save in DDR
      for(i = 0; i < bytes_to_receive; i++) {
+     #ifdef FIXED
+       //Check if receiving input image
+       if(DATA_SIZE == INPUT_FILE_SIZE) fp_data_char[j*ETH_NBYTES*2 + i*2] = data_rcv[14+i];
+       else fp_data_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     #else
        fp_data_char[j*ETH_NBYTES + i] = data_rcv[14+i];
+     #endif  
        data_to_send[i] = data_rcv[14+i];
      }
 
@@ -1827,6 +1836,9 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
+#ifdef FIXED
+  char * fp_image_char = (char *) fp_image;
+#endif
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      // start timer
@@ -1837,7 +1849,11 @@ void send_data() {
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
+   #ifdef FIXED
+     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_image_char[j*ETH_NBYTES*2 + i*2];
+   #else
      for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_image[j*ETH_NBYTES + i];
+   #endif
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
