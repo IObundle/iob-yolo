@@ -15,3 +15,4 @@ Repository for the implementation of an object detection application based on th
 - **yolo_sw:** reception of the input image and weights and full execution of the tiny-yolo CNN in RISCV. Goal: baseline for hardware acceleration of tiny-yolo.
 - **yolo_sw_full:** Full execution of the YOLO pipeline (image resize, tiny-yolo CNN and detections). Goal: baseline for hardware acceleration of full YOLO pipeline.
 - **versat_test:** performs one 3D convolution with 5 input FMs of 5x5 and kernels of 3x3. Goal: verify deep_versat pipeline is working.
+- **yolo_hw_full:** Full execution of YOLO pipeline using versat. Goal: adapt yolo-sw code to be easily accelerated by versat.

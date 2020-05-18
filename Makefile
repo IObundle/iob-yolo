@@ -1,5 +1,5 @@
 #configurable parameters
-TEST = yolo_sw_full
+TEST = yolo_hw_full
 LOOPBACK = 0
 XILINX = 1
 VCD = 0
