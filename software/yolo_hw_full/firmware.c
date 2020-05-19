@@ -13,6 +13,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+//define number of versats used in specific function
+#define RESIZE_NSTAGES 26 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26)
+
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
@@ -187,7 +190,7 @@ void prepare_resize() {
 void resize_image() {
 
   //local variables
-  int i, j, k;
+  int i, j, k, l;
   unsigned int data_time, config_time, run_time = 0;
 #ifdef SIM
   int num_err = 0;
@@ -195,46 +198,96 @@ void resize_image() {
 
   //load ix and dx to versat
   start = timer_get_count_us(TIMER);
-  for(i = 0; i < ix_size; i++) stage[0].memA[0].write(i, ix[i]);
-  for(i = 0; i < dx_size; i++) stage[0].memA[1].write(i, dx[i]);
+  for(j = 0; j < RESIZE_NSTAGES; j += 2) {
+    for(i = 0; i < ix_size; i++) stage[j].memA[0].write(i, ix[i]);
+    for(i = 0; i < dx_size; i++) stage[j].memA[1].write(i, dx[i]);
+  }
   end = timer_get_count_us(TIMER);
   data_time = end - start;
 
-  //configure mem0 (stage 0) to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
+  //loop to configure versat stages
   start = timer_get_count_us(TIMER);
-  //start, iter, incr, delay, per, duty, sel, shift, in_wr
-  stage[0].memA[0].setConf(0, 2, 1, 0, 2, 2, 0, 2*NEW_W-2, 0);
-  //iter2, per2, shift2, incr2
-  stage[0].memA[0].setConf(1, NEW_W, 0, 2);
-  stage[0].memA[0].writeConf();
+  for(i = 0; i < RESIZE_NSTAGES; i+=2) {
 
-  //configure mem1(stage 0) to read 1-dx, dx sequence twice
-  stage[0].memA[1].setConf(0, 2, 1, MEMP_LAT, 2, 2, 0, -2, 0);
-  //iter2, per2, shift2, incr2
-  stage[0].memA[1].setConf(1, NEW_W, 0, 2);
-  stage[0].memA[1].writeConf();
+    ///////////////////////////////////////////////////////////////////////////////
+    //                            STAGE i
+    ///////////////////////////////////////////////////////////////////////////////
 
-  //configure mem2 (stage 0) to read input pixels (addressed by mem0)
-  //start, iter, incr, delay, per, duty, sel, shift, in_wr, rvrs, ext
-  stage[0].memA[2].setConf(0, 1, 0, MEMP_LAT, 4*NEW_W, 4*NEW_W, sMEMA[0], 0, 0, 0, 1);
-  stage[0].memA[2].writeConf();
+    //configure mem0 to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
+    //start, iter, incr, delay, per, duty, sel, shift, in_wr
+    stage[i].memA[0].setConf(0, 2, 1, 0, 2, 2, 0, 2*NEW_W-2, 0);
+    //iter2, per2, shift2, incr2
+    stage[i].memA[0].setConf(1, NEW_W, 0, 2);
+    stage[i].memA[0].writeConf();
 
-  //pixel * 1-dx/dx = res0
-  //sela, selb, fns, iter, per, delay, shift
-  stage[0].muladd[0].setConf(sMEMA[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
-  stage[0].muladd[0].writeConf();
+    //configure mem1 to read 1-dx, dx sequence twice
+    stage[i].memA[1].setConf(0, 2, 1, MEMP_LAT, 2, 2, 0, -2, 0);
+    //iter2, per2, shift2, incr2
+    stage[i].memA[1].setConf(1, NEW_W, 0, 2);
+    stage[i].memA[1].writeConf();
 
-  //configure mem0 (stage 1) to read 0, 1-dy, 0, dy sequence
-  stage[1].memA[0].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
-  stage[1].memA[0].writeConf();
+    //configure mem2 to read input pixels (addressed by mem0)
+    //start, iter, incr, delay, per, duty, sel, shift, in_wr, rvrs, ext
+    stage[i].memA[2].setConf(0, 1, 0, MEMP_LAT, 4*NEW_W, 4*NEW_W, sMEMA[0], 0, 0, 0, 1);
+    stage[i].memA[2].writeConf();
 
-  //res0 * 0/1-dy/0/dy = res1
-  stage[1].muladd[0].setConf(sMEMA[0], sMULADD_p[0], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
-  stage[1].muladd[0].writeConf();
+    //pixel * 1-dx/dx = res0
+    //sela, selb, fns, iter, per, delay, shift
+    stage[i].muladd[0].setConf(sMEMA[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
+    stage[i].muladd[0].writeConf();
 
-  //store res1 in mem1 (stage 1)
-  stage[1].memA[1].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[0], 0, 1);
-  stage[1].memA[1].writeConf();
+    //final results are stores in last layer, not first
+    if(i == 0) {
+
+      //res0 * 0/1-dy/0/dy = res1
+      stage[RESIZE_NSTAGES].muladd[1].setConf(sMEMA_p[1], sMULADD_p[1], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
+      stage[RESIZE_NSTAGES].muladd[1].writeConf();
+
+      //store res1 in mem3
+      stage[RESIZE_NSTAGES].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[1], 0, 1);
+      stage[RESIZE_NSTAGES].memA[3].writeConf();
+
+    } else {
+
+      //res0 * 0/1-dy/0/dy = res1
+      stage[i].muladd[1].setConf(sMEMA_p[1], sMULADD_p[1], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
+      stage[i].muladd[1].writeConf();
+
+      //store res1 in mem3
+      stage[i].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[1], 0, 1);
+      stage[i].memA[3].writeConf();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    //                            STAGE i+1
+    ///////////////////////////////////////////////////////////////////////////////
+
+    //configure mem0 (stage 1) to read 0, 1-dy, 0, dy sequence
+    stage[i+1].memA[0].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
+    stage[i+1].memA[0].writeConf();
+
+    //res0 * 0/1-dy/0/dy = res1
+    stage[i+1].muladd[0].setConf(sMEMA[0], sMULADD_p[0], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
+    stage[i+1].muladd[0].writeConf();
+
+    //store res1 in mem3
+    stage[i+1].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[0], 0, 1);
+    stage[i+1].memA[3].writeConf();
+
+    //configure mem2 to read input pixels (addressed by mem0 of previous stage)
+    stage[i+1].memA[2].setConf(0, 1, 0, MEMP_LAT, 4*NEW_W, 4*NEW_W, sMEMA_p[0], 0, 0, 0, 1);
+    stage[i+1].memA[2].writeConf();
+
+    //pixel * 1-dx/dx = res0
+    stage[i+1].muladd[1].setConf(sMEMA_p[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
+    stage[i+1].muladd[1].writeConf();
+
+    //configure mem1 to read 0, 1-dy, 0, dy sequence
+    stage[i+1].memA[1].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
+    stage[i+1].memA[1].writeConf();
+  }
+
+  //end measuring config time
   end = timer_get_count_us(TIMER);
   config_time = end - start;
 
@@ -244,16 +297,23 @@ void resize_image() {
     for(j = 0; j < 1; j++) {
 #else
   for(k = 0; k < NTW_IN_C; k++) {
-    for(j = 0; j < NEW_H; j++) {
+    for(j = 0; j < NEW_H; j += RESIZE_NSTAGES) {
 #endif
 
-      //Store 2 lines of pixels in mem2 (stage 0)
+      //Store 2 lines of pixels in mem2
       //Extra pixel is necessary to be multiplied by zero
       start = timer_get_count_us(TIMER);
-      for(i = 0; i < IMG_W*2+1; i++) stage[0].memA[2].write(i, fp_image[k*IMG_W*IMG_H + iy[j]*IMG_W + i]);
+      for(l = 0; l < RESIZE_NSTAGES; l++)
+        for(i = 0; i < IMG_W*2+1; i++)
+          stage[l].memA[2].write(i, fp_image[k*IMG_W*IMG_H + iy[j+l]*IMG_W + i]);
 
-      //store dy in mem0 (stage 1)
-      for(i = 0; i < 4; i++) stage[1].memA[0].write(i, dy[4*j+i]);
+      //store dy in mem0 and mem1
+      for(l = 0; l < RESIZE_NSTAGES; l+=2) {
+        for(i = 0; i < 4; i++) {
+          stage[l+1].memA[0].write(i, dy[4*(j+l)+i]);
+          stage[l+1].memA[1].write(i, dy[4*(j+l+1)+i]);
+        }
+      }
       end = timer_get_count_us(TIMER);
       data_time += (end - start);
 
@@ -267,11 +327,14 @@ void resize_image() {
       //store result in DDR
       start = timer_get_count_us(TIMER);
       for(i = 0; i < NEW_W; i++)
-      #ifdef SIM
-        if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[1].memA[1].read(i)) num_err++;
-      #else
-        fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[1].memA[1].read(i);
-      #endif
+	for(l = 0; l < RESIZE_NSTAGES; l++)
+        #ifdef SIM
+          if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[l+1].memA[3].read(i)) num_err++;
+        #else
+          fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[l+1].memA[3].read(i);
+        #endif
+
+      //end measuring data load/store time
       end = timer_get_count_us(TIMER);
       data_time += (end - start);
     }

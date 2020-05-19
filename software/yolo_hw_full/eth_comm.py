@@ -119,4 +119,4 @@ for j in range(num_frames_output+1):
         
 #Close file
 f_output.close()
-print("Detections received with %d errors..." %(count_errors))
+print("Resized image received with %d errors..." %(count_errors))
