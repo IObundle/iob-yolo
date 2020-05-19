@@ -20,11 +20,9 @@ ETH_P_ALL = 0x0800
 #Open files
 input_ntw_filename = "../input_fixed.network"
 weights_filename = "../yolov3-tiny_batch-fixed.weights"
-all_data_filename = '../all_data_fixed.network'
 output_ntw_filename = '../output_fixed.network'
 f_in = open(input_ntw_filename, 'rb')
 f_weights = open(weights_filename, 'rb')
-f_data = open(all_data_filename, 'rb')
 f_out = open(output_ntw_filename, "rb")
 input_ntw_file_size = getsize(input_ntw_filename)
 weights_file_size = getsize(weights_filename)
@@ -148,47 +146,7 @@ for k in range(len(yolo_layer_file_size_arr)):
                 count_errors += 1  
 print("Number of errors in yolo layers output: " + str(count_errors))
 
-#######################################################################################
-##Reset byte counter
-#count_bytes = 0
-#print("\nChecking layer output")
-#
-#layer_file_size = DATA_LAYER_17
-#
-##Frame parameters
-#num_frames_layer = int(layer_file_size/eth_nbytes)
-#print("layer_file_size: %d" % layer_file_size)     
-#print("num_frames_layer: %d" % (num_frames_layer+1))
-#
-##Check output of layer
-#pos = NETWORK_INPUT + DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_3 + DATA_LAYER_4 + DATA_LAYER_5 + DATA_LAYER_6 + DATA_LAYER_7 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16
-#f_data.seek(pos)
-#for j in range(num_frames_layer+1):
-#    
-#    #Check if it is last packet (not enough for full payload)
-#    if j == num_frames_layer:
-#        bytes_to_receive = layer_file_size - count_bytes
-#    else:
-#        bytes_to_receive = eth_nbytes
-#        
-#    #Form frames
-#    payload = f_data.read(bytes_to_receive)
-#
-#    #Accumulate sent bytes
-#    count_bytes += eth_nbytes
-#    
-#    #Receve frame
-#    rcv = s.recv(4096)
-#    
-#    #Check if data is correct
-#    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
-#        if sent_byte != rcv_byte:
-#            count_errors += 1  
-#print("Number of errors in layer: " + str(count_errors))
-#######################################################################################
-
 #Close files
 f_in.close()
 f_weights.close()
-f_data.close() 
 f_out.close()

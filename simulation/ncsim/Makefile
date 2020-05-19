@@ -20,9 +20,10 @@ AXI_RAM = ../../submodules/iob-soc/submodules/axi-mem
 ETH_DIR = ../../submodules/iob-eth
 TIMER_DIR = ../../submodules/iob-timer
 VERSAT_DIR = ../../submodules/iob-versat
+VERSAT_IO_DIR = $(VERSAT_DIR)/submodules/versat-io
 
 #hardware includes
-HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include
+HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include -incdir $(VERSAT_IO_DIR)/rtl/include
 ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
     HW_INCLUDE += -incdir $(FIRM_DIR)
 else

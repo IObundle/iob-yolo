@@ -340,24 +340,23 @@ module system (
 `ifdef USE_VERSAT
 
    //register output
-   reg [15:0] versat_wdata_reg;
+   reg [`DATA_W-1:0] versat_wdata_reg;
    reg versat_ready_reg;
-   wire [15:0] versat_wdata;
+   wire [`DATA_W-1:0] versat_wdata;
    wire versat_ready;
    always @ (posedge clk, posedge reset_int)
      if(reset_int) begin
-        versat_wdata_reg <= 16'b0;
+        versat_wdata_reg <= `DATA_W'b0;
   	versat_ready_reg <= 1'b0;
      end else begin
         versat_wdata_reg <= versat_wdata;
 	versat_ready_reg <= versat_ready;
      end
-   assign s_rdata[`VERSAT_BASE] = {{`DATA_W/2{1'b0}}, versat_wdata_reg};
+   assign s_rdata[`VERSAT_BASE] = versat_wdata_reg;
    assign s_ready[`VERSAT_BASE] = versat_ready_reg;
 
    xversat # (
-	       .ADDR_W		     (`ADDR_W-2),
-	       .DATA_W		     (16)
+	       .ADDR_W		     (`ADDR_W-2)
    ) versat (
 	       .clk		     (clk),
 	       .rst                  (reset_int),
@@ -366,7 +365,7 @@ module system (
                .we		     (|m_wstrb),
 	       .wdata		     (versat_wdata),
 	       .ready		     (versat_ready),
-               .rdata		     (m_wdata[15:0])
+               .rdata		     (m_wdata)
                );
 `endif
 

@@ -34,7 +34,7 @@ versat:
 	python $(VERSAT_SW)/mkvhdr.py . .
 	python $(VERSAT_SW)/mkhdr.py $(VERSAT_INC) . $(VERSAT_IO_INC) .
 
-firmware.hex: $(IOB_SOC_FIRM_DIR)/firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h $(CACHE_DIR)/iob-cache.h $(VERSAT_SW)/versat.hpp versat.h
+firmware.hex: $(IOB_SOC_FIRM_DIR)/firmware.lds $(SRC) system.h $(UART_DIR)/iob-uart.h $(ETH_DIR)/iob-eth.h $(TIMER_DIR)/iob_timer.h $(CACHE_DIR)/iob-cache.h $(VERSAT_SW)/versat.hpp versat.h firmware.h
 	$(TOOLCHAIN_PREFIX)g++ -O3 -nostdlib -march=rv32im -mabi=ilp32 -o firmware.elf $(DEFINE) $(INCLUDE) $(SRC) -Wl,-Bstatic,-T,$(IOB_SOC_FIRM_DIR)/firmware.lds,-Map,firmware.map,--strip-debug -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary firmware.elf firmware.bin
 	$(eval MEM_SIZE=`$(IOB_SOC_FIRM_DIR)/get_firmsize.sh`)
@@ -46,7 +46,7 @@ system.h: ../../rtl/include/system.vh
 	sed s/\`/\#/g ../../rtl/include/system.vh > system.h
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.dat *.h *.vh
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.dat *.vh versat.h
 	@rm -rf uart_loader system.h
 	@rm -rf ../uart_loader
 	@rm -rf *.pyc
