@@ -14,6 +14,7 @@ read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xdefs.vh
+read_verilog ../../../submodules/iob-versat/submodules/versat-io/rtl/include/versat-io.vh
 if { [file exists [lindex $argv $argc-1]] == 1} {
     #use xversat.vh of firmware folder
     read_verilog [lindex $argv $argc-1]
