@@ -33,7 +33,7 @@
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
 #define dx_size (NEW_W*2)
-#define dy_size (NEW_H*2)
+#define dy_size (NEW_H*4)
 
 //define DDR mapping
 #define ix_BASE_ADDRESS (DDR_MEM + (int)pow(2,MAINRAM_ADDR_W)) //after main mem
@@ -176,8 +176,10 @@ void prepare_resize() {
     iy[i] = (int) val;
     val_d = val - iy[i];
     //dy
-    dy[2*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
-    dy[2*i+1] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+    dy[4*i] = 0;
+    dy[4*i+1] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+    dy[4*i+2] = 0;
+    dy[4*i+3] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
   }
 }
 
@@ -186,17 +188,20 @@ void resize_image() {
 
   //local variables
   int i, j, k;
+  unsigned int data_time, config_time, run_time = 0;
 #ifdef SIM
   int num_err = 0;
 #endif
 
   //load ix and dx to versat
+  start = timer_get_count_us(TIMER);
   for(i = 0; i < ix_size; i++) stage[0].memA[0].write(i, ix[i]);
   for(i = 0; i < dx_size; i++) stage[0].memA[1].write(i, dx[i]);
-  stage[1].memA[0].write(0, 0);
-  stage[1].memA[0].write(2, 0);
+  end = timer_get_count_us(TIMER);
+  data_time = end - start;
 
   //configure mem0 (stage 0) to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
+  start = timer_get_count_us(TIMER);
   //start, iter, incr, delay, per, duty, sel, shift, in_wr
   stage[0].memA[0].setConf(0, 2, 1, 0, 2, 2, 0, 2*NEW_W-2, 0);
   //iter2, per2, shift2, incr2
@@ -230,6 +235,8 @@ void resize_image() {
   //store res1 in mem1 (stage 1)
   stage[1].memA[1].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[0], 0, 1);
   stage[1].memA[1].writeConf();
+  end = timer_get_count_us(TIMER);
+  config_time = end - start;
 
   //loops for performing resizing
 #ifdef SIM
@@ -242,29 +249,39 @@ void resize_image() {
 
       //Store 2 lines of pixels in mem2 (stage 0)
       //Extra pixel is necessary to be multiplied by zero
+      start = timer_get_count_us(TIMER);
       for(i = 0; i < IMG_W*2+1; i++) stage[0].memA[2].write(i, fp_image[k*IMG_W*IMG_H + iy[j]*IMG_W + i]);
 
       //store dy in mem0 (stage 1)
-      stage[1].memA[0].write(1, dy[2*j]);
-      stage[1].memA[0].write(3, dy[2*j+1]);
+      for(i = 0; i < 4; i++) stage[1].memA[0].write(i, dy[4*j+i]);
+      end = timer_get_count_us(TIMER);
+      data_time += (end - start);
 
       //Wait until done
+      start = timer_get_count_us(TIMER);
       run();
       while(done() == 0);
+      end = timer_get_count_us(TIMER);
+      run_time += (end - start);
 
       //store result in DDR
+      start = timer_get_count_us(TIMER);
       for(i = 0; i < NEW_W; i++)
       #ifdef SIM
         if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[1].memA[1].read(i)) num_err++;
       #else
         fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[1].memA[1].read(i);
       #endif
-
+      end = timer_get_count_us(TIMER);
+      data_time += (end - start);
     }
   }
 #ifdef SIM
   uart_printf("Resizing done with %d errors\n", num_err);
 #endif
+  uart_printf("FU config time = %d us\n", config_time);
+  uart_printf("FU run time = %d us\n", run_time);
+  uart_printf("FU load/store data time = %d us\n", data_time);
 }
 
 //send detection results back
@@ -321,7 +338,6 @@ int main(int argc, char **argv) {
 
   //define memory regions
   define_memory_regions();
-  unsigned int total_time;
 
   //load data and reset DDR to zero
 #ifndef SIM
@@ -335,14 +351,9 @@ int main(int argc, char **argv) {
 
   //resize input image
   uart_printf("\nResizing input image...\n");
-  start = timer_get_count_us(TIMER);
   resize_image();
-  end = timer_get_count_us(TIMER);
-  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
-  total_time = (end-start)/1000;
 
   //return data
-  uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
 #ifndef SIM
   send_data();
 #endif

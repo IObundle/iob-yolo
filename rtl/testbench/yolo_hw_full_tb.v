@@ -10,7 +10,7 @@
 `define ix_size (`NEW_W*4)
 `define iy_size (`NEW_H)
 `define dx_size (`NEW_W*2)
-`define dy_size (`NEW_H*2)
+`define dy_size (`NEW_H*4)
 `define IMAGE_INPUT (768*576*3)
 `define NETWORK_INPUT (418*418*3)
 `define STRINGIFY(x) `"x`"
