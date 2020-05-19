@@ -57,7 +57,7 @@ void print_cache_status() {
  #define ix_size (NEW_W*4*2) //16 bits
  #define iy_size (NEW_H*2) //16 bits
  #define dx_size (NEW_W*2*2) //16 bits
- #define dy_size (NEW_H*3*2) //16 bits
+ #define dy_size (NEW_H*2*2) //16 bits
 
  //define DDR mapping
  #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
@@ -183,9 +183,8 @@ void print_cache_status() {
     iy[i] = (int) val;
     val_d = val - iy[i];
     //dy
-    dy[3*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
-    dy[3*i+1] = 0;
-    dy[3*i+2] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+    dy[2*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+    dy[2*i+1] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
   }
  }
 
@@ -211,8 +210,8 @@ void print_cache_status() {
 	next_val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15	  
 
 	//Height reduction
-	mul = (int32_t)((int32_t)dy[3*r]*(int32_t)val_w); //Q2.14 * Q1.15 = Q3.29
-	mul += (int32_t)((int32_t)dy[3*r+2]*(int32_t)next_val_w); //Q3.29
+	mul = (int32_t)((int32_t)dy[2*r]*(int32_t)val_w); //Q2.14 * Q1.15 = Q3.29
+	mul += (int32_t)((int32_t)dy[2*r+1]*(int32_t)next_val_w); //Q3.29
 	val_h = (int16_t)(mul >> 21); //Q3.29 to Q8.8
 
 	//Save new value

@@ -33,7 +33,7 @@
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
 #define dx_size (NEW_W*2)
-#define dy_size (NEW_H*3)
+#define dy_size (NEW_H*2)
 
 //define DDR mapping
 #define ix_BASE_ADDRESS (DDR_MEM + (int)pow(2,MAINRAM_ADDR_W)) //after main mem
@@ -176,67 +176,25 @@ void prepare_resize() {
     iy[i] = (int) val;
     val_d = val - iy[i];
     //dy
-    dy[3*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
-    dy[3*i+1] = 0;
-    dy[3*i+2] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+    dy[2*i] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+    dy[2*i+1] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
   }
 }
 
+//resize input image
 void resize_image() {
 
   //local variables
-  uint16_t r, c, k;
-  int32_t mul;
-  int16_t val_w, next_val_w, val_h;
+  int i, j, k;
 #ifdef SIM
   int num_err = 0;
 #endif
 
-  //perform resize
-#ifdef SIM
-  for(k = 0; k < 1; k++) {
-    for(r = 0; r < 1; r++) {
-#else
-  for(k = 0; k < NTW_IN_C; k++) {
-    for(r = 0; r < NEW_H; r++) {
-#endif
-      for(c = 0; c < NEW_W; c++) {     
-
-        //Width reduction
-        mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c]])); //Q2.14 * Q8.8 = Q10.22
-        mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1]])); //Q10.22
-        val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-        mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+2*NEW_W]])); //Q2.14 * Q8.8 = Q10.22
-        mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(fp_image[k*IMG_W*IMG_H + iy[r]*IMG_W + ix[2*c+1+2*NEW_W]])); //Q10.22
-        next_val_w = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-
-        //Height reduction
-        mul = (int32_t)((int32_t)dy[3*r]*(int32_t)val_w); //Q2.14 * Q1.15 = Q3.29
-        mul += (int32_t)((int32_t)dy[3*r+2]*(int32_t)next_val_w); //Q3.29
-        val_h = (int16_t)(mul >> 21); //Q3.29 to Q8.8
-
-        //Save new value
-      #ifdef SIM
-	if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+1)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != val_h) num_err++;
-      #else	
-        fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+1)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = val_h;
-      #endif
-      }
-    }
-  }
-#ifdef SIM
-  uart_printf("Resized done with %d errors\n", num_err);
-#endif
-}
-
-//resize input image
-/*void resize_image() {
-
-  //load ix, dx and dy to versat
-  int i;
+  //load ix and dx to versat
   for(i = 0; i < ix_size; i++) stage[0].memA[0].write(i, ix[i]);
   for(i = 0; i < dx_size; i++) stage[0].memA[1].write(i, dx[i]);
-  for(i = 0; i < dy_size; i++) stage[1].memA[0].write(i, dy[i]);
+  stage[1].memA[0].write(0, 0);
+  stage[1].memA[0].write(2, 0);
 
   //configure mem0 (stage 0) to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
   //start, iter, incr, delay, per, duty, sel, shift, in_wr
@@ -261,30 +219,53 @@ void resize_image() {
   stage[0].muladd[0].setConf(sMEMA[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
   stage[0].muladd[0].writeConf();
 
-  //configure mem0 (stage 1) to read 1-dy, 0, dy sequence
-  stage[1].memA[0].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 3, 3, 0, -3, 0);
+  //configure mem0 (stage 1) to read 0, 1-dy, 0, dy sequence
+  stage[1].memA[0].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
   stage[1].memA[0].writeConf();
 
-  //res0 * 1-dy/0/dy = res1
-  stage[1].muladd[0].setConf(sMEMA[0], sMULADD_p[0], MULADD_MACC, NEW_W, 3, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
+  //res0 * 0/1-dy/0/dy = res1
+  stage[1].muladd[0].setConf(sMEMA[0], sMULADD_p[0], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
   stage[1].muladd[0].writeConf();
 
   //store res1 in mem1 (stage 1)
-  stage[1].memA[1].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT, 3, 1, sMULADD[0], 0, 1);
+  stage[1].memA[1].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[0], 0, 1);
   stage[1].memA[1].writeConf();
 
   //loops for performing resizing
+#ifdef SIM
+  for(k = 0; k < 1; k++) {
+    for(j = 0; j < 1; j++) {
+#else
+  for(k = 0; k < NTW_IN_C; k++) {
+    for(j = 0; j < NEW_H; j++) {
+#endif
 
-  //Store 2 lines of pixels in mem2 (stage 0)
-  for(i = 0; i < IMG_W*2; i++) stage[0].memA[2].write(i, fp_image[iy[0]*IMG_W+i]);
+      //Store 2 lines of pixels in mem2 (stage 0)
+      //Extra pixel is necessary to be multiplied by zero
+      for(i = 0; i < IMG_W*2+1; i++) stage[0].memA[2].write(i, fp_image[k*IMG_W*IMG_H + iy[j]*IMG_W + i]);
 
-  //Wait until done
-  run();
-  while(done() == 0);
+      //store dy in mem0 (stage 1)
+      stage[1].memA[0].write(1, dy[2*j]);
+      stage[1].memA[0].write(3, dy[2*j+1]);
 
-  for(i = 0; i < 10; i++) uart_printf("%x\n", stage[1].memA[1].read(i));
+      //Wait until done
+      run();
+      while(done() == 0);
 
-}*/
+      //store result in DDR
+      for(i = 0; i < NEW_W; i++)
+      #ifdef SIM
+        if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[1].memA[1].read(i)) num_err++;
+      #else
+        fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[1].memA[1].read(i);
+      #endif
+
+    }
+  }
+#ifdef SIM
+  uart_printf("Resizing done with %d errors\n", num_err);
+#endif
+}
 
 //send detection results back
 void send_data() {

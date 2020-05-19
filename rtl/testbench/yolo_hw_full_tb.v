@@ -10,7 +10,7 @@
 `define ix_size (`NEW_W*4)
 `define iy_size (`NEW_H)
 `define dx_size (`NEW_W*2)
-`define dy_size (`NEW_H*3)
+`define dy_size (`NEW_H*2)
 `define IMAGE_INPUT (768*576*3)
 `define NETWORK_INPUT (418*418*3)
 `define STRINGIFY(x) `"x`"
@@ -35,6 +35,7 @@ module yolo_hw_full_tb;
    reg          uart_rd;
    reg [31:0]   uart_di;
    reg [31:0]   uart_do;
+   wire		uart_ready;
 
    //cpu to receive getchar
    reg [7:0]    cpu_char = 0;
@@ -49,7 +50,7 @@ module yolo_hw_full_tb;
 
 `ifdef VCD
       $dumpfile("yolo_hw_full.vcd");
-      $dumpvars(2, yolo_hw_full_tb.uut.versat);
+      $dumpvars(0, yolo_hw_full_tb.uut.versat);
 `endif
 
       //init cpu bus signals
@@ -243,6 +244,7 @@ module yolo_hw_full_tb;
 		               .read      (uart_rd),
 		               .data_in   (uart_di),
 		               .data_out  (uart_do),
+			       .ready     (uart_ready),
 
 		               .txd       (tester_txd),
 		               .rxd       (tester_rxd),
