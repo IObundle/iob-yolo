@@ -74,11 +74,59 @@ for j in range(num_frames_input+1):
 f_in.close()
 print("input.network transmitted with %d errors..." %(count_errors))
 
+################################# SEND WEIGHTS ##############################################
+
+#Open weight file
+print("\nStarting input weight transmission...")
+weights_filename = "../yolov3-tiny_batch-fixed.weights"
+f_weights = open(weights_filename, 'rb')
+
+#Frame parameters
+#weights_file_size = getsize(weights_filename)
+weights_file_size = (16*2 + 16*3*3*3)*2 #layer 1
+num_frames_weights = int(weights_file_size/eth_nbytes)
+print("weights_file_size: %d" % weights_file_size)
+print("num_frames_weights: %d" % (num_frames_weights+1))
+
+#Reset byte counter
+count_bytes = 0
+count_errors = 0
+
+# Loop to send weights frames
+for j in range(num_frames_weights+1):
+
+    # check if it is last packet (not enough for full payload)
+    if j == num_frames_weights:
+        bytes_to_send = weights_file_size - count_bytes
+        padding = '\x00' * (eth_nbytes-bytes_to_send)
+    else:
+        bytes_to_send = eth_nbytes
+        padding = ''
+
+    #form frame
+    payload = f_weights.read(bytes_to_send)
+
+    # accumulate sent bytes
+    count_bytes += eth_nbytes
+
+    #Send packet
+    s.send(dst_addr + src_addr + eth_type + payload + padding)
+
+    #receive data back as ack
+    rcv = s.recv(4096)
+    for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_send+14]):
+        if sent_byte != rcv_byte:
+            count_errors += 1
+
+#Close file
+f_weights.close()
+print("weights transmitted with %d errors..." %(count_errors))
+
 ################################# RECEIVE IMAGE RESIZED ##############################################
 
 #Open output image files
 print("\nStarting reception of resized image...")
-output_filename = '../dog_resized.bin'
+output_filename = '../result.bin'
 f_output = open(output_filename, "rb")
 
 #Reset counters

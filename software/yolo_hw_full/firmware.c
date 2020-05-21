@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //define number of versats used in specific function
-#define RESIZE_NSTAGES 26 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26)
+#define RESIZE_NSTAGES 26 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26, 52)
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -29,9 +29,11 @@
 
 //define general constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE IMAGE_INPUT //8 bits per point
+#define INPUT_FILE_SIZE IMAGE_INPUT //8 bits per pixel
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (NETWORK_INPUT*2) //16 bits per output
+#define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
+#define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
+#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -43,7 +45,8 @@
 #define iy_BASE_ADDRESS (ix_BASE_ADDRESS + ix_size*2) //16 bits
 #define dx_BASE_ADDRESS (iy_BASE_ADDRESS + iy_size*2) //16 bits
 #define dy_BASE_ADDRESS (dx_BASE_ADDRESS + dx_size*2) //16 bits
-#define DATA_BASE_ADDRESS (dy_BASE_ADDRESS + dy_size*2) //16 bits
+#define WEIGHTS_BASE_ADDRESS (dy_BASE_ADDRESS + dy_size*2) //16 bits
+#define DATA_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + WEIGHTS_FILE_SIZE) //16 bits
 
 //ETHERNET variables
 int rcv_timeout = 5000;
@@ -55,8 +58,7 @@ unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 unsigned int start, end;
 
 //data base address pointers
-int16_t * fp_data;
-int16_t * fp_image;
+int16_t * fp_data, * fp_image, * fp_weights;
 int16_t * ix, * iy, * dx, * dy;
 
 //define base address of data pointers
@@ -73,6 +75,9 @@ void define_memory_regions() {
   iy = (int16_t *) iy_BASE_ADDRESS;
   dx = (int16_t *) dx_BASE_ADDRESS;
   dy = (int16_t *) dy_BASE_ADDRESS;
+
+  //weights
+  fp_weights = (int16_t *) WEIGHTS_BASE_ADDRESS;
 }
 
 //reset certain DDR positions to zero due to padding
@@ -100,7 +105,6 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 
   //Local variables
   int i, j;
-  char * fp_data_char = (char *) data_p;
   count_bytes = 0;
 
   //Loop to receive intermediate data frames
@@ -118,7 +122,8 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 
      //save in DDR
      for(i = 0; i < bytes_to_receive; i++) {
-       fp_data_char[j*ETH_NBYTES*2 + i*2] = data_rcv[14+i];
+       if(DATA_SIZE == INPUT_FILE_SIZE) data_p[j*ETH_NBYTES*2 + i*2] = data_rcv[14+i];
+       else data_p[j*ETH_NBYTES + i] = data_rcv[14+i];
        data_to_send[i] = data_rcv[14+i];
      }
 
@@ -134,20 +139,26 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 void receive_data() {
 
   //Receive input image
-  uart_printf("\nReady to receive input image...\n");
+  uart_printf("\nReady to receive input image and weights...\n");
   char * fp_image_char = (char *) DATA_BASE_ADDRESS;
   rcv_frame(NUM_INPUT_FRAMES, INPUT_FILE_SIZE, fp_image_char);
   end = timer_get_count_us(TIMER);
   uart_printf("Image received in %d ms\n", (end-start)/1000);
+
+  //Receive weights
+  char * fp_weights_char = (char *) WEIGHTS_BASE_ADDRESS;
+  rcv_frame(NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, fp_weights_char);
+  end = timer_get_count_us(TIMER);
+  uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 }
 
 //fill resized image region with grey (0.5 = 0x0080 in Q8.8)
 void fill_grey() {
   int i, j, k;
-  for(i = 0; i < NTW_IN_C; i++)
-    for(j = 0; j < NTW_IN_H; j++)
-      for(k = 0; k < NTW_IN_W; k++)
-	fp_data[i*(NTW_IN_H+2)*(NTW_IN_W+2) + (j+1)*(NTW_IN_W+2) + (k+1)] = 0x0080;
+  for(i = 0; i < IMG_C; i++)
+    for(j = 0; j < YOLO_INPUT; j++)
+      for(k = 0; k < YOLO_INPUT; k++)
+	fp_data[i*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (k+1)] = 0x0080;
 }
 
 //initializes ix, iy, dx and dy variables
@@ -296,7 +307,7 @@ void resize_image() {
   for(k = 0; k < 1; k++) {
     for(j = 0; j < 1; j++) {
 #else
-  for(k = 0; k < NTW_IN_C; k++) {
+  for(k = 0; k < IMG_C; k++) {
     for(j = 0; j < NEW_H; j += RESIZE_NSTAGES) {
 #endif
 
@@ -329,9 +340,9 @@ void resize_image() {
       for(i = 0; i < NEW_W; i++)
 	for(l = 0; l < RESIZE_NSTAGES; l++)
         #ifdef SIM
-          if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[l+1].memA[3].read(i)) num_err++;
+          if(fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+l+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H)] != stage[l+1].memA[3].read(i)) num_err++;
         #else
-          fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[l+1].memA[3].read(i);
+          fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+l+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H)] = stage[l+1].memA[3].read(i);
         #endif
 
       //end measuring data load/store time
@@ -347,13 +358,62 @@ void resize_image() {
   uart_printf("FU load/store data time = %d us\n", data_time);
 }
 
+//layer 1 (conv)
+void layer1() {
+
+  //update pointers
+  int16_t * output = (int16_t*) fp_data + NETWORK_INPUT;
+  int16_t * scales = (int16_t *) fp_weights + LAYER_1_NUM_KER*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C;
+  int16_t * bias = (int16_t *) scales + LAYER_1_NUM_KER;
+
+  //local variables
+  int i, j, k, l, m, n;
+  int32_t acc;
+  int16_t batch_norm;
+
+  //run layer
+  #ifdef SIM
+  int num_err = 0;
+  for(i = 0; i < 1; i++) {
+    for(j = 0; j < 1; j++) {
+#else
+  for(i = 0; i < LAYER_1_NUM_KER; i++) {
+    for(j = 0; j < YOLO_INPUT; j++) {
+#endif
+
+      for(k = 0; k < YOLO_INPUT; k++) {
+        //convolution
+        acc = 0;
+        for(l = 0; l < IMG_C; l++)
+          for(m = 0; m < LAYER_1_KER_SIZE; m++)
+            for(n = 0; n < LAYER_1_KER_SIZE; n++)
+              acc += (int32_t)((int32_t)fp_data[j*(YOLO_INPUT+2) + k + l*(YOLO_INPUT+2)*(YOLO_INPUT+2) + m*(YOLO_INPUT+2) + n]*(int32_t)fp_weights[i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + l*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + m*LAYER_1_KER_SIZE + n]); //Q8.8*Q4.12=Q12.20
+
+        //batch normalize -> Q12.20 to Q10.6 * Q8.8 = Q18.14 to Q8.8
+        batch_norm = (int16_t)(((int32_t)(acc>>14) * (int32_t) scales[i]) >> 6) + bias[i];
+
+        //activation function -> Q8.8*Q1.15 = Q9.23 to Q8.8
+        if(batch_norm < 0) batch_norm = (int16_t)(((int32_t)batch_norm * (int32_t)3276) >> 15);
+      #ifdef SIM
+        if(output[i*YOLO_INPUT*YOLO_INPUT + j*YOLO_INPUT + k] != batch_norm) num_err++;
+      #else
+        output[i*YOLO_INPUT*YOLO_INPUT + j*YOLO_INPUT + k] = batch_norm;
+      #endif
+      }
+    }
+  }
+#ifdef SIM
+  uart_printf("Layer 1 done with %d errors\n", num_err);
+#endif
+}
+
 //send detection results back
 void send_data() {
 
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_data;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -407,7 +467,6 @@ int main(int argc, char **argv) {
   reset_DDR();
   receive_data();
   fill_grey();
-#endif
 
   //initialize ix, iy, dx and dy arrays
   prepare_resize();
@@ -415,6 +474,14 @@ int main(int argc, char **argv) {
   //resize input image
   uart_printf("\nResizing input image...\n");
   resize_image();
+#endif
+
+  //layer1 (conv)
+  uart_printf("\nRunning layer 1...\n");
+  start = timer_get_count_us(TIMER);
+  layer1();
+  end = timer_get_count_us(TIMER);
+  uart_printf("Layer1 %d ms\n", (end-start)/1000);
 
   //return data
 #ifndef SIM
