@@ -12,6 +12,7 @@ read_verilog ../../../submodules/iob-versat/rtl/include/xbsdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xconfdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
+read_verilog ../../../submodules/iob-versat/rtl/include/xmuladdlitedefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xdefs.vh
 read_verilog ../../../submodules/iob-versat/submodules/versat-io/rtl/include/versat-io.vh
@@ -70,6 +71,7 @@ read_verilog ../../../submodules/iob-versat/rtl/src/xmem.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul_pipe.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmuladd.v
+read_verilog ../../../submodules/iob-versat/rtl/src/xmuladdlite.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xstage.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xversat.v
 read_verilog ../../../submodules/iob-versat/submodules/mem/tdp_mem/iob_tdp_mem.v
@@ -88,6 +90,7 @@ set_property file_type SystemVerilog [get_files xmem.v]
 set_property file_type SystemVerilog [get_files xmul.v]
 set_property file_type SystemVerilog [get_files xmul_pipe.v]
 set_property file_type SystemVerilog [get_files xmuladd.v]
+set_property file_type SystemVerilog [get_files xmuladdlite.v]
 set_property file_type SystemVerilog [get_files xstage.v]
 set_property file_type SystemVerilog [get_files xversat.v]
 

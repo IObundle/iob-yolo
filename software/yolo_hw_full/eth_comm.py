@@ -122,10 +122,10 @@ for j in range(num_frames_weights+1):
 f_weights.close()
 print("weights transmitted with %d errors..." %(count_errors))
 
-################################# RECEIVE IMAGE RESIZED ##############################################
+################################# RECEIVE RESULT ##############################################
 
 #Open output image files
-print("\nStarting reception of resized image...")
+print("\nStarting reception of result...")
 output_filename = '../result.bin'
 f_output = open(output_filename, "rb")
 
@@ -167,4 +167,4 @@ for j in range(num_frames_output+1):
         
 #Close file
 f_output.close()
-print("Resized image received with %d errors..." %(count_errors))
+print("Result received with %d errors..." %(count_errors))
