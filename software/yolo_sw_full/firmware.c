@@ -596,7 +596,8 @@ void print_cache_status() {
 	  val_16 = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k]); //Q2.14
 	  val_32 = (int32_t)((int32_t)val_16*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
 	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  //val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
 	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
 	  out_d_pos[85*nboxes+2] = val_16; //w
 
@@ -604,7 +605,8 @@ void print_cache_status() {
 	  val_16 = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k]); //Q2.14
 	  val_32 = (int32_t)((int32_t)val_16*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
 	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  //val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
 	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
 	  out_d_pos[85*nboxes+3] = val_16; //h
 
@@ -1353,10 +1355,12 @@ void print_cache_status() {
 	    out_d_pos[85*nboxes+1] = (in_d_pos[(85*i+1)*w*w + j*w + k]+j)*xy_div*y_scales - y_bias;
 	
 	    //Calculate w
-	    out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+3*first_yolo)];
+	    //out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+3*first_yolo)];
+	    out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)];
 	    
             //Calculate h
-	    out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+3*first_yolo)+1];
+	    //out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+3*first_yolo)+1];
+	    out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)+1];
 	
 	    //Objectness score
 	    out_d_pos[85*nboxes+4] = in_d_pos[(85*i+4)*w*w + j*w + k];
