@@ -215,7 +215,7 @@ if(interm_data_flag):
     #Open interm data file
     print("\nStarting interm data transmission...")
     if(fixed_flag):
-        interm_data_filename = '../interm_data.network'
+        interm_data_filename = '../interm_data-fixed.network'
     else:
         interm_data_filename = '../interm_data-float.network'
     f_interm_data = open(interm_data_filename, 'rb')

@@ -22,7 +22,7 @@
 //define constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE (418*418*3*2) //16 bits per point
-#define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
+#define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per input
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
 #define WEIGTHS_BASE_ADDRESS (DDR_MEM + 0x00008000) //16kb for program + 16kb for stack
@@ -146,7 +146,7 @@ void receive_data() {
 }
 
 //perform convolutional layer
-void conv_layer_unroll_4_2(int w, int c, int num_ker, int ker_size, int pad, int batch_norm, int nextPadding, int nextStride, int ignorePadding, unsigned int new_output_pos) {
+void conv_layer(int w, int c, int num_ker, int ker_size, int pad, int batch_norm, int nextPadding, int nextStride, int ignorePadding, unsigned int new_output_pos) {
 
   //locate weight and data pointers
   unsigned int pos_delta = (w+2*pad)*(w+2*pad)*c;
@@ -156,595 +156,116 @@ void conv_layer_unroll_4_2(int w, int c, int num_ker, int ker_size, int pad, int
   int16_t * in_d_pos = (int16_t *) fp_data + data_pos;
   int16_t * out_d_pos;
   if(new_output_pos != 0) out_d_pos = (int16_t *) fp_data + new_output_pos; else out_d_pos = (int16_t *) in_d_pos + pos_delta;
-
-  //local variables
-  int i, j, k, l, m, n, new_w;
-  unsigned int output_pos, output_pos2, output_pos3, output_pos4;
-  unsigned int output_pos5, output_pos6, output_pos7, output_pos8;
-  if(nextStride) new_w = w+1; else if(nextPadding) new_w = w+2; else new_w = w;
-  int16_t op1, op2, op2_2, op2_3, op2_4, output_conv, mul_16;
-  int16_t leaky = 3276; //0.1 in Q1.15;
-  int32_t acc, acc2, acc3, acc4, acc5, acc6, acc7, acc8; 
-  int32_t acc_final, acc_final2, acc_final3, acc_final4, acc_final5, acc_final6, acc_final7, acc_final8; 
-  int32_t mul;
-  int16_t shared_bias, shared_scales;
-
-  //perform convolution
-  for(i = 0; i < num_ker; i+=4) {               //Number of kernels
-    for(j = 0; j < w; j+=2) {  	        	//Output map size
-      for(k = 0; k < w; k++) {
-	output_pos = i*new_w*new_w + j*new_w + k;
-	output_pos2 = (i+1)*new_w*new_w + j*new_w + k;
-	output_pos3 = (i+2)*new_w*new_w + j*new_w + k;
-	output_pos4 = (i+3)*new_w*new_w + j*new_w + k;
-	output_pos5 = i*new_w*new_w + (j+1)*new_w + k;
-	output_pos6 = (i+1)*new_w*new_w + (j+1)*new_w + k;
-	output_pos7 = (i+2)*new_w*new_w + (j+1)*new_w + k;
-	output_pos8 = (i+3)*new_w*new_w + (j+1)*new_w + k;
-	acc_final = 0;
-	acc_final2 = 0;
-	acc_final3 = 0;
-	acc_final4 = 0;
-	acc_final5 = 0;
-	acc_final6 = 0;
-	acc_final7 = 0;
-	acc_final8 = 0;
-	for(l = 0; l < c; l++) { 		//Number of channels
- 	  acc = 0;
- 	  acc2 = 0;
- 	  acc3 = 0;
- 	  acc4 = 0;
- 	  acc5 = 0;
- 	  acc6 = 0;
- 	  acc7 = 0;
- 	  acc8 = 0;
-	  for(m = 0; m < ker_size; m++) {	//Kernel size
-	    for(n = 0; n < ker_size; n++) {
-	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc += mul; //Q12.20
-	      op2_2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_2); //Q12.20
-	      acc2 += mul; //Q12.20
-	      op2_3 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_3); //Q12.20
-	      acc3 += mul; //Q12.20
-	      op2_4 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_4); //Q12.20
-	      acc4 += mul; //Q12.20
-	      op1 = in_d_pos[(j+1+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc5 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_2); //Q12.20
-	      acc6 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_3); //Q12.20
-	      acc7 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_4); //Q12.20
-	      acc8 += mul; //Q12.20
-	    }
-	  }
-	  acc_final += acc; //Q12.20
-	  acc_final2 += acc2; //Q12.20
-	  acc_final3 += acc3; //Q12.20
-	  acc_final4 += acc4; //Q12.20
-	  acc_final5 += acc5; //Q12.20
-	  acc_final6 += acc6; //Q12.20
-	  acc_final7 += acc7; //Q12.20
-	  acc_final8 += acc8; //Q12.20
-	}
-
-	//perform batch normalize and leaky activation
-	shared_scales = bias_pos[i]; 
-	shared_bias = bias_pos[num_ker+i];
-	output_conv = (int16_t) ((int32_t) (acc_final << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos] = mul_16;
-	output_conv = (int16_t) ((int32_t) (acc_final5 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos5] = mul_16;
-
-	shared_scales = bias_pos[i+1]; 
-	shared_bias = bias_pos[num_ker+i+1];
-	output_conv = (int16_t) ((int32_t) (acc_final2 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos2] = mul_16;
-	output_conv = (int16_t) ((int32_t) (acc_final6 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos6] = mul_16;
-
-	shared_scales = bias_pos[i+2]; 
-	shared_bias = bias_pos[num_ker+i+2];
-	output_conv = (int16_t) ((int32_t) (acc_final3 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos3] = mul_16;
-	output_conv = (int16_t) ((int32_t) (acc_final7 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos7] = mul_16;
-
-	shared_scales = bias_pos[i+3]; 
-	shared_bias = bias_pos[num_ker+i+3];
-	output_conv = (int16_t) ((int32_t) (acc_final4 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos4] = mul_16;
-	output_conv = (int16_t) ((int32_t) (acc_final8 << 3) >> 16);//Q12.20 to Q9.7
-  	mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	mul_16 += shared_bias; //Q8.8
-	if(mul_16 < 0) {
-	  mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	  mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	}
-	out_d_pos[output_pos8] = mul_16;
-      }
-    }
-  }
-
-  //update weights and data pointers
-  if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
-  else weight_pos += num_ker + num_ker*c*ker_size*ker_size;
-  if(new_output_pos != 0) data_pos = new_output_pos; else data_pos += pos_delta;
-}
-
-//perform convolutional layer
-void conv_layer_unroll_4_0_0_2(int w, int c, int num_ker, int ker_size, int pad, int batch_norm, int nextPadding, int nextStride, int ignorePadding, unsigned int new_output_pos) {
-
-  //locate weight and data pointers
-  unsigned int pos_delta = (w+2*pad)*(w+2*pad)*c;
-  int16_t * w_pos;
-  w_pos = (int16_t *) fp_weights + weight_pos;
-  int16_t * bias_pos = (int16_t *) fp_weights + weight_pos + num_ker*ker_size*ker_size*c;
-  int16_t * in_d_pos = (int16_t *) fp_data + data_pos;
-  int16_t * out_d_pos;
-  if(new_output_pos != 0) out_d_pos = (int16_t *) fp_data + new_output_pos; else out_d_pos = (int16_t *) in_d_pos + pos_delta;
-
+	
   //local variables
   int i, j, k, l, m, n, new_w;
   unsigned int output_pos, output_pos2, output_pos3, output_pos4;
   if(nextStride) new_w = w+1; else if(nextPadding) new_w = w+2; else new_w = w;
-  int16_t op1, op2, output_conv; 
-  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4;
-  int16_t leaky = 3276; //0.1 in Q1.15;
-  int32_t acc, acc2, acc3, acc4; 
-  int32_t acc_final, acc_final2, acc_final3, acc_final4; 
-  int32_t mul;
-
+  int16_t op1, op2;
+  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4, leaky = 3276; //0.1 in Q1.15;	
+  int32_t acc, acc2, acc3, acc4, mul;
+	
   //perform convolution
-  for(i = 0; i < num_ker; i+=4) {               //Number of kernels
-    for(j = 0; j < w; j++) {   	        	//Output map size
+  for(i = 0; i < num_ker; i+=4) {								//Number of kernels
+    for(j = 0; j < w; j++) {   								//Output map size
       for(k = 0; k < w; k++) {
-        if(nextPadding) {
-	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1);
+	if(nextPadding) {
+  	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1); 
 	  output_pos2 = (i+1)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos3 = (i+2)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos4 = (i+3)*new_w*new_w + (j+1)*new_w + (k+1);
-	} else { 
+	  output_pos3 = (i+2)*new_w*new_w + (j+1)*new_w + (k+1); 
+	  output_pos4 = (i+3)*new_w*new_w + (j+1)*new_w + (k+1); 
+	} else {
 	  output_pos = i*new_w*new_w + j*new_w + k;
 	  output_pos2 = (i+1)*new_w*new_w + j*new_w + k;
 	  output_pos3 = (i+2)*new_w*new_w + j*new_w + k;
 	  output_pos4 = (i+3)*new_w*new_w + j*new_w + k;
 	}
-	acc_final = 0;
-	acc_final2 = 0;
-	acc_final3 = 0;
-	acc_final4 = 0;
-	for(l = 0; l < c; l+=2) { 		//Number of channels
- 	  acc = 0; 
- 	  acc2 = 0; 
- 	  acc3 = 0;
- 	  acc4 = 0;
-	  for(m = 0; m < ker_size; m++) {	//Kernel size
+	acc = 0;
+	acc2 = 0;
+	acc3 = 0;
+	acc4 = 0;
+	for(l = 0; l < c; l++) { 						//Number of channels
+	  for(m = 0; m < ker_size; m++) {				//Kernel size
 	    for(n = 0; n < ker_size; n++) {
 	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc += mul; //Q12.20
-	      op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc2 += mul; //Q12.20
-	      op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc3 += mul; //Q12.20
-	      op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc4 += mul; //Q12.20
-
-  	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + (l+1)*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      op2 = w_pos[i*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc += mul; //Q12.20
-	      op2 = w_pos[(i+1)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q6.10
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q14.18
+	      acc += mul; //Q14.18
+	      op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q6.10
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q14.18
 	      acc2 += mul;
-	      op2 = w_pos[(i+2)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q6.10
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q14.18
 	      acc3 += mul;
-	      op2 = w_pos[(i+3)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q6.10
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q14.18
 	      acc4 += mul;
 	    }
 	  }
-	  acc_final += acc; //Q12.20
-	  acc_final2 += acc2; //Q12.20
-	  acc_final3 += acc3; //Q12.20
-	  acc_final4 += acc4; //Q12.20
 	}
-
-	//perform batch normalize
+				
+	//add bias
+	mul_16 = (int16_t)(acc >> 10) + bias_pos[i]; //Q14.18 to Q8.8
+	mul_16_2 = (int16_t)(acc2 >> 10) + bias_pos[i+1]; //Q14.18 to Q8.8
+	mul_16_3 = (int16_t)(acc3 >> 10) + bias_pos[i+2]; //Q14.18 to Q8.8
+	mul_16_4 = (int16_t)(acc4 >> 10) + bias_pos[i+3]; //Q14.18 to Q8.8
+				
+	//perform leaky activation
 	if(batch_norm) {
-	  output_conv = (int16_t) ((int32_t) (acc_final << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i];//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += bias_pos[num_ker+i]; //Q8.8
-	  output_conv = (int16_t) ((int32_t) (acc_final2 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i+1];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_2 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16_2 += bias_pos[num_ker+i+1]; //Q8.8
-	  output_conv = (int16_t) ((int32_t) (acc_final3 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i+2];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_3 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16_3 += bias_pos[num_ker+i+2]; //Q8.8
-	  output_conv = (int16_t) ((int32_t) (acc_final4 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i+3];//Q9.7 * Q8.8 = Q17.15
-	  mul_16_4 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16_4 += bias_pos[num_ker+i+3]; //Q8.8
-
-	  //perform leaky activation
-	  if(mul_16 < 0) {
+	  if(mul_16 < 0) {						
 	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
 	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos] = mul_16;
-	  if(mul_16_2 < 0) {
+	  if(mul_16_2 < 0) {						
 	    mul = (int32_t) mul_16_2 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
 	    mul_16_2 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos2] = mul_16_2;
-	  if(mul_16_3 < 0) {
+	  if(mul_16_3 < 0) {						
 	    mul = (int32_t) mul_16_3 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
 	    mul_16_3 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos3] = mul_16_3;
-	  if(mul_16_4 < 0) {
+	  if(mul_16_4 < 0) {						
 	    mul = (int32_t) mul_16_4 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
 	    mul_16_4 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos4] = mul_16_4;
-
+					
 	  //Copy last column and last row if needed
 	  if(nextStride) {
 	    if(k == w-1) { 
-	      out_d_pos[output_pos + 1] = mul_16;
-	      out_d_pos[output_pos2 + 1] = mul_16_2;
+	      out_d_pos[output_pos + 1] = mul_16; 
+	      out_d_pos[output_pos2 + 1] = mul_16_2; 
 	      out_d_pos[output_pos3 + 1] = mul_16_3;
 	      out_d_pos[output_pos4 + 1] = mul_16_4;
 	    }
-	    if(j == w-1) {
-	      out_d_pos[output_pos + new_w] = mul_16;
+	    if(j == w-1) { 
+	      out_d_pos[output_pos + new_w] = mul_16; 
 	      out_d_pos[output_pos2 + new_w] = mul_16_2;
 	      out_d_pos[output_pos3 + new_w] = mul_16_3;
-	      out_d_pos[output_pos4 + new_w] = mul_16_4;
+	      out_d_pos[output_pos4 + new_w] = mul_16_4;							
 	    }
-	    if(k == w-1 && j == w-1) {
-	      out_d_pos[output_pos + 1 + new_w] = mul_16;
-	      out_d_pos[output_pos2 + 1 + new_w] = mul_16_2;
-	      out_d_pos[output_pos3 + 1 + new_w] = mul_16_3;
-	      out_d_pos[output_pos4 + 1 + new_w] = mul_16_4;
+	    if(k == w-1 && j == w-1) { 
+	      out_d_pos[output_pos + 1 + new_w] = mul_16; 
+	      out_d_pos[output_pos2 + 1 + new_w] = mul_16_2; 
+	      out_d_pos[output_pos3 + 1 + new_w] = mul_16_3; 
+	      out_d_pos[output_pos4 + 1 + new_w] = mul_16_4; 
 	    }
 	  }
 	}
-
-	//otherwise, only add bias
-	else {
-	  output_conv = (int16_t) ((int32_t) (acc_final << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos] = output_conv + bias_pos[i];
-	  output_conv = (int16_t) ((int32_t) (acc_final2 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos2] = output_conv + bias_pos[i+1];
-	  output_conv = (int16_t) ((int32_t) (acc_final3 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos3] = output_conv + bias_pos[i+2];
-	  output_conv = (int16_t) ((int32_t) (acc_final4 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos4] = output_conv + bias_pos[i+3];
-	}
+				
+	//store results
+	out_d_pos[output_pos] = mul_16;
+	out_d_pos[output_pos2] = mul_16_2;
+	out_d_pos[output_pos3] = mul_16_3;
+	out_d_pos[output_pos4] = mul_16_4;
       }
     }
   }
-
+	
   //update weights and data pointers
-  if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
-  else weight_pos += num_ker + num_ker*c*ker_size*ker_size;
+  weight_pos += num_ker + num_ker*c*ker_size*ker_size;
   if(new_output_pos != 0) data_pos = new_output_pos; else data_pos += pos_delta;
 }
 
-//perform convolutional layer
-void conv_layer_unroll_4_2_0_2(int w, int c, int num_ker, int ker_size, int pad, int batch_norm, int nextPadding, int nextStride, int ignorePadding, unsigned int new_output_pos) {
-
-  //locate weight and data pointers
-  unsigned int pos_delta = (w+2*pad)*(w+2*pad)*c;
-  int16_t * w_pos;
-  w_pos = (int16_t *) fp_weights + weight_pos;
-  int16_t * bias_pos = (int16_t *) fp_weights + weight_pos + num_ker*ker_size*ker_size*c;
-  int16_t * in_d_pos = (int16_t *) fp_data + data_pos;
-  int16_t * out_d_pos;
-  if(new_output_pos != 0) out_d_pos = (int16_t *) fp_data + new_output_pos; else out_d_pos = (int16_t *) in_d_pos + pos_delta;
-
-  //local variables
-  int i, j, k, l, m, n, new_w;
-  unsigned int output_pos, output_pos2, output_pos3, output_pos4, output_pos5, output_pos6, output_pos7, output_pos8;
-  if(nextStride) new_w = w+1; else if(nextPadding) new_w = w+2; else new_w = w;
-  int16_t op1, op2, op2_2, op2_3, op2_4, op2_5, op2_6, op2_7, op2_8, output_conv, mul_16;
-  int16_t leaky = 3276; //0.1 in Q1.15;
-  int32_t acc, acc2, acc3, acc4, acc5, acc6, acc7, acc8; 
-  int32_t acc_final, acc_final2, acc_final3, acc_final4, acc_final5, acc_final6, acc_final7, acc_final8; 
-  int32_t mul;
-  int16_t shared_bias, shared_scales;
-
-  //perform convolution
-  for(i = 0; i < num_ker; i+=4) {               //Number of kernels
-    for(j = 0; j < w; j+=2) {           	//Output map size
-      for(k = 0; k < w; k++) {
-        if(nextPadding) {
-	  output_pos = i*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos2 = (i+1)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos3 = (i+2)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos4 = (i+3)*new_w*new_w + (j+1)*new_w + (k+1);
-	  output_pos5 = i*new_w*new_w + (j+2)*new_w + (k+1);
-	  output_pos6 = (i+1)*new_w*new_w + (j+2)*new_w + (k+1);
-	  output_pos7 = (i+2)*new_w*new_w + (j+2)*new_w + (k+1);
-	  output_pos8 = (i+3)*new_w*new_w + (j+2)*new_w + (k+1);
-	} else { 
-	  output_pos = i*new_w*new_w + j*new_w + k;
-	  output_pos2 = (i+1)*new_w*new_w + j*new_w + k;
-	  output_pos3 = (i+2)*new_w*new_w + j*new_w + k;
-	  output_pos4 = (i+3)*new_w*new_w + j*new_w + k;
-	  output_pos5 = i*new_w*new_w + (j+1)*new_w + k;
-	  output_pos6 = (i+1)*new_w*new_w + (j+1)*new_w + k;
-	  output_pos7 = (i+2)*new_w*new_w + (j+1)*new_w + k;
-	  output_pos8 = (i+3)*new_w*new_w + (j+1)*new_w + k;
-	}
-	acc_final = 0;
-	acc_final2 = 0;
-	acc_final3 = 0;
-	acc_final4 = 0;
-	acc_final5 = 0;
-	acc_final6 = 0;
-	acc_final7 = 0;
-	acc_final8 = 0;
-	for(l = 0; l < c; l+=2) { 		//Number of channels
- 	  acc = 0; 
- 	  acc2 = 0; 
- 	  acc3 = 0;
- 	  acc4 = 0;
- 	  acc5 = 0; 
- 	  acc6 = 0; 
- 	  acc7 = 0;
- 	  acc8 = 0;
-	  for(m = 0; m < ker_size; m++) {	//Kernel size
-	    for(n = 0; n < ker_size; n++) {
-	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc += mul; //Q12.20
-	      op2_2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_2); //Q12.20
-	      acc2 += mul; //Q12.20
-	      op2_3 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_3); //Q12.20
-	      acc3 += mul; //Q12.20
-	      op2_4 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_4); //Q12.20
-	      acc4 += mul; //Q12.20
-  	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + (l+1)*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      op2_5 = w_pos[i*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_5); //Q12.20
-	      acc += mul; //Q12.20
-	      op2_6 = w_pos[(i+1)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_6); //Q12.20
-	      acc2 += mul;
-	      op2_7 = w_pos[(i+2)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_7); //Q12.20
-	      acc3 += mul;
-	      op2_8 = w_pos[(i+3)*c*ker_size*ker_size + (l+1)*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_8); //Q12.20
-	      acc4 += mul;
-
-	      op1 = in_d_pos[(j+1+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc5 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_2); //Q12.20
-	      acc6 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_3); //Q12.20
-	      acc7 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_4); //Q12.20
-	      acc8 += mul; //Q12.20
-  	      op1 = in_d_pos[(j+1+ignorePadding)*(w+2*pad) + (k+ignorePadding) + (l+1)*(w+2*pad)*(w+2*pad) + m*(w+2*pad) + n]; //Q8.8
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_5); //Q12.20
-	      acc5 += mul; //Q12.20
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_6); //Q12.20
-	      acc6 += mul;
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_7); //Q12.20
-	      acc7 += mul;
-	      mul = (int32_t)((int32_t)op1*(int32_t)op2_8); //Q12.20
-	      acc8 += mul;
-	    }
-	  }
-	  acc_final += acc; //Q12.20
-	  acc_final2 += acc2; //Q12.20
-	  acc_final3 += acc3; //Q12.20
-	  acc_final4 += acc4; //Q12.20
-	  acc_final5 += acc5; //Q12.20
-	  acc_final6 += acc6; //Q12.20
-	  acc_final7 += acc7; //Q12.20
-	  acc_final8 += acc8; //Q12.20
-	}
-
-	//perform batch normalize and leaky activation
-	if(batch_norm) {
-
-	  shared_scales = bias_pos[i];
- 	  shared_bias = bias_pos[num_ker+i];
-	  output_conv = (int16_t) ((int32_t) (acc_final << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos] = mul_16;
-	  output_conv = (int16_t) ((int32_t) (acc_final5 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos5] = mul_16;
-
-	  shared_scales = bias_pos[i+1];
- 	  shared_bias = bias_pos[num_ker+i+1];
-	  output_conv = (int16_t) ((int32_t) (acc_final2 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos2] = mul_16;
-	  output_conv = (int16_t) ((int32_t) (acc_final6 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos6] = mul_16;
-
-	  shared_scales = bias_pos[i+2];
- 	  shared_bias = bias_pos[num_ker+i+2];
-	  output_conv = (int16_t) ((int32_t) (acc_final3 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos3] = mul_16;
-	  output_conv = (int16_t) ((int32_t) (acc_final7 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos7] = mul_16;
-
-	  shared_scales = bias_pos[i+3];
- 	  shared_bias = bias_pos[num_ker+i+3];
-	  output_conv = (int16_t) ((int32_t) (acc_final4 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos4] = mul_16;
-	  output_conv = (int16_t) ((int32_t) (acc_final8 << 3) >> 16);//Q12.20 to Q9.7
-  	  mul = (int32_t) output_conv * (int32_t) shared_scales;//Q9.7 * Q8.8 = Q17.15
-	  mul_16 = (int16_t) ((int32_t) (mul << 9) >> 16);//Q17.15 to Q8.8
-	  mul_16 += shared_bias; //Q8.8
-	  if(mul_16 < 0) {
-	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16 = (int16_t) ((int32_t)(mul << 1 ) >> 16); //Convert to Q8.8
-	  }
-	  out_d_pos[output_pos8] = mul_16;
-
-	}
-
-	//otherwise, only add bias
-	else {
-
-	  shared_bias = bias_pos[i];
-	  output_conv = (int16_t) ((int32_t) (acc_final << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos] = output_conv + shared_bias;
-	  output_conv = (int16_t) ((int32_t) (acc_final5 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos5] = output_conv + shared_bias;
-
-	  shared_bias = bias_pos[i+1];
-	  output_conv = (int16_t) ((int32_t) (acc_final2 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos2] = output_conv + shared_bias;
-	  output_conv = (int16_t) ((int32_t) (acc_final6 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos6] = output_conv + shared_bias;
-
-	  shared_bias = bias_pos[i+2];
-	  output_conv = (int16_t) ((int32_t) (acc_final3 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos3] = output_conv + shared_bias;
-	  output_conv = (int16_t) ((int32_t) (acc_final7 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos7] = output_conv + shared_bias;
-
-	  shared_bias = bias_pos[i+3];
-	  output_conv = (int16_t) ((int32_t) (acc_final4 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos4] = output_conv + shared_bias;
-	  output_conv = (int16_t) ((int32_t) (acc_final8 << 4) >> 16);//Q12.20 to Q8.8
-	  out_d_pos[output_pos8] = output_conv + shared_bias;
-
-	}
-      }
-    }
-  }
-
-  //update weights and data pointers
-  if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
-  else weight_pos += num_ker + num_ker*c*ker_size*ker_size;
-  if(new_output_pos != 0) data_pos = new_output_pos; else data_pos += pos_delta;
-}
 //perform maxpool layer
 void maxpool_layer(int w, int num_ker, int downsample, int ignorePadding, unsigned int new_output_pos) {
 
@@ -976,7 +497,7 @@ int main(int argc, char **argv) {
   //layer1 (418x418x3 -> 416x416x16)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2(NTW_IN_W, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0);
+  conv_layer(NTW_IN_W, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
@@ -996,7 +517,7 @@ int main(int argc, char **argv) {
   //layer3 (210x210x16 -> 208x208x32)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_3_W, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0);
+  conv_layer(LAYER_3_W, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1016,7 +537,7 @@ int main(int argc, char **argv) {
   //layer5 (106x106x32 -> 104x104x64)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_5_W, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0);
+  conv_layer(LAYER_5_W, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1036,7 +557,7 @@ int main(int argc, char **argv) {
   //layer7 (54x54x64 -> 52x52x128)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_7_W, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0);
+  conv_layer(LAYER_7_W, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1060,7 +581,7 @@ int main(int argc, char **argv) {
   //Result of layer 9 goes after result of layer 20
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_9_W, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20);
+  conv_layer(LAYER_9_W, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1081,7 +602,7 @@ int main(int argc, char **argv) {
   //Repeats last line and column of each feature map
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0);
+  conv_layer(LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1101,7 +622,7 @@ int main(int argc, char **argv) {
   //layer13 (15x15x512 -> 13x13x1024)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0);
+  conv_layer(LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1111,7 +632,7 @@ int main(int argc, char **argv) {
   //layer14 (13x13x1024 -> 15x15x256)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0);
+  conv_layer(LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1124,7 +645,7 @@ int main(int argc, char **argv) {
   //layer15 (15x15x256 -> 13x13x512)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0);
+  conv_layer(LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1134,7 +655,7 @@ int main(int argc, char **argv) {
   //layer16 (13x13x512 -> 13x13x255)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0);
+  conv_layer(LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1163,7 +684,7 @@ int main(int argc, char **argv) {
   //layer19 (15x15x256 -> 13x13x128)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_0_0_2(LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos);
+  conv_layer(LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1184,7 +705,7 @@ int main(int argc, char **argv) {
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9);
+  conv_layer(LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
@@ -1194,7 +715,7 @@ int main(int argc, char **argv) {
   //layer23 (26x26x256 -> 26x26x255)
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
-  conv_layer_unroll_4_2_0_2(LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0);
+  conv_layer(LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
   uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;

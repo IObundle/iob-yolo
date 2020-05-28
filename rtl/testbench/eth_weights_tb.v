@@ -6,7 +6,7 @@
 
 `define ETH_NBYTES (1024-18)
 `define DATA_FILE_SIZE (418*418*3*2) //16 bits per input
-`define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
+`define WEIGHTS_FILE_SIZE (17698364) //16 bits per input
 `define STRINGIFY(x) `"x`"
 `define NUM_DATA_FRAMES (`DATA_FILE_SIZE/`ETH_NBYTES)
 `define NUM_WEIGHT_FRAMES (`WEIGHTS_FILE_SIZE/`ETH_NBYTES)
