@@ -8,10 +8,12 @@
 	"nALULITE": 			1,
 	"nMUL":				0,
 	"nMULADD":			1,
+	"nMULADDLITE":			0,
 	"nBS":				0,
 	"MEM_ADDR_W":			5,
 	"PERIOD_W":			5,
 	"CONF_MEM_ADDR_W": 		3,
 	"CONF_MEM_USE": 		false,
-	"MULADD_COMB":			false
+	"MULADD_COMB":			false,
+	"include":                      ["\"xmuladdlitedefs.vh\""]
 }
