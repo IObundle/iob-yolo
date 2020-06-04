@@ -83,7 +83,7 @@ f_weights = open(weights_filename, 'rb')
 
 #Frame parameters
 #weights_file_size = getsize(weights_filename)
-weights_file_size = (16*2 + 16*3*3*3)*2 #layer 1
+weights_file_size = (16 + 16*3*3*3)*2 #layer 1
 num_frames_weights = int(weights_file_size/eth_nbytes)
 print("weights_file_size: %d" % weights_file_size)
 print("num_frames_weights: %d" % (num_frames_weights+1))

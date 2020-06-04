@@ -16,7 +16,7 @@
 `define NETWORK_INPUT (418*418*3)
 `define STRINGIFY(x) `"x`"
 `define DDR_INITIAL (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size)*2)
-`define WEIGHTS_LAYER_1 (16*2 + 16*3*3*3)
+`define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
 `define FILE_SIZE ((`DDR_INITIAL + (`WEIGHTS_LAYER_1+`IMAGE_INPUT+`NETWORK_INPUT+`LAYER_1)*2)/4)
 
 module yolo_hw_full_tb;

@@ -14,5 +14,6 @@
 	"PERIOD_W":			11,
 	"CONF_MEM_ADDR_W": 		3,
 	"CONF_MEM_USE": 		false,
-	"MULADD_COMB":			false
+	"MULADD_COMB":			false,
+	"include":			["\"xmuladdlitedefs.vh\""]
 }
