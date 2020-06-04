@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 `include "xversat.vh"
 
-module xmuladdlite # (
+module xyolo # (
 		parameter		      DATA_W = 32
 	) (
                 input                         rst,
@@ -13,7 +13,7 @@ module xmuladdlite # (
                 output [DATA_W-1:0] 	      flow_out,
 
                 // config interface
-                input [`MULADDLITE_CONF_BITS-1:0] configdata
+                input [`YOLO_CONF_BITS-1:0] configdata
                 );
 
    //double precision data
@@ -40,17 +40,17 @@ module xmuladdlite # (
    reg                                        ld_acc0, ld_acc1, ld_acc2, ld_acc3;
 
    //unpack config bits
-   assign sela = configdata[`MULADDLITE_CONF_BITS-1 -: `N_W];
-   assign selb = configdata[`MULADDLITE_CONF_BITS-1-`N_W -: `N_W];
-   assign selc = configdata[`MULADDLITE_CONF_BITS-1-2*`N_W -: `N_W];
-   assign iterations = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W -: `MEM_ADDR_W];
-   assign period = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W -: `PERIOD_W];
-   assign delay = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-`PERIOD_W -: `PERIOD_W];
-   assign shift = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W -: `SHIFT_W];
-   assign accIN = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
-   assign accOUT = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
-   assign bias = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
-   assign leaky = configdata[`MULADDLITE_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-3 -: 1];
+   assign sela = configdata[`YOLO_CONF_BITS-1 -: `N_W];
+   assign selb = configdata[`YOLO_CONF_BITS-1-`N_W -: `N_W];
+   assign selc = configdata[`YOLO_CONF_BITS-1-2*`N_W -: `N_W];
+   assign iterations = configdata[`YOLO_CONF_BITS-1-3*`N_W -: `MEM_ADDR_W];
+   assign period = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W -: `PERIOD_W];
+   assign delay = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-`PERIOD_W -: `PERIOD_W];
+   assign shift = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W -: `SHIFT_W];
+   assign accIN = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
+   assign accOUT = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
+   assign bias = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
+   assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-3 -: 1];
 
    //input selection
    xinmux # (

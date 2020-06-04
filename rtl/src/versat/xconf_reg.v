@@ -305,40 +305,40 @@ module xconf_reg # (
 		conf_reg[`CONF_MULADD0_B - i*`MULADD_CONF_BITS - 2*`N_W - `MULADD_FNS_W - `MEM_ADDR_W - 2*`PERIOD_W -: `SHIFT_W] <= ctr_data_in[`SHIFT_W-1:0];
 	   end
 
-	   // configure MULADDLITEs
-	   for (i=0; i<`nMULADDLITE; i=i+1) begin
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_SELA))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS -: `N_W] <= ctr_data_in[`N_W-1:0];
+	   // configure YOLOs
+	   for (i=0; i<`nYOLO; i=i+1) begin
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_SELA))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS -: `N_W] <= ctr_data_in[`N_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_SELB))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - `N_W -: `N_W] <= ctr_data_in[`N_W-1:0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_SELB))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - `N_W -: `N_W] <= ctr_data_in[`N_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_SELC))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 2*`N_W -: `N_W] <= ctr_data_in[`N_W-1:0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_SELC))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 2*`N_W -: `N_W] <= ctr_data_in[`N_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_ITER))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_ITER))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_PER))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_PER))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_DELAY))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - `PERIOD_W -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_DELAY))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - `PERIOD_W -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
 
-	      if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_SHIFT))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W -: `SHIFT_W] <= ctr_data_in[`SHIFT_W-1:0];
+	      if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_SHIFT))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W -: `SHIFT_W] <= ctr_data_in[`SHIFT_W-1:0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_ACCIN))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W -: 1] <= ctr_data_in[0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_ACCIN))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W -: 1] <= ctr_data_in[0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_ACCOUT))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-1 -: 1] <= ctr_data_in[0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_ACCOUT))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-1 -: 1] <= ctr_data_in[0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_BIAS))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-2 -: 1] <= ctr_data_in[0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_BIAS))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-2 -: 1] <= ctr_data_in[0];
 
-              if(ctr_addr == (`CONF_MULADDLITE0 + i*`MULADDLITE_CONF_OFFSET + `MULADDLITE_CONF_LEAKY))
-                conf_reg[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-3 -: 1] <= ctr_data_in[0];
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_LEAKY))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-3 -: 1] <= ctr_data_in[0];
            end
 
 	   // configure BSs

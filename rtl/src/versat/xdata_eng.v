@@ -2,12 +2,12 @@
 
  Data bus structure
 
- {MEM0A, MEM0B, ..., VREAD0, ..., ALU0, ..., ALULITE0, ..., MUL0, ..., MULADD0, ..., MULADDLITE0, ..., BS0, ...}
+ {MEM0A, MEM0B, ..., VREAD0, ..., ALU0, ..., ALULITE0, ..., MUL0, ..., MULADD0, ..., YOLO0, ..., BS0, ...}
 
 
  Config bus structure
 
- {MEM0A, MEM0B, ..., VREAD0, ..., VWRITE0, ..., ALU0, ..., ALULITE0, ..., MUL0, ..., MULADD0, ..., MULADDLITE0, ..., BS0, ...}
+ {MEM0A, MEM0B, ..., VREAD0, ..., VWRITE0, ..., ALU0, ..., ALULITE0, ..., MUL0, ..., MULADD0, ..., YOLO0, ..., BS0, ...}
 
  */
 
@@ -322,23 +322,23 @@ module xdata_eng # (
    endgenerate
 
    //
-   //  Instantiate the MULADDLITEs
+   //  Instantiate YOLO
    //
-   generate for (i=0; i < `nMULADDLITE; i=i+1) begin : muladdlite_array
-      xmuladdlite # (
+   generate for (i=0; i < `nYOLO; i=i+1) begin : yolo_array
+      xyolo # (
                     .DATA_W(`DATAPATH_W)
                     )
-      muladdlite (
+      yolo (
                  .clk(clk),
                  .rst(run_reg),
                  .addrgen_rst(rst),
 
                  // flow interface
                  .flow_in(data_bus),
-		 .flow_out(data_bus[`DATA_MULADDLITE0_B - i*`DATAPATH_W -: `DATAPATH_W]),
+		 .flow_out(data_bus[`DATA_YOLO0_B - i*`DATAPATH_W -: `DATAPATH_W]),
 
                  // configuration interface
-                 .configdata(config_reg_shadow[`CONF_MULADDLITE0_B - i*`MULADDLITE_CONF_BITS -: `MULADDLITE_CONF_BITS])
+                 .configdata(config_reg_shadow[`CONF_YOLO0_B - i*`YOLO_CONF_BITS -: `YOLO_CONF_BITS])
                  );
    end
    endgenerate

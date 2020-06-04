@@ -231,55 +231,55 @@ class CMulAdd {
 };//end class CMULADD
 #endif
 
-#if nMULADDLITE>0
-class CMulAddLite {
+#if nYOLO>0
+class CYolo {
   public:
-    int versat_base, muladdlite_base;
+    int versat_base, yolo_base;
 
     //Default constructor
-    CMulAddLite() {
+    CYolo() {
     }
 
-    CMulAddLite(int versat_base, int i) {
+    CYolo(int versat_base, int i) {
       this->versat_base = versat_base;
-      this->muladdlite_base = CONF_BASE + CONF_MULADDLITE0 + i*MULADDLITE_CONF_OFFSET;
+      this->yolo_base = CONF_BASE + CONF_YOLO0 + i*YOLO_CONF_OFFSET;
     }
 
     //Methods to set config parameters
     void setSelA(int sela) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_SELA), sela);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_SELA), sela);
     }
     void setSelB(int selb) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_SELB), selb);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_SELB), selb);
     }
     void setSelC(int selc) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_SELC), selc);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_SELC), selc);
     }
     void setIter(int iter) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_ITER), iter);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ITER), iter);
     }
     void setPer(int per) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_PER), per);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_PER), per);
     }
     void setDelay(int delay) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_DELAY), delay);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_DELAY), delay);
     }
     void setShift(int shift) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_SHIFT), shift);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_SHIFT), shift);
     }
     void setAccIN(int accIN) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_ACCIN), accIN);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ACCIN), accIN);
     }
     void setAccOUT(int accOUT) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_ACCOUT), accOUT);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ACCOUT), accOUT);
     }
     void setBias(int bias) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_BIAS), bias);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_BIAS), bias);
     }
     void setLeaky(int leaky) {
-      MEMSET(versat_base, (this->muladdlite_base + MULADDLITE_CONF_LEAKY), leaky);
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_LEAKY), leaky);
     }
-};//end class CMULADDLITE
+};//end class CYOLO
 #endif
 
 class CStage {
@@ -304,8 +304,8 @@ class CStage {
   #if nMULADD>0
     CMulAdd muladd[nMULADD];
   #endif
-  #if nMULADDLITE>0
-    CMulAddLite muladdlite[nMULADDLITE];
+  #if nYOLO>0
+    CYolo yolo[nYOLO];
   #endif
 
     //Default constructor
@@ -337,8 +337,8 @@ class CStage {
     #if nMULADD>0
       for (i=0; i<nMULADD; i++) muladd[i] = CMulAdd(versat_base, i);
     #endif
-    #if nMULADDLITE>0
-      for (i=0; i<nMULADDLITE; i++) muladdlite[i] = CMulAddLite(versat_base, i);
+    #if nYOLO>0
+      for (i=0; i<nYOLO; i++) yolo[i] = CYolo(versat_base, i);
     #endif
     }
     
@@ -378,8 +378,8 @@ int sMEMA[nMEM], sMEMA_p[nMEM], sMEMB[nMEM], sMEMB_p[nMEM];
 #if nMULADD>0
   int sMULADD[nMULADD], sMULADD_p[nMULADD];
 #endif
-#if nMULADDLITE>0
-  int sMULADDLITE[nMULADDLITE], sMULADDLITE_p[nMULADDLITE];
+#if nYOLO>0
+  int sYOLO[nYOLO], sYOLO_p[nYOLO];
 #endif
 #if nBS>0
   int sBS[nBS], sBS_p[nBS];
@@ -439,12 +439,12 @@ inline void versat_init(int base_addr) {
   } s_cnt += nMULADD;                             
 #endif
 
-#if nMULADDLITE>0
-  //MULADDLITES
-  for (i=0; i<nMULADDLITE; i=i+1) {
-    sMULADDLITE[i] = s_cnt+i;
-    sMULADDLITE_p[i] = sMULADDLITE[i] + p_offset;
-  } s_cnt += nMULADDLITE;
+#if nYOLO>0
+  //YOLOS
+  for (i=0; i<nYOLO; i=i+1) {
+    sYOLO[i] = s_cnt+i;
+    sYOLO_p[i] = sYOLO[i] + p_offset;
+  } s_cnt += nYOLO;
 #endif
     
 #if nBS>0

@@ -5,7 +5,7 @@
 #include
 read_verilog ../../../rtl/include/versat/xconfdefs.vh
 read_verilog ../../../rtl/include/versat/xdefs.vh
-read_verilog ../../../rtl/include/versat/xmuladdlitedefs.vh
+read_verilog ../../../rtl/include/versat/xyolodefs.vh
 read_verilog ../../../rtl/include/system.vh
 read_verilog ../../../submodules/iob-soc/submodules/iob-uart/rtl/include/iob-uart.vh
 read_verilog ../../../submodules/iob-eth/rtl/include/iob_eth_defs.vh
@@ -58,7 +58,7 @@ read_verilog ../../../submodules/iob-timer/iob_timer.v
 #versat
 read_verilog ../../../rtl/src/versat/xconf_reg.v
 read_verilog ../../../rtl/src/versat/xdata_eng.v
-read_verilog ../../../rtl/src/versat/xmuladdlite.v
+read_verilog ../../../rtl/src/versat/xyolo.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen2.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xalu.v
@@ -90,7 +90,7 @@ set_property file_type SystemVerilog [get_files xmem.v]
 set_property file_type SystemVerilog [get_files xmul.v]
 set_property file_type SystemVerilog [get_files xmul_pipe.v]
 set_property file_type SystemVerilog [get_files xmuladd.v]
-set_property file_type SystemVerilog [get_files xmuladdlite.v]
+set_property file_type SystemVerilog [get_files xyolo.v]
 set_property file_type SystemVerilog [get_files xstage.v]
 set_property file_type SystemVerilog [get_files xversat.v]
 

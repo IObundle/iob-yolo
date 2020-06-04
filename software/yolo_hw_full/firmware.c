@@ -254,28 +254,28 @@ void resize_image() {
     stage[i].memA[2].setExt(1);
 
     //pixel * 1-dx/dx = res0
-    stage[i].muladdlite[0].setSelA(sMEMA[1]);
-    stage[i].muladdlite[0].setSelB(sMEMA[2]);
-    stage[i].muladdlite[0].setIter(2*NEW_W);
-    stage[i].muladdlite[0].setPer(2);
-    stage[i].muladdlite[0].setDelay(2*MEMP_LAT);
-    stage[i].muladdlite[0].setShift(7); //Q10.22 to Q1.15
+    stage[i].yolo[0].setSelA(sMEMA[1]);
+    stage[i].yolo[0].setSelB(sMEMA[2]);
+    stage[i].yolo[0].setIter(2*NEW_W);
+    stage[i].yolo[0].setPer(2);
+    stage[i].yolo[0].setDelay(2*MEMP_LAT);
+    stage[i].yolo[0].setShift(7); //Q10.22 to Q1.15
 
     //res0 * 0/1-dy/0/dy = res1
-    stage[stage_num].muladdlite[1].setSelA(sMEMA_p[1]);
-    stage[stage_num].muladdlite[1].setSelB(sMULADDLITE_p[1]);
-    stage[stage_num].muladdlite[1].setIter(NEW_W);
-    stage[stage_num].muladdlite[1].setPer(4);
-    stage[stage_num].muladdlite[1].setDelay(2*MEMP_LAT+MULADDLITE_LAT);
-    stage[stage_num].muladdlite[1].setShift(21); 
+    stage[stage_num].yolo[1].setSelA(sMEMA_p[1]);
+    stage[stage_num].yolo[1].setSelB(sYOLO_p[1]);
+    stage[stage_num].yolo[1].setIter(NEW_W);
+    stage[stage_num].yolo[1].setPer(4);
+    stage[stage_num].yolo[1].setDelay(2*MEMP_LAT+YOLO_LAT);
+    stage[stage_num].yolo[1].setShift(21); 
 
     //store res1 in mem3
     stage[stage_num].memA[3].setIter(NEW_W);
     stage[stage_num].memA[3].setIncr(1);
-    stage[stage_num].memA[3].setDelay(2*MEMP_LAT+2*MULADDLITE_LAT+(4-1));
+    stage[stage_num].memA[3].setDelay(2*MEMP_LAT+2*YOLO_LAT+(4-1));
     stage[stage_num].memA[3].setPer(4);
     stage[stage_num].memA[3].setDuty(1);
-    stage[stage_num].memA[3].setSel(sMULADDLITE[1]);
+    stage[stage_num].memA[3].setSel(sYOLO[1]);
     stage[stage_num].memA[3].setInWr(1);
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -285,26 +285,26 @@ void resize_image() {
     //configure mem0 (stage 1) to read 0, 1-dy, 0, dy sequence
     stage[i+1].memA[0].setIter(NEW_W);
     stage[i+1].memA[0].setIncr(1);
-    stage[i+1].memA[0].setDelay(MEMP_LAT+MULADDLITE_LAT);
+    stage[i+1].memA[0].setDelay(MEMP_LAT+YOLO_LAT);
     stage[i+1].memA[0].setPer(4);
     stage[i+1].memA[0].setDuty(4);
     stage[i+1].memA[0].setShift(-4);
 
     //res0 * 0/1-dy/0/dy = res1
-    stage[i+1].muladdlite[0].setSelA(sMEMA[0]);
-    stage[i+1].muladdlite[0].setSelB(sMULADDLITE_p[0]);
-    stage[i+1].muladdlite[0].setIter(NEW_W);
-    stage[i+1].muladdlite[0].setPer(4);
-    stage[i+1].muladdlite[0].setDelay(2*MEMP_LAT+MULADDLITE_LAT);
-    stage[i+1].muladdlite[0].setShift(21); //Q3.29 to Q8.8
+    stage[i+1].yolo[0].setSelA(sMEMA[0]);
+    stage[i+1].yolo[0].setSelB(sYOLO_p[0]);
+    stage[i+1].yolo[0].setIter(NEW_W);
+    stage[i+1].yolo[0].setPer(4);
+    stage[i+1].yolo[0].setDelay(2*MEMP_LAT+YOLO_LAT);
+    stage[i+1].yolo[0].setShift(21); //Q3.29 to Q8.8
 
     //store res1 in mem3
     stage[i+1].memA[3].setIter(NEW_W);
     stage[i+1].memA[3].setIncr(1);
-    stage[i+1].memA[3].setDelay(2*MEMP_LAT+2*MULADDLITE_LAT+(4-1));
+    stage[i+1].memA[3].setDelay(2*MEMP_LAT+2*YOLO_LAT+(4-1));
     stage[i+1].memA[3].setPer(4);
     stage[i+1].memA[3].setDuty(1);
-    stage[i+1].memA[3].setSel(sMULADDLITE[0]);
+    stage[i+1].memA[3].setSel(sYOLO[0]);
     stage[i+1].memA[3].setInWr(1);
 
     //configure mem2 to read input pixels (addressed by mem0 of previous stage)
@@ -316,17 +316,17 @@ void resize_image() {
     stage[i+1].memA[2].setExt(1);
 
     //pixel * 1-dx/dx = res0
-    stage[i+1].muladdlite[1].setSelA(sMEMA_p[1]);
-    stage[i+1].muladdlite[1].setSelB(sMEMA[2]);
-    stage[i+1].muladdlite[1].setIter(2*NEW_W);
-    stage[i+1].muladdlite[1].setPer(2);
-    stage[i+1].muladdlite[1].setDelay(2*MEMP_LAT);
-    stage[i+1].muladdlite[1].setShift(7); //Q10.22 to Q1.15
+    stage[i+1].yolo[1].setSelA(sMEMA_p[1]);
+    stage[i+1].yolo[1].setSelB(sMEMA[2]);
+    stage[i+1].yolo[1].setIter(2*NEW_W);
+    stage[i+1].yolo[1].setPer(2);
+    stage[i+1].yolo[1].setDelay(2*MEMP_LAT);
+    stage[i+1].yolo[1].setShift(7); //Q10.22 to Q1.15
 
     //configure mem1 to read 0, 1-dy, 0, dy sequence
     stage[i+1].memA[1].setIter(NEW_W);
     stage[i+1].memA[1].setIncr(1);
-    stage[i+1].memA[1].setDelay(MEMP_LAT+MULADDLITE_LAT);
+    stage[i+1].memA[1].setDelay(MEMP_LAT+YOLO_LAT);
     stage[i+1].memA[1].setPer(4);
     stage[i+1].memA[1].setDuty(4);
     stage[i+1].memA[1].setShift(-4);
@@ -455,21 +455,21 @@ void layer1() {
   stage[0].memA[3].setIter(32*52);
   stage[0].memA[3].setPer(9);
 
-  //configure muladdlite0 to perform channel0 convolutions
-  stage[0].muladdlite[0].setSelA(sMEMA[0]);
-  stage[0].muladdlite[0].setSelB(sMEMA[1]);
-  stage[0].muladdlite[0].setIter(32*52);
-  stage[0].muladdlite[0].setPer(9);
-  stage[0].muladdlite[0].setDelay(MEMP_LAT);
-  stage[0].muladdlite[0].setAccOUT(1);
-  stage[0].muladdlite[0].setSelC(sMEMA[3]);
-  stage[0].muladdlite[0].setBias(1);
-  stage[0].muladdlite[0].setShift(10);
+  //configure yolo0 to perform channel0 convolutions
+  stage[0].yolo[0].setSelA(sMEMA[0]);
+  stage[0].yolo[0].setSelB(sMEMA[1]);
+  stage[0].yolo[0].setIter(32*52);
+  stage[0].yolo[0].setPer(9);
+  stage[0].yolo[0].setDelay(MEMP_LAT);
+  stage[0].yolo[0].setAccOUT(1);
+  stage[0].yolo[0].setSelC(sMEMA[3]);
+  stage[0].yolo[0].setBias(1);
+  stage[0].yolo[0].setShift(10);
 
   //configure mem2 to read 3x3 blocks from 54x34 channel1 FM
   stage[0].memA[2].setIter(3);
   stage[0].memA[2].setIncr(1);
-  stage[0].memA[2].setDelay(MULADDLITE_LAT+9);
+  stage[0].memA[2].setDelay(YOLO_LAT+9);
   stage[0].memA[2].setPer(3);
   stage[0].memA[2].setDuty(3);
   stage[0].memA[2].setShift(54-3);
@@ -485,25 +485,25 @@ void layer1() {
   //configure mem0 to read channel1 weights
   stage[1].memA[0].setIter(32*52);
   stage[1].memA[0].setIncr(1);
-  stage[1].memA[0].setDelay(MULADDLITE_LAT+9);
+  stage[1].memA[0].setDelay(YOLO_LAT+9);
   stage[1].memA[0].setPer(9);
   stage[1].memA[0].setDuty(9);
   stage[1].memA[0].setShift(-9);
 
-  //configure muladdlite0 to perform channel1 convolutions
-  stage[1].muladdlite[0].setSelA(sMEMA_p[2]);
-  stage[1].muladdlite[0].setSelB(sMEMA[0]);
-  stage[1].muladdlite[0].setIter(32*52);
-  stage[1].muladdlite[0].setPer(9);
-  stage[1].muladdlite[0].setDelay(MEMP_LAT+MULADDLITE_LAT+9);
-  stage[1].muladdlite[0].setSelC(sMULADDLITE_p[0]);
-  stage[1].muladdlite[0].setAccIN(1);
-  stage[1].muladdlite[0].setAccOUT(1);
+  //configure yolo0 to perform channel1 convolutions
+  stage[1].yolo[0].setSelA(sMEMA_p[2]);
+  stage[1].yolo[0].setSelB(sMEMA[0]);
+  stage[1].yolo[0].setIter(32*52);
+  stage[1].yolo[0].setPer(9);
+  stage[1].yolo[0].setDelay(MEMP_LAT+YOLO_LAT+9);
+  stage[1].yolo[0].setSelC(sYOLO_p[0]);
+  stage[1].yolo[0].setAccIN(1);
+  stage[1].yolo[0].setAccOUT(1);
 
   //configure mem1 to read 3x3 blocks from 54x34 channel2 FM
   stage[1].memA[1].setIter(3);
   stage[1].memA[1].setIncr(1);
-  stage[1].memA[1].setDelay(2*(MULADDLITE_LAT+9));
+  stage[1].memA[1].setDelay(2*(YOLO_LAT+9));
   stage[1].memA[1].setPer(3);
   stage[1].memA[1].setDuty(3);
   stage[1].memA[1].setShift(54-3);
@@ -515,29 +515,29 @@ void layer1() {
   //configure mem2 to read channel2 weights
   stage[1].memA[2].setIter(32*52);
   stage[1].memA[2].setIncr(1);
-  stage[1].memA[2].setDelay(2*(MULADDLITE_LAT+9));
+  stage[1].memA[2].setDelay(2*(YOLO_LAT+9));
   stage[1].memA[2].setPer(9);
   stage[1].memA[2].setDuty(9);
   stage[1].memA[2].setShift(-9);
 
-  //configure muladdlite1 to perform channel2 convolutions
-  stage[1].muladdlite[1].setSelA(sMEMA[1]);
-  stage[1].muladdlite[1].setSelB(sMEMA[2]);
-  stage[1].muladdlite[1].setIter(32*52);
-  stage[1].muladdlite[1].setPer(9);
-  stage[1].muladdlite[1].setDelay(MEMP_LAT+2*(MULADDLITE_LAT+9));
-  stage[1].muladdlite[1].setShift(10);
-  stage[1].muladdlite[1].setSelC(sMULADDLITE[0]);
-  stage[1].muladdlite[1].setAccIN(1);
-  stage[1].muladdlite[1].setLeaky(1);
+  //configure yolo1 to perform channel2 convolutions
+  stage[1].yolo[1].setSelA(sMEMA[1]);
+  stage[1].yolo[1].setSelB(sMEMA[2]);
+  stage[1].yolo[1].setIter(32*52);
+  stage[1].yolo[1].setPer(9);
+  stage[1].yolo[1].setDelay(MEMP_LAT+2*(YOLO_LAT+9));
+  stage[1].yolo[1].setShift(10);
+  stage[1].yolo[1].setSelC(sYOLO[0]);
+  stage[1].yolo[1].setAccIN(1);
+  stage[1].yolo[1].setLeaky(1);
 
   //configure mem3 to write convolution results
   stage[1].memA[3].setIter(32*52);
   stage[1].memA[3].setIncr(1);
-  stage[1].memA[3].setDelay(MEMP_LAT+3*(MULADDLITE_LAT+9)-1);
+  stage[1].memA[3].setDelay(MEMP_LAT+3*(YOLO_LAT+9)-1);
   stage[1].memA[3].setPer(9);
   stage[1].memA[3].setDuty(1);
-  stage[1].memA[3].setSel(sMULADDLITE[1]);
+  stage[1].memA[3].setSel(sYOLO[1]);
   stage[1].memA[3].setInWr(1);
 
   //end measuring config time
