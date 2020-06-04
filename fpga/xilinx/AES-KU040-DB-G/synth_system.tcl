@@ -3,18 +3,18 @@
 #
 
 #include
+read_verilog ../../../rtl/include/versat/xconfdefs.vh
+read_verilog ../../../rtl/include/versat/xdefs.vh
+read_verilog ../../../rtl/include/versat/xmuladdlitedefs.vh
 read_verilog ../../../rtl/include/system.vh
 read_verilog ../../../submodules/iob-soc/submodules/iob-uart/rtl/include/iob-uart.vh
 read_verilog ../../../submodules/iob-eth/rtl/include/iob_eth_defs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xaludefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xalulitedefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xbsdefs.vh
-read_verilog ../../../submodules/iob-versat/rtl/include/xconfdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
-read_verilog ../../../submodules/iob-versat/rtl/include/xmuladdlitedefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
-read_verilog ../../../submodules/iob-versat/rtl/include/xdefs.vh
 read_verilog ../../../submodules/iob-versat/submodules/versat-io/rtl/include/versat-io.vh
 if { [file exists [lindex $argv $argc-1]] == 1} {
     #use xversat.vh of firmware folder
@@ -56,6 +56,9 @@ read_verilog ../../../submodules/iob-eth/rtl/src/iob_eth.v
 read_verilog ../../../submodules/iob-timer/iob_timer.v
 
 #versat
+read_verilog ../../../rtl/src/versat/xconf_reg.v
+read_verilog ../../../rtl/src/versat/xdata_eng.v
+read_verilog ../../../rtl/src/versat/xmuladdlite.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen2.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xalu.v
@@ -64,14 +67,11 @@ read_verilog ../../../submodules/iob-versat/rtl/src/xbs.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xclz.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xconf.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xconf_mem.v
-read_verilog ../../../submodules/iob-versat/rtl/src/xconf_reg.v
-read_verilog ../../../submodules/iob-versat/rtl/src/xdata_eng.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xinmux.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmem.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul_pipe.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmuladd.v
-read_verilog ../../../submodules/iob-versat/rtl/src/xmuladdlite.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xstage.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xversat.v
 read_verilog ../../../submodules/iob-versat/submodules/mem/tdp_mem/iob_tdp_mem.v

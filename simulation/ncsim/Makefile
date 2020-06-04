@@ -23,7 +23,7 @@ VERSAT_DIR = ../../submodules/iob-versat
 VERSAT_IO_DIR = $(VERSAT_DIR)/submodules/versat-io
 
 #hardware includes
-HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(VERSAT_DIR)/rtl/include -incdir $(VERSAT_IO_DIR)/rtl/include
+HW_INCLUDE = -incdir . -incdir $(RTL_DIR)/include -incdir $(UART_DIR)/rtl/include -incdir $(CACHE_DIR)/rtl/header -incdir $(ETH_DIR)/rtl/include -incdir $(TIMER_DIR) -incdir $(RTL_DIR)/include/versat -incdir $(VERSAT_DIR)/rtl/include -incdir $(VERSAT_IO_DIR)/rtl/include
 ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
     HW_INCLUDE += -incdir $(FIRM_DIR)
 else
@@ -49,7 +49,8 @@ endif
 HW_DEFINE += -define FILES_DIR=$(FILES_DIR)
 
 #hardware sources
-VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/rtl/src/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v
+VERSAT_SRC = $(RTL_DIR)/src/versat/*.v $(VERSAT_DIR)/rtl/src/xaddrgen.v $(VERSAT_DIR)/rtl/src/xaddrgen2.v $(VERSAT_DIR)/rtl/src/xalu.v $(VERSAT_DIR)/rtl/src/xalulite.v $(VERSAT_DIR)/rtl/src/xbs.v $(VERSAT_DIR)/rtl/src/xclz.v $(VERSAT_DIR)/rtl/src/xconf.v $(VERSAT_DIR)/rtl/src/xconf_mem.v $(VERSAT_DIR)/rtl/src/xinmux.v $(VERSAT_DIR)/rtl/src/xmem.v $(VERSAT_DIR)/rtl/src/xmul.v $(VERSAT_DIR)/rtl/src/xmuladd.v $(VERSAT_DIR)/rtl/src/xstage.v $(VERSAT_DIR)/rtl/src/xversat.v
+VSRC =  $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(RTL_DIR)/testbench/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v $(VERSAT_SRC)
 
 #simulator flags
 CFLAGS = -errormax 15 -status -update -linedebug -sv $(HW_DEFINE) $(HW_INCLUDE)
