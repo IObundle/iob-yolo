@@ -12,8 +12,12 @@
 `define dx_size (`NEW_W*2)
 `define dy_size (`NEW_H*4)
 `define IMAGE_INPUT (768*576*3)
+`define LAYER_1 (416*416*16)
 `define NETWORK_INPUT (418*418*3)
 `define STRINGIFY(x) `"x`"
+`define DDR_INITIAL (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size)*2)
+`define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
+`define FILE_SIZE ((`DDR_INITIAL + (`WEIGHTS_LAYER_1+`IMAGE_INPUT+`NETWORK_INPUT+`LAYER_1)*2)/4)
 
 module yolo_hw_full_tb;
 
@@ -108,8 +112,8 @@ module yolo_hw_full_tb;
    wire 	       tester_rx_dv;   
 
    //define parameters
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "dog.hex"};
-   parameter file_size = (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size+`IMAGE_INPUT+`NETWORK_INPUT)*2)/4;
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer1.hex"};
+   parameter file_size = `FILE_SIZE;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
 
 `ifdef USE_DDR

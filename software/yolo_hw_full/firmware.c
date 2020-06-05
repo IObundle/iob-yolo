@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //define number of versats used in specific function
-#define RESIZE_NSTAGES 26 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26)
+#define RESIZE_NSTAGES 2 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26, 52)
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -29,9 +29,11 @@
 
 //define general constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE IMAGE_INPUT //8 bits per point
+#define INPUT_FILE_SIZE IMAGE_INPUT //8 bits per pixel
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (NETWORK_INPUT*2) //16 bits per output
+#define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
+#define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
+#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -43,7 +45,8 @@
 #define iy_BASE_ADDRESS (ix_BASE_ADDRESS + ix_size*2) //16 bits
 #define dx_BASE_ADDRESS (iy_BASE_ADDRESS + iy_size*2) //16 bits
 #define dy_BASE_ADDRESS (dx_BASE_ADDRESS + dx_size*2) //16 bits
-#define DATA_BASE_ADDRESS (dy_BASE_ADDRESS + dy_size*2) //16 bits
+#define WEIGHTS_BASE_ADDRESS (dy_BASE_ADDRESS + dy_size*2) //16 bits
+#define DATA_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + WEIGHTS_FILE_SIZE) //16 bits
 
 //ETHERNET variables
 int rcv_timeout = 5000;
@@ -55,8 +58,7 @@ unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 unsigned int start, end;
 
 //data base address pointers
-int16_t * fp_data;
-int16_t * fp_image;
+int16_t * fp_data, * fp_image, * fp_weights;
 int16_t * ix, * iy, * dx, * dy;
 
 //define base address of data pointers
@@ -73,6 +75,9 @@ void define_memory_regions() {
   iy = (int16_t *) iy_BASE_ADDRESS;
   dx = (int16_t *) dx_BASE_ADDRESS;
   dy = (int16_t *) dy_BASE_ADDRESS;
+
+  //weights
+  fp_weights = (int16_t *) WEIGHTS_BASE_ADDRESS;
 }
 
 //reset certain DDR positions to zero due to padding
@@ -100,7 +105,6 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 
   //Local variables
   int i, j;
-  char * fp_data_char = (char *) data_p;
   count_bytes = 0;
 
   //Loop to receive intermediate data frames
@@ -118,7 +122,8 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 
      //save in DDR
      for(i = 0; i < bytes_to_receive; i++) {
-       fp_data_char[j*ETH_NBYTES*2 + i*2] = data_rcv[14+i];
+       if(DATA_SIZE == INPUT_FILE_SIZE) data_p[j*ETH_NBYTES*2 + i*2] = data_rcv[14+i];
+       else data_p[j*ETH_NBYTES + i] = data_rcv[14+i];
        data_to_send[i] = data_rcv[14+i];
      }
 
@@ -134,20 +139,26 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 void receive_data() {
 
   //Receive input image
-  uart_printf("\nReady to receive input image...\n");
+  uart_printf("\nReady to receive input image and weights...\n");
   char * fp_image_char = (char *) DATA_BASE_ADDRESS;
   rcv_frame(NUM_INPUT_FRAMES, INPUT_FILE_SIZE, fp_image_char);
   end = timer_get_count_us(TIMER);
   uart_printf("Image received in %d ms\n", (end-start)/1000);
+
+  //Receive weights
+  char * fp_weights_char = (char *) WEIGHTS_BASE_ADDRESS;
+  rcv_frame(NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, fp_weights_char);
+  end = timer_get_count_us(TIMER);
+  uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 }
 
 //fill resized image region with grey (0.5 = 0x0080 in Q8.8)
 void fill_grey() {
   int i, j, k;
-  for(i = 0; i < NTW_IN_C; i++)
-    for(j = 0; j < NTW_IN_H; j++)
-      for(k = 0; k < NTW_IN_W; k++)
-	fp_data[i*(NTW_IN_H+2)*(NTW_IN_W+2) + (j+1)*(NTW_IN_W+2) + (k+1)] = 0x0080;
+  for(i = 0; i < IMG_C; i++)
+    for(j = 0; j < YOLO_INPUT; j++)
+      for(k = 0; k < YOLO_INPUT; k++)
+	fp_data[i*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (k+1)] = 0x0080;
 }
 
 //initializes ix, iy, dx and dy variables
@@ -190,7 +201,7 @@ void prepare_resize() {
 void resize_image() {
 
   //local variables
-  int i, j, k, l;
+  int i, j, k, l, stage_num = RESIZE_NSTAGES;
   unsigned int data_time, config_time, run_time = 0;
 #ifdef SIM
   int num_err = 0;
@@ -214,77 +225,114 @@ void resize_image() {
     ///////////////////////////////////////////////////////////////////////////////
 
     //configure mem0 to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
-    //start, iter, incr, delay, per, duty, sel, shift, in_wr
-    stage[i].memA[0].setConf(0, 2, 1, 0, 2, 2, 0, 2*NEW_W-2, 0);
-    //iter2, per2, shift2, incr2
-    stage[i].memA[0].setConf(1, NEW_W, 0, 2);
-    stage[i].memA[0].writeConf();
+    stage[i].memA[0].setIter(2);
+    stage[i].memA[0].setIncr(1);
+    stage[i].memA[0].setPer(2);
+    stage[i].memA[0].setDuty(2);
+    stage[i].memA[0].setShift(2*NEW_W-2);
+    stage[i].memA[0].setIter2(1);
+    stage[i].memA[0].setPer2(NEW_W);
+    stage[i].memA[0].setIncr2(2);
 
     //configure mem1 to read 1-dx, dx sequence twice
-    stage[i].memA[1].setConf(0, 2, 1, MEMP_LAT, 2, 2, 0, -2, 0);
-    //iter2, per2, shift2, incr2
-    stage[i].memA[1].setConf(1, NEW_W, 0, 2);
-    stage[i].memA[1].writeConf();
+    stage[i].memA[1].setIter(2);
+    stage[i].memA[1].setIncr(1);
+    stage[i].memA[1].setDelay(MEMP_LAT);
+    stage[i].memA[1].setPer(2);
+    stage[i].memA[1].setDuty(2);
+    stage[i].memA[1].setShift(-2);
+    stage[i].memA[1].setIter2(1);
+    stage[i].memA[1].setPer2(NEW_W);
+    stage[i].memA[1].setIncr2(2);
 
     //configure mem2 to read input pixels (addressed by mem0)
-    //start, iter, incr, delay, per, duty, sel, shift, in_wr, rvrs, ext
-    stage[i].memA[2].setConf(0, 1, 0, MEMP_LAT, 4*NEW_W, 4*NEW_W, sMEMA[0], 0, 0, 0, 1);
-    stage[i].memA[2].writeConf();
+    stage[i].memA[2].setIter(1);
+    stage[i].memA[2].setDelay(MEMP_LAT);
+    stage[i].memA[2].setPer(4*NEW_W);
+    stage[i].memA[2].setDuty(4*NEW_W);
+    stage[i].memA[2].setSel(sMEMA[0]);
+    stage[i].memA[2].setExt(1);
 
     //pixel * 1-dx/dx = res0
-    //sela, selb, fns, iter, per, delay, shift
-    stage[i].muladd[0].setConf(sMEMA[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
-    stage[i].muladd[0].writeConf();
+    stage[i].yolo[0].setSelA(sMEMA[1]);
+    stage[i].yolo[0].setSelB(sMEMA[2]);
+    stage[i].yolo[0].setIter(2*NEW_W);
+    stage[i].yolo[0].setPer(2);
+    stage[i].yolo[0].setDelay(2*MEMP_LAT);
+    stage[i].yolo[0].setShift(7); //Q10.22 to Q1.15
 
-    //final results are stores in last layer, not first
-    if(i == 0) {
+    //res0 * 0/1-dy/0/dy = res1
+    stage[stage_num].yolo[1].setSelA(sMEMA_p[1]);
+    stage[stage_num].yolo[1].setSelB(sYOLO_p[1]);
+    stage[stage_num].yolo[1].setIter(NEW_W);
+    stage[stage_num].yolo[1].setPer(4);
+    stage[stage_num].yolo[1].setDelay(2*MEMP_LAT+YOLO_LAT);
+    stage[stage_num].yolo[1].setShift(21); 
 
-      //res0 * 0/1-dy/0/dy = res1
-      stage[RESIZE_NSTAGES].muladd[1].setConf(sMEMA_p[1], sMULADD_p[1], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
-      stage[RESIZE_NSTAGES].muladd[1].writeConf();
-
-      //store res1 in mem3
-      stage[RESIZE_NSTAGES].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[1], 0, 1);
-      stage[RESIZE_NSTAGES].memA[3].writeConf();
-
-    } else {
-
-      //res0 * 0/1-dy/0/dy = res1
-      stage[i].muladd[1].setConf(sMEMA_p[1], sMULADD_p[1], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
-      stage[i].muladd[1].writeConf();
-
-      //store res1 in mem3
-      stage[i].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[1], 0, 1);
-      stage[i].memA[3].writeConf();
-    }
+    //store res1 in mem3
+    stage[stage_num].memA[3].setIter(NEW_W);
+    stage[stage_num].memA[3].setIncr(1);
+    stage[stage_num].memA[3].setDelay(2*MEMP_LAT+2*YOLO_LAT+(4-1));
+    stage[stage_num].memA[3].setPer(4);
+    stage[stage_num].memA[3].setDuty(1);
+    stage[stage_num].memA[3].setSel(sYOLO[1]);
+    stage[stage_num].memA[3].setInWr(1);
 
     ///////////////////////////////////////////////////////////////////////////////
     //                            STAGE i+1
     ///////////////////////////////////////////////////////////////////////////////
 
     //configure mem0 (stage 1) to read 0, 1-dy, 0, dy sequence
-    stage[i+1].memA[0].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
-    stage[i+1].memA[0].writeConf();
+    stage[i+1].memA[0].setIter(NEW_W);
+    stage[i+1].memA[0].setIncr(1);
+    stage[i+1].memA[0].setDelay(MEMP_LAT+YOLO_LAT);
+    stage[i+1].memA[0].setPer(4);
+    stage[i+1].memA[0].setDuty(4);
+    stage[i+1].memA[0].setShift(-4);
 
     //res0 * 0/1-dy/0/dy = res1
-    stage[i+1].muladd[0].setConf(sMEMA[0], sMULADD_p[0], MULADD_MACC, NEW_W, 4, 2*MEMP_LAT+MULADD_LAT, 21); //Q3.29 to Q8.8
-    stage[i+1].muladd[0].writeConf();
+    stage[i+1].yolo[0].setSelA(sMEMA[0]);
+    stage[i+1].yolo[0].setSelB(sYOLO_p[0]);
+    stage[i+1].yolo[0].setIter(NEW_W);
+    stage[i+1].yolo[0].setPer(4);
+    stage[i+1].yolo[0].setDelay(2*MEMP_LAT+YOLO_LAT);
+    stage[i+1].yolo[0].setShift(21); //Q3.29 to Q8.8
 
     //store res1 in mem3
-    stage[i+1].memA[3].setConf(0, NEW_W, 1, 2*MEMP_LAT+2*MULADD_LAT+(4-1), 4, 1, sMULADD[0], 0, 1);
-    stage[i+1].memA[3].writeConf();
+    stage[i+1].memA[3].setIter(NEW_W);
+    stage[i+1].memA[3].setIncr(1);
+    stage[i+1].memA[3].setDelay(2*MEMP_LAT+2*YOLO_LAT+(4-1));
+    stage[i+1].memA[3].setPer(4);
+    stage[i+1].memA[3].setDuty(1);
+    stage[i+1].memA[3].setSel(sYOLO[0]);
+    stage[i+1].memA[3].setInWr(1);
 
     //configure mem2 to read input pixels (addressed by mem0 of previous stage)
-    stage[i+1].memA[2].setConf(0, 1, 0, MEMP_LAT, 4*NEW_W, 4*NEW_W, sMEMA_p[0], 0, 0, 0, 1);
-    stage[i+1].memA[2].writeConf();
+    stage[i+1].memA[2].setIter(1);
+    stage[i+1].memA[2].setDelay(MEMP_LAT);
+    stage[i+1].memA[2].setPer(4*NEW_W);
+    stage[i+1].memA[2].setDuty(4*NEW_W);
+    stage[i+1].memA[2].setSel(sMEMA_p[0]);
+    stage[i+1].memA[2].setExt(1);
 
     //pixel * 1-dx/dx = res0
-    stage[i+1].muladd[1].setConf(sMEMA_p[1], sMEMA[2], MULADD_MACC, 2*NEW_W, 2, 2*MEMP_LAT, 7); //Q10.22 to Q1.15
-    stage[i+1].muladd[1].writeConf();
+    stage[i+1].yolo[1].setSelA(sMEMA_p[1]);
+    stage[i+1].yolo[1].setSelB(sMEMA[2]);
+    stage[i+1].yolo[1].setIter(2*NEW_W);
+    stage[i+1].yolo[1].setPer(2);
+    stage[i+1].yolo[1].setDelay(2*MEMP_LAT);
+    stage[i+1].yolo[1].setShift(7); //Q10.22 to Q1.15
 
     //configure mem1 to read 0, 1-dy, 0, dy sequence
-    stage[i+1].memA[1].setConf(0, NEW_W, 1, MEMP_LAT+MULADD_LAT, 4, 4, 0, -4, 0);
-    stage[i+1].memA[1].writeConf();
+    stage[i+1].memA[1].setIter(NEW_W);
+    stage[i+1].memA[1].setIncr(1);
+    stage[i+1].memA[1].setDelay(MEMP_LAT+YOLO_LAT);
+    stage[i+1].memA[1].setPer(4);
+    stage[i+1].memA[1].setDuty(4);
+    stage[i+1].memA[1].setShift(-4);
+
+    //final results are stores in last layer, not first
+    stage_num = i+2;
   }
 
   //end measuring config time
@@ -296,7 +344,7 @@ void resize_image() {
   for(k = 0; k < 1; k++) {
     for(j = 0; j < 1; j++) {
 #else
-  for(k = 0; k < NTW_IN_C; k++) {
+  for(k = 0; k < IMG_C; k++) {
     for(j = 0; j < NEW_H; j += RESIZE_NSTAGES) {
 #endif
 
@@ -329,9 +377,9 @@ void resize_image() {
       for(i = 0; i < NEW_W; i++)
 	for(l = 0; l < RESIZE_NSTAGES; l++)
         #ifdef SIM
-          if(fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] != stage[l+1].memA[3].read(i)) num_err++;
+          if(fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+l+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H)] != stage[l+1].memA[3].read(i)) num_err++;
         #else
-          fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (j+l+1)*(NTW_IN_W+2) + (i+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H)] = stage[l+1].memA[3].read(i);
+          fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+l+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H)] = stage[l+1].memA[3].read(i);
         #endif
 
       //end measuring data load/store time
@@ -345,6 +393,159 @@ void resize_image() {
   uart_printf("FU config time = %d us\n", config_time);
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
+  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+}
+
+//layer 1 (conv)
+void layer1() {
+
+  //clear configuration of all stages
+  globalClearConf();
+
+  //update pointers
+  int16_t * output = (int16_t*) fp_data + NETWORK_INPUT;
+  int16_t * bias = (int16_t *) fp_weights + LAYER_1_NUM_KER*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C;
+
+  //local variables
+  int i, j, k, l, m;
+#ifdef SIM
+  int num_err = 0;
+#endif
+  unsigned int data_time, config_time, run_time = 0;
+
+  //load weights (z-x-y format)
+  start = timer_get_count_us(TIMER);
+  for(i = 0; i < LAYER_1_NUM_KER; i++) {
+    for(j = 0; j < IMG_C; j++)
+      for(k = 0; k < LAYER_1_KER_SIZE*LAYER_1_KER_SIZE; k++)
+        stage[0].memA[1].write(i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k*IMG_C + j, fp_weights[i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k]);
+    stage[0].memA[2].write(i, bias[i]);
+  }
+  end = timer_get_count_us(TIMER);
+  data_time = end - start;
+
+  //loop to configure versat stages
+  start = timer_get_count_us(TIMER);
+
+  ///////////////////////////////////////////////////////////////////////////////
+  //                            STAGE 0
+  ///////////////////////////////////////////////////////////////////////////////
+  
+  //configure mem0 to read 3x3*3 blocks from 34x18x3 FM
+  stage[0].memA[0].setDuty(9);
+  stage[0].memA[0].setPer(9);
+  stage[0].memA[0].setIncr(1);
+  stage[0].memA[0].setIter(3);
+  stage[0].memA[0].setShift(34*3-9);
+  stage[0].memA[0].setPer2(32);
+  stage[0].memA[0].setIncr2(3);
+  stage[0].memA[0].setIter2(16);
+  stage[0].memA[0].setShift2(34*3-32*3);
+
+  //configure mem1 to read weights
+  stage[0].memA[1].setDuty(27);
+  stage[0].memA[1].setPer(27);
+  stage[0].memA[1].setIncr(1);
+  stage[0].memA[1].setIter(32*16);
+  stage[0].memA[1].setShift(-27);
+
+  //configure mem2 to read bias
+  stage[0].memA[2].setIter(32*16);
+  stage[0].memA[2].setPer(27);
+
+  //configure yolo0 to perform convolutions
+  stage[0].yolo[0].setSelA(sMEMA[0]);
+  stage[0].yolo[0].setSelB(sMEMA[1]);
+  stage[0].yolo[0].setSelC(sMEMA[2]);
+  stage[0].yolo[0].setIter(32*16);
+  stage[0].yolo[0].setPer(27);
+  stage[0].yolo[0].setDelay(MEMP_LAT);
+  stage[0].yolo[0].setBias(1);
+  stage[0].yolo[0].setShift(10);
+  stage[0].yolo[0].setLeaky(1);
+
+  //configure mem3 to write convolution results
+  stage[0].memA[3].setDuty(1);
+  stage[0].memA[3].setPer(27);
+  stage[0].memA[3].setIncr(1);
+  stage[0].memA[3].setIter(32*16);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27-1);
+  stage[0].memA[3].setSel(sYOLO[0]);
+  stage[0].memA[3].setInWr(1);
+
+  //end measuring config time
+  end = timer_get_count_us(TIMER);
+  config_time = end - start;
+
+  //loops for performing convolution
+#ifdef SIM
+  for(l = 0; l < 1; l++) {
+    for(m = 0; m < 1; m++) {
+#else
+  for(l = 0; l < 26; l++) {
+    for(m = 0; m < 13; m++) {
+#endif
+
+      //Send input FM 34x18 tile (z-x-y format)
+      start = timer_get_count_us(TIMER);
+      for(i = 0; i < IMG_C; i++)
+        for(j = 0; j < 18; j++)
+          for(k = 0; k < 34; k++)
+            stage[0].memA[0].write((j*34+k)*IMG_C + i, fp_data[i*418*418 + j*418 + k + m*32 + l*16*418]);
+      end = timer_get_count_us(TIMER);
+      data_time += (end - start);
+
+    #ifdef SIM
+      for(k = 0; k < 1; k++) {
+    #else
+      for(k = 0; k < LAYER_1_NUM_KER; k++) {
+    #endif
+
+        //run
+        start = timer_get_count_us(TIMER);
+        run();
+
+	//configure weight and bias mems start for next iteration
+      #ifdef SIM
+        if(k == 0) {
+      #else
+        if(k == LAYER_1_NUM_KER-1) {
+      #endif
+          stage[0].memA[1].setStart(0);
+          stage[0].memA[2].setStart(0);
+        } else {
+          stage[0].memA[1].setStart((k+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
+          stage[0].memA[2].setStart(k+1);
+        }
+
+        //Wait until done
+        while(done() == 0);
+        end = timer_get_count_us(TIMER);
+        run_time += (end - start);
+
+        //store result in DDR
+        start = timer_get_count_us(TIMER);
+	for(i = 0; i < 16; i++)
+          for(j = 0; j < 32; j++)
+          #ifdef SIM
+            if(output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] != stage[0].memA[3].read(i*32+j)) num_err++;
+          #else
+            output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] = stage[0].memA[3].read(i*32+j);
+          #endif
+
+        //end measuring data load/store time
+        end = timer_get_count_us(TIMER);
+        data_time += (end - start);
+      }
+    }
+  }
+#ifdef SIM
+  uart_printf("Layer 1 done with %d errors\n", num_err);
+#endif
+  uart_printf("FU config time = %d us\n", config_time);
+  uart_printf("FU run time = %d us\n", run_time);
+  uart_printf("FU load/store data time = %d us\n", data_time);
+  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
 }
 
 //send detection results back
@@ -353,7 +554,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_data;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -407,7 +608,6 @@ int main(int argc, char **argv) {
   reset_DDR();
   receive_data();
   fill_grey();
-#endif
 
   //initialize ix, iy, dx and dy arrays
   prepare_resize();
@@ -415,6 +615,11 @@ int main(int argc, char **argv) {
   //resize input image
   uart_printf("\nResizing input image...\n");
   resize_image();
+#endif
+
+  //layer1 (conv)
+  uart_printf("\nRunning layer 1...\n");
+  layer1();
 
   //return data
 #ifndef SIM

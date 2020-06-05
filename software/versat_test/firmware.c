@@ -89,21 +89,32 @@ int main(int argc, char **argv) {
   for(i = 0; i < nSTAGE; i++) {
 
     //configure mem0A to read 3x3 block from feature map
-    //start, iter, incr, delay, per, duty, sel, shift, in_wr
-    stage[i].memA[0].setConf(0, 3, 1, delay, 3, 3, 0, 5-3, 0);
-    stage[i].memA[0].writeConf();
+    stage[i].memA[0].setIter(3);
+    stage[i].memA[0].setIncr(1);
+    stage[i].memA[0].setDelay(delay);
+    stage[i].memA[0].setPer(3);
+    stage[i].memA[0].setDuty(3);
+    stage[i].memA[0].setShift(5-3);
   
     //configure mem1A to read kernel
-    stage[i].memA[1].setConf(0, 1, 1, delay, 10, 10, 0, 0, 0);
-    stage[i].memA[1].writeConf();
+    stage[i].memA[1].setIter(1);
+    stage[i].memA[1].setIncr(1);
+    stage[i].memA[1].setDelay(delay);
+    stage[i].memA[1].setPer(10);
+    stage[i].memA[1].setDuty(10);
 
     //configure muladd0
-    stage[i].muladd[0].setConf(sMEMA[0], sMEMA[1], MULADD_MACC, 1, 9, MEMP_LAT + delay, 0);
-    stage[i].muladd[0].writeConf();
+    stage[i].muladd[0].setSelA(sMEMA[0]);
+    stage[i].muladd[0].setSelB(sMEMA[1]);
+    stage[i].muladd[0].setFNS(MULADD_MACC);
+    stage[i].muladd[0].setIter(1);
+    stage[i].muladd[0].setPer(9);
+    stage[i].muladd[0].setDelay(MEMP_LAT + delay);
 
     //configure ALULite0 to add bias to muladd result
-    stage[i].alulite[0].setConf(in_1_alulite, sMULADD[0], ALULITE_ADD);
-    stage[i].alulite[0].writeConf();
+    stage[i].alulite[0].setOpA(in_1_alulite);
+    stage[i].alulite[0].setOpB(sMULADD[0]);
+    stage[i].alulite[0].setFNS(ALULITE_ADD);
 
     //update variables
     if(i==0) in_1_alulite = sALULITE_p[0];
@@ -111,8 +122,13 @@ int main(int argc, char **argv) {
   }
 
   //config mem2A to store ALULite output
-  stage[nSTAGE-1].memA[2].setConf(0, 1, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay, 1, 1, sALULITE[0], 0, 1);
-  stage[nSTAGE-1].memA[2].writeConf();
+  stage[nSTAGE-1].memA[2].setIter(1);
+  stage[nSTAGE-1].memA[2].setIncr(1);
+  stage[nSTAGE-1].memA[2].setDelay(MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay);
+  stage[nSTAGE-1].memA[2].setPer(1);
+  stage[nSTAGE-1].memA[2].setDuty(1);
+  stage[nSTAGE-1].memA[2].setSel(sALULITE[0]);
+  stage[nSTAGE-1].memA[2].setInWr(1);
   end = timer_get_count_us(TIMER);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
   
@@ -153,20 +169,27 @@ int main(int argc, char **argv) {
   start = timer_get_count_us(TIMER);
 
   //configure mem1B to read bias
-  //start, iter, incr, delay, per, duty, sel, shift, in_wr
-  stage[0].memB[1].setConf(9, 9, 0, 0, 9, 9, 0, 0, 0);
-  stage[0].memB[1].writeConf();
+  stage[0].memB[1].setStart(9);
+  stage[0].memB[1].setIter(9);
+  stage[0].memB[1].setPer(9);
+  stage[0].memB[1].setDuty(9);
 
   for(i = 0; i < nSTAGE; i++) {
 
     //configure mem0A to read all 3x3 blocks from feature map
-    stage[i].memA[0].setConf(3, 3, 5-3, 1); 
+    stage[i].memA[0].setIter2(3); 
+    stage[i].memA[0].setPer2(3); 
+    stage[i].memA[0].setShift2(5-3); 
+    stage[i].memA[0].setIncr2(1); 
     stage[i].memA[0].setStart(0);
-    stage[i].memA[0].writeConf();
   
     //configure mem1A to read kernel
-    stage[i].memA[1].setConf(0, 9, 1, delay, 9, 9, 0, -9, 0);
-    stage[i].memA[1].writeConf();
+    stage[i].memA[1].setIter(9);
+    stage[i].memA[1].setIncr(1);
+    stage[i].memA[1].setDelay(delay);
+    stage[i].memA[1].setPer(9);
+    stage[i].memA[1].setDuty(9);
+    stage[i].memA[1].setShift(-9);
 
     //configure muladd0
     stage[i].muladd[0].setIter(9);
@@ -180,8 +203,15 @@ int main(int argc, char **argv) {
   }
 
   //config mem2A to store ALULite output
-  stage[nSTAGE-1].memA[2].setConf(10, 9, 1, MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay, 9, 1, sALULITE[0], 0, 1);
-  stage[nSTAGE-1].memA[2].writeConf();
+  //start, iter, incr, delay, per, duty, sel, shift, in_wr
+  stage[nSTAGE-1].memA[2].setStart(10);
+  stage[nSTAGE-1].memA[2].setIter(9);
+  stage[nSTAGE-1].memA[2].setIncr(1);
+  stage[nSTAGE-1].memA[2].setDelay(MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay);
+  stage[nSTAGE-1].memA[2].setPer(9);
+  stage[nSTAGE-1].memA[2].setDuty(1);
+  stage[nSTAGE-1].memA[2].setSel(sALULITE[0]);
+  stage[nSTAGE-1].memA[2].setInWr(1);
   end = timer_get_count_us(TIMER);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
   

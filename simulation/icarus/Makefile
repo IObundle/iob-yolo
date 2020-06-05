@@ -29,7 +29,7 @@ VERSAT_DIR := $(SUBMODULES_DIR)/iob-versat
 VERSAT_IO_DIR = $(VERSAT_DIR)/submodules/versat-io
 
 #hw includes
-HW_INCLUDE := -I. -I$(RTL_DIR)/include -I$(UART_DIR)/rtl/include -I$(CACHE_DIR)/rtl/header -I$(ETH_DIR)/rtl/include -I$(TIMER_DIR) -I$(VERSAT_DIR)/rtl/include -I$(VERSAT_IO_DIR)/rtl/include
+HW_INCLUDE := -I. -I$(RTL_DIR)/include -I$(UART_DIR)/rtl/include -I$(CACHE_DIR)/rtl/header -I$(ETH_DIR)/rtl/include -I$(TIMER_DIR) -I$(RTL_DIR)/include/versat -I$(VERSAT_DIR)/rtl/include -I$(VERSAT_IO_DIR)/rtl/include
 ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
     HW_INCLUDE += -I$(FIRM_DIR)
 else
@@ -58,7 +58,8 @@ ifeq ($(VCD),1)
 endif
 
 #hardware sources
-VSRC = $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(TB_DIR)/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM_DIR)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/rtl/src/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v
+VERSAT_SRC = $(RTL_DIR)/src/versat/*.v $(VERSAT_DIR)/rtl/src/xaddrgen.v $(VERSAT_DIR)/rtl/src/xaddrgen2.v $(VERSAT_DIR)/rtl/src/xalu.v $(VERSAT_DIR)/rtl/src/xalulite.v $(VERSAT_DIR)/rtl/src/xbs.v $(VERSAT_DIR)/rtl/src/xclz.v $(VERSAT_DIR)/rtl/src/xconf.v $(VERSAT_DIR)/rtl/src/xconf_mem.v $(VERSAT_DIR)/rtl/src/xinmux.v $(VERSAT_DIR)/rtl/src/xmem.v $(VERSAT_DIR)/rtl/src/xmul.v $(VERSAT_DIR)/rtl/src/xmuladd.v $(VERSAT_DIR)/rtl/src/xstage.v $(VERSAT_DIR)/rtl/src/xversat.v
+VSRC = $(RISCV_DIR)/picorv32.v $(UART_DIR)/rtl/src/iob-uart.v $(FIFO_DIR)/afifo.v $(TB_DIR)/$(TEST)_tb.v  $(RTL_DIR)/src/*.v $(RTL_DIR_IOB_SOC)/src/memory/behav/*.v $(CACHE_DIR)/rtl/src/gen_mem_reg.v $(CACHE_DIR)/rtl/src/iob-cache.v $(AXI_RAM_DIR)/rtl/axi_ram.v $(ETH_DIR)/rtl/src/*.v $(RTL_DIR_IOB_SOC)/src/int_mem.v $(RTL_DIR_IOB_SOC)/src/iob_generic_interconnect.v $(TIMER_DIR)/*.v $(VERSAT_DIR)/submodules/mem/tdp_mem/*.v $(VERSAT_SRC)
 
 all: default_rmac $(VSRC) firmware boot 
 	$(VLOG) $(HW_INCLUDE) $(TB_DEFINE) $(VSRC)

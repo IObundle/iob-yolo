@@ -49,7 +49,7 @@ void print_cache_status() {
  #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
  #define INPUT_FILE_SIZE IMAGE_INPUT //8 bits per point
  #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
- #define WEIGHTS_FILE_SIZE (17704732) //16 bits per input
+ #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per input
  #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
  #define LABELS_FILE_SIZE (82+MAX_LABEL_SIZE*81) //8 bits per input (82 to keep it align)
  #define GEMM_IN_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*2) //16 bits per input
@@ -247,10 +247,12 @@ void print_cache_status() {
   //local variables
   int i, j, k, l, m, n;
   unsigned int output_pos;
-  int16_t output_conv, leaky = 3276; //0.1 in Q1.15;
+  int16_t leaky = 3276; //0.1 in Q1.15;
   int32_t mul;
 
  #ifdef GEMM
+
+  int16_t output_conv;
 
   //Transformation
   for(l = 0; l < c; l++)  		//Number of channels
@@ -264,7 +266,7 @@ void print_cache_status() {
   for(i = 0; i < num_ker; i++) {
     for(j = 0; j < c*ker_size*ker_size; j++) {
       for(k = 0; k < w*h; k++) { 
-	//Q4.12 * Q8.8 = Q12.20
+	//Q6.10 * Q8.8 = Q14.18
 	if(j == 0) fp_gemm_out[i*w*h + k] = (int32_t)((int32_t)w_pos[i*c*ker_size*ker_size + j]*(int32_t)fp_gemm_in[j*w*h + k]);
 	else fp_gemm_out[i*w*h + k] += (int32_t)((int32_t)w_pos[i*c*ker_size*ker_size + j]*(int32_t)fp_gemm_in[j*w*h + k]);
       }
@@ -280,16 +282,15 @@ void print_cache_status() {
       if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
       else output_pos = i*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 
-      //perform batch normalize
+      //add bias
+      output_conv = (int16_t)(fp_gemm_out[i*w*h + j*w + k] >> 10) + bias_pos[i]; //Q14.18 to Q8.8
+
+      //perform leaky activation function
       if(batch_norm) {
-	output_conv = (int16_t)(fp_gemm_out[i*w*h + j*w + k] >> 14); //Q12.20 to Q10.6
-	mul = (int32_t) output_conv * (int32_t) bias_pos[i]; //Q10.6 * Q8.8 = Q18.14
-	output_conv = (int16_t)(mul >> 6) +  bias_pos[num_ker+i]; //Q18.14 to Q8.8
 	if(output_conv < 0) {
 	  mul = (int32_t) output_conv * (int32_t) leaky; //Q8.8 * Q1.15 = Q9.23
 	  output_conv = (int16_t) (mul >> 15); //Convert to Q8.8
 	}
-	out_d_pos[output_pos] = output_conv;
 
 	//Copy last column and last row if needed
 	if(nextStride) {
@@ -299,11 +300,8 @@ void print_cache_status() {
 	}
       } 
  
-      //otherwise, only add bias
-      else {
-	output_conv = (int16_t)(fp_gemm_out[i*w*h + j*w + k] >> 12);//Q12.20 to Q8.8
-	out_d_pos[output_pos] = output_conv + bias_pos[i];
-      }
+      //store result
+      out_d_pos[output_pos] = output_conv;
     }
   }
  }
@@ -312,11 +310,9 @@ void print_cache_status() {
 
   //local variables
   unsigned int output_pos2, output_pos3, output_pos4;
-  int16_t op1, op2, op2_2, op2_3, op2_4;
-  int16_t output_conv2, output_conv3, output_conv4;
-  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4; //0.1 in Q1.15;
-  int32_t acc_final, acc_final2, acc_final3, acc_final4; 
-  int32_t mul2, mul3, mul4;
+  int16_t op1, op2;
+  int16_t mul_16, mul_16_2, mul_16_3, mul_16_4;
+  int32_t acc, acc2, acc3, acc4; 
 
   //perform convolution
   for(i = 0; i < num_ker; i+=4) {               //Number of kernels
@@ -333,70 +329,54 @@ void print_cache_status() {
 	  output_pos3 = (i+2)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 	  output_pos4 = (i+3)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 	}
-	acc_final = 0;
-	acc_final2 = 0;
-	acc_final3 = 0;
-	acc_final4 = 0;
+	acc = 0;
+	acc2 = 0;
+	acc3 = 0;
+	acc4 = 0;
 	for(l = 0; l < c; l++) { 		//Number of channels
 	  for(m = 0; m < ker_size; m++) {	//Kernel size
 	    for(n = 0; n < ker_size; n++) {
 	      op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n]; //Q8.8
 	      op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
 	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
-	      acc_final += mul; //Q12.20
-	      op2_2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul2 = (int32_t)((int32_t)op1*(int32_t)op2_2); //Q12.20
-	      acc_final2 += mul2; //Q12.20
-	      op2_3 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul3 = (int32_t)((int32_t)op1*(int32_t)op2_3); //Q12.20
-	      acc_final3 += mul3; //Q12.20
-	      op2_4 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
-	      mul4 = (int32_t)((int32_t)op1*(int32_t)op2_4); //Q12.20
-	      acc_final4 += mul4; //Q12.20
+	      acc += mul; //Q12.20
+	      op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      acc2 += mul; //Q12.20
+	      op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      acc3 += mul; //Q12.20
+	      op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n]; //Q4.12
+	      mul = (int32_t)((int32_t)op1*(int32_t)op2); //Q12.20
+	      acc4 += mul; //Q12.20
 	    }
 	  }
 	}
 
-	//perform batch normalize
-	if(batch_norm) {
-	  output_conv = (int16_t) (acc_final >> 14);//Q12.20 to Q10.6
-  	  mul = (int32_t) output_conv * (int32_t) bias_pos[i];//Q10.6 * Q8.8 = Q18.14
-	  mul_16 = (int16_t) (mul >> 6);//Q18.14 to Q8.8
-	  mul_16 += bias_pos[num_ker+i]; //Q8.8
-	  output_conv2 = (int16_t) (acc_final2 >> 14);//Q12.20 to Q10.6
-  	  mul2 = (int32_t) output_conv2 * (int32_t) bias_pos[i+1];//Q10.6 * Q8.8 = Q18.14
-	  mul_16_2 = (int16_t) (mul2 >> 6);//Q18.14 to Q8.8
-	  mul_16_2 += bias_pos[num_ker+i+1]; //Q8.8
-	  output_conv3 = (int16_t) (acc_final3 >> 14);//Q12.20 to Q10.6
-  	  mul3 = (int32_t) output_conv3 * (int32_t) bias_pos[i+2];//Q10.6 * Q8.8 = Q18.14
-	  mul_16_3 = (int16_t) (mul3 >> 6);//Q18.14 to Q8.8
-	  mul_16_3 += bias_pos[num_ker+i+2]; //Q8.8
-	  output_conv4 = (int16_t) (acc_final4 >> 14);//Q12.20 to Q10.6
-  	  mul4 = (int32_t) output_conv4 * (int32_t) bias_pos[i+3];//Q10.6 * Q8.8 = Q18.14
-	  mul_16_4 = (int16_t) (mul4 >> 6);//Q18.14 to Q8.8
-	  mul_16_4 += bias_pos[num_ker+i+3]; //Q8.8
+	//add bias
+	mul_16 = (int16_t) (acc >> 10) + bias_pos[i]; //Q14.18 to Q8.8
+	mul_16_2 = (int16_t) (acc2 >> 10) + bias_pos[i+1]; //Q14.18 to Q8.8
+	mul_16_3 = (int16_t) (acc3 >> 10) + bias_pos[i+2]; //Q14.18 to Q8.8
+	mul_16_4 = (int16_t) (acc4 >> 10) + bias_pos[i+3]; //Q14.18 to Q8.8
 
-	  //perform leaky activation
+	//perform leaky activation
+	if(batch_norm) {
 	  if(mul_16 < 0) {
 	    mul = (int32_t) mul_16 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
 	    mul_16 = (int16_t) (mul >> 15); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos] = mul_16;
 	  if(mul_16_2 < 0) {
-	    mul2 = (int32_t) mul_16_2 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_2 = (int16_t) (mul2 >> 15); //Convert to Q8.8
+	    mul = (int32_t) mul_16_2 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
+	    mul_16_2 = (int16_t) (mul >> 15); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos2] = mul_16_2;
 	  if(mul_16_3 < 0) {
-	    mul3 = (int32_t) mul_16_3 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_3 = (int16_t) (mul3 >> 15); //Convert to Q8.8
+	    mul = (int32_t) mul_16_3 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
+	    mul_16_3 = (int16_t) (mul >> 15); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos3] = mul_16_3;
 	  if(mul_16_4 < 0) {
-	    mul4 = (int32_t) mul_16_4 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
-	    mul_16_4 = (int16_t) (mul4 >> 15); //Convert to Q8.8
+	    mul = (int32_t) mul_16_4 * (int32_t) leaky; ////Q8.8 * Q1.15 = Q9.23
+	    mul_16_4 = (int16_t) (mul >> 15); //Convert to Q8.8
 	  }
-	  out_d_pos[output_pos4] = mul_16_4;
 
 	  //Copy last column and last row if needed
 	  if(nextStride) {
@@ -421,25 +401,18 @@ void print_cache_status() {
 	  }
 	}
 
-	//otherwise, only add bias
-	else {
-	  output_conv = (int16_t) (acc_final >> 12);//Q12.20 to Q8.8
-	  out_d_pos[output_pos] = output_conv + bias_pos[i];
-	  output_conv2 = (int16_t) (acc_final2 >> 12);//Q12.20 to Q8.8
-	  out_d_pos[output_pos2] = output_conv2 + bias_pos[i+1];
-	  output_conv3 = (int16_t) (acc_final3 >> 12);//Q12.20 to Q8.8
-	  out_d_pos[output_pos3] = output_conv3 + bias_pos[i+2];
-	  output_conv4 = (int16_t) (acc_final4 >> 12);//Q12.20 to Q8.8
-	  out_d_pos[output_pos4] = output_conv4 + bias_pos[i+3];
-	}
+	//store results
+	out_d_pos[output_pos] = mul_16;
+	out_d_pos[output_pos2] = mul_16_2;
+	out_d_pos[output_pos3] = mul_16_3;
+	out_d_pos[output_pos4] = mul_16_4;
       }
     }
   }
  #endif
 
   //update weights and data pointers
-  if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
-  else weight_pos += num_ker + num_ker*c*ker_size*ker_size;
+  weight_pos += num_ker + num_ker*c*ker_size*ker_size;
   if(new_output_pos != 0) data_pos = new_output_pos; else data_pos += pos_delta;
  }
 
@@ -623,7 +596,8 @@ void print_cache_status() {
 	  val_16 = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k]); //Q2.14
 	  val_32 = (int32_t)((int32_t)val_16*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
 	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  //val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
 	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
 	  out_d_pos[85*nboxes+2] = val_16; //w
 
@@ -631,7 +605,8 @@ void print_cache_status() {
 	  val_16 = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k]); //Q2.14
 	  val_32 = (int32_t)((int32_t)val_16*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
 	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  //val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
 	  val_16 = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
 	  out_d_pos[85*nboxes+3] = val_16; //h
 
@@ -906,7 +881,7 @@ void print_cache_status() {
  #define ETH_NBYTES (1022-18) //1024-2 to be divisible by 4
  #define INPUT_FILE_SIZE (IMAGE_INPUT*4) //32 bits per point
  #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
- #define WEIGHTS_FILE_SIZE (35409464) //32 bits per input
+ #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*4) //32 bits per input
  #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
  #define LABELS_FILE_SIZE ((82+MAX_LABEL_SIZE*81)*4) //32 bits per input (82 to keep it align)
  #define GEMM_IN_SIZE (NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*4) //32 bits per input
@@ -1079,7 +1054,7 @@ void print_cache_status() {
   //local variables
   int i, j, k, l, m, n;
   unsigned int output_pos;
-  float output_conv, leaky = 0.1;
+  float output_conv;
 
  #ifdef GEMM
 
@@ -1110,11 +1085,12 @@ void print_cache_status() {
 	if(nextPadding) output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w);
 	else output_pos = i*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 
-	//perform batch normalize
+	//Add bias
+	output_conv = fp_gemm_out[i*w*h + j*w + k] + bias_pos[i];
+
+	//perform leaky activation function
 	if(batch_norm) {
-	  output_conv = fp_gemm_out[i*w*h + j*w + k]*bias_pos[i] + bias_pos[num_ker+i];
-	  if(output_conv < 0) output_conv *= leaky;
-	  out_d_pos[output_pos] = output_conv;
+	  if(output_conv < 0) output_conv *= 0.1;
 
 	  //Copy last column and last row if needed
 	  if(nextStride) {
@@ -1122,7 +1098,7 @@ void print_cache_status() {
 	    if(j == w-1) out_d_pos[output_pos + new_w] = output_conv;
 	    if(k == w-1 && j == w-1) out_d_pos[output_pos + 1 + new_w] = output_conv;
 	  }
-	} else out_d_pos[output_pos] = fp_gemm_out[i*w*h + j*w + k] + bias_pos[i];
+	} out_d_pos[output_pos] = fp_gemm_out[i*w*h + j*w + k] + bias_pos[i];
       }
     }
   }
@@ -1169,23 +1145,19 @@ void print_cache_status() {
 	    }
 	  }
 	}
+
+	//add bias
+	output_conv = acc_final + bias_pos[i];
+	output_conv2 = acc_final2 + bias_pos[i+1];
+	output_conv3 = acc_final3 + bias_pos[i+2];
+	output_conv4 = acc_final4 + bias_pos[i+3];
 					
-	//perform batch normalize
+	//perform leaky activation
 	if(batch_norm) {
-	  output_conv = acc_final*bias_pos[i] + bias_pos[num_ker+i];
-	  output_conv2 = acc_final2*bias_pos[i+1] + bias_pos[num_ker+i+1];
-	  output_conv3 = acc_final3*bias_pos[i+2] + bias_pos[num_ker+i+2];
-	  output_conv4 = acc_final4*bias_pos[i+3] + bias_pos[num_ker+i+3];
-														
-	  //perform leaky activation
-	  if(output_conv < 0) output_conv *= leaky;
-	  if(output_conv2 < 0) output_conv2 *= leaky;
-	  if(output_conv3 < 0) output_conv3 *= leaky;
-	  if(output_conv4 < 0) output_conv4 *= leaky;
-	  out_d_pos[output_pos] = output_conv;
-	  out_d_pos[output_pos2] = output_conv2;
-	  out_d_pos[output_pos3] = output_conv3;
-	  out_d_pos[output_pos4] = output_conv4;
+	  if(output_conv < 0) output_conv *= 0.1;
+	  if(output_conv2 < 0) output_conv2 *= 0.1;
+	  if(output_conv3 < 0) output_conv3 *= 0.1;
+	  if(output_conv4 < 0) output_conv4 *= 0.1;
 						
 	  //Copy last column and last row if needed
 	  if(nextStride) {
@@ -1210,13 +1182,11 @@ void print_cache_status() {
 	  }
 	}
 					
-	//otherwise, only add bias
-	else {
-	  out_d_pos[output_pos] = acc_final + bias_pos[i];
-	  out_d_pos[output_pos2] = acc_final2 + bias_pos[i+1];
-	  out_d_pos[output_pos3] = acc_final3 + bias_pos[i+2];
-	  out_d_pos[output_pos4] = acc_final4 + bias_pos[i+3];
-	}
+	//store results
+	out_d_pos[output_pos] = output_conv;
+	out_d_pos[output_pos2] = output_conv2;
+	out_d_pos[output_pos3] = output_conv3;
+	out_d_pos[output_pos4] = output_conv4;
       }
     }
   }
@@ -1224,8 +1194,7 @@ void print_cache_status() {
  #endif
 		
   //update weights and data pointers
-  if(batch_norm) weight_pos += num_ker*2 + num_ker*c*ker_size*ker_size;
-  else weight_pos += num_ker + num_ker*c*ker_size*ker_size;
+  weight_pos += num_ker + num_ker*c*ker_size*ker_size;
   if(new_output_pos != 0) data_pos = new_output_pos; else data_pos += pos_delta;
  }	
 	
@@ -1386,10 +1355,12 @@ void print_cache_status() {
 	    out_d_pos[85*nboxes+1] = (in_d_pos[(85*i+1)*w*w + j*w + k]+j)*xy_div*y_scales - y_bias;
 	
 	    //Calculate w
-	    out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+3*first_yolo)];
+	    //out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+3*first_yolo)];
+	    out_d_pos[85*nboxes+2] = exp_poly_appr(in_d_pos[(85*i+2)*w*w + j*w + k])*w_scales*yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)];
 	    
             //Calculate h
-	    out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+3*first_yolo)+1];
+	    //out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+3*first_yolo)+1];
+	    out_d_pos[85*nboxes+3] = exp_poly_appr(in_d_pos[(85*i+3)*w*w + j*w + k])*h_scales*yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)+1];
 	
 	    //Objectness score
 	    out_d_pos[85*nboxes+4] = in_d_pos[(85*i+4)*w*w + j*w + k];
