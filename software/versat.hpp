@@ -267,12 +267,6 @@ class CYolo {
     void setShift(int shift) {
       MEMSET(versat_base, (this->yolo_base + YOLO_CONF_SHIFT), shift);
     }
-    void setAccIN(int accIN) {
-      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ACCIN), accIN);
-    }
-    void setAccOUT(int accOUT) {
-      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ACCOUT), accOUT);
-    }
     void setBias(int bias) {
       MEMSET(versat_base, (this->yolo_base + YOLO_CONF_BIAS), bias);
     }

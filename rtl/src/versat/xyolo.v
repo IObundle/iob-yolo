@@ -16,28 +16,23 @@ module xyolo # (
                 input [`YOLO_CONF_BITS-1:0] configdata
                 );
 
-   //double precision data
-   reg signed [2*DATA_W-1:0]		      result_mult;
-   reg [2*DATA_W-1:0]                         out_reg;
-   wire [2*DATA_W-1:0]                        shifted, adder;
-
    //data
+   wire [2*DATA_W-1:0]                        shifted, adder;
    wire signed [DATA_W-1:0]                   op_a, op_b, op_c, act_fnc, shifted_half;
    wire [`MEM_ADDR_W-1:0]                     op_o;
-   reg signed [DATA_W-1:0]                    op_c_r0, op_c_r1;
-   wire [DATA_W-1:0]                          result;
-   reg [DATA_W-1:0]                           result_reg;
+   reg signed [DATA_W-1:0]                    bias_reg;
+   reg [DATA_W-1:0]                           result;
 
    //config data
    wire [`N_W-1:0]                            sela, selb, selc;
    wire [`MEM_ADDR_W-1:0]		      iterations;
    wire [`PERIOD_W-1:0]                       period, delay;
    wire [`SHIFT_W-1:0]			      shift;
-   wire                                       accIN, accOUT, bias, leaky;
+   wire                                       bias, leaky;
 
    //accumulator load signal
    wire                                       ld_acc;
-   reg                                        ld_acc0, ld_acc1, ld_acc2, ld_acc3;
+   reg                                        ld_acc0, ld_acc1;
 
    //unpack config bits
    assign sela = configdata[`YOLO_CONF_BITS-1 -: `N_W];
@@ -47,10 +42,8 @@ module xyolo # (
    assign period = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W -: `PERIOD_W];
    assign delay = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-`PERIOD_W -: `PERIOD_W];
    assign shift = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W -: `SHIFT_W];
-   assign accIN = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
-   assign accOUT = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
-   assign bias = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
-   assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-3 -: 1];
+   assign bias = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
+   assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
 
    //input selection
    xinmux # (
@@ -103,33 +96,25 @@ module xyolo # (
      if (rst) begin
        ld_acc0 <= 1'b0;
        ld_acc1 <= 1'b0;
-       ld_acc2 <= 1'b0;
-       ld_acc3 <= 1'b0;
-       out_reg <= {2*DATA_W{1'b0}};
-       op_c_r0 <= {DATA_W{1'b0}};
-       op_c_r1 <= {DATA_W{1'b0}};
-       result_reg <= {DATA_W{1'b0}};
+       bias_reg <= {DATA_W{1'b0}};
+       result <= {DATA_W{1'b0}};
      end else begin
        ld_acc0 <= ld_acc;
        ld_acc1 <= ld_acc0;
-       ld_acc2 <= ld_acc1;
-       ld_acc3 <= ld_acc2;
-       out_reg <= shifted;
-       op_c_r0 <= op_c;
-       op_c_r1 <= op_c_r0;
-       result_reg <= result;
+       bias_reg <= op_c;
+       result <= act_fnc;
      end
    end
 
-   //concatenate
-   assign adder = (ld_acc || !accIN) ? {{DATA_W{1'b0}},op_c_r0} : {op_c_r0,op_c_r1};
+   //double-precision bias
+   assign adder = {{DATA_W{1'b0}}, bias_reg};
 
    //compute accumulator load signal
    assign ld_acc = (op_o=={`MEM_ADDR_W{1'd0}});
 
    //multiplier signals and regs
    reg signed [DATA_W-1:0] op_a_reg, op_b_reg;
-   reg signed [2*DATA_W-1:0] acc, dsp_out, op_c_reg;
+   reg signed [2*DATA_W-1:0] acc, dsp_out, op_c_reg, result_mult;
    wire signed [2*DATA_W-1:0] acc_w, adder_w;
 
    //4-stage multiplier (DSP48E2 template)
@@ -144,15 +129,14 @@ module xyolo # (
    assign acc_w = ld_acc1 ? op_c_reg : acc;
 
    //select accumulation initial value
-   assign adder_w = bias ? adder << shift : accIN ? adder : {2*DATA_W{1'b0}};
+   assign adder_w = bias ? adder << shift : {2*DATA_W{1'b0}};
 
    //apply activation function
-   assign shifted = bias ? dsp_out : dsp_out >> shift;
+   assign shifted = dsp_out >> shift;
    assign shifted_half = shifted[DATA_W-1:0];
    assign act_fnc = (leaky & shifted_half[DATA_W-1]) ? shifted_half >>> 3 : shifted_half;
 
-   //select output 1st/2nd half
-   assign result = (ld_acc3 & accOUT) ? out_reg[2*DATA_W-1 -: DATA_W] : act_fnc;
-   assign flow_out = result_reg;
+   //result
+   assign flow_out = result;
 
 endmodule

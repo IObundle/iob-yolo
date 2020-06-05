@@ -328,17 +328,11 @@ module xconf_reg # (
 	      if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_SHIFT))
                 conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W -: `SHIFT_W] <= ctr_data_in[`SHIFT_W-1:0];
 
-              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_ACCIN))
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_BIAS))
                 conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W -: 1] <= ctr_data_in[0];
 
-              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_ACCOUT))
-                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-1 -: 1] <= ctr_data_in[0];
-
-              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_BIAS))
-                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-2 -: 1] <= ctr_data_in[0];
-
               if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_LEAKY))
-                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-3 -: 1] <= ctr_data_in[0];
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-1 -: 1] <= ctr_data_in[0];
            end
 
 	   // configure BSs

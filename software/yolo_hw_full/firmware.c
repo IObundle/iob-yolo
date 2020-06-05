@@ -393,8 +393,8 @@ void resize_image() {
   uart_printf("FU config time = %d us\n", config_time);
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
+  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
 }
-
 
 //layer 1 (conv)
 void layer1() {
@@ -411,17 +411,15 @@ void layer1() {
 #ifdef SIM
   int num_err = 0;
 #endif
-  unsigned int data_time, config_time, run_time = 0, start_config_time = 0;
+  unsigned int data_time, config_time, run_time = 0;
 
-  //load weights
+  //load weights (z-x-y format)
   start = timer_get_count_us(TIMER);
   for(i = 0; i < LAYER_1_NUM_KER; i++) {
-    for(j = 0; j < LAYER_1_KER_SIZE*LAYER_1_KER_SIZE; j++) {
-      stage[0].memA[1].write(i*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE+j, fp_weights[3*i*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j]);
-      stage[1].memA[0].write(i*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE+j, fp_weights[(3*i+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j]);
-      stage[1].memA[2].write(i*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE+j, fp_weights[(3*i+2)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j]);
-    }
-    stage[0].memA[3].write(i, bias[i]);
+    for(j = 0; j < IMG_C; j++)
+      for(k = 0; k < LAYER_1_KER_SIZE*LAYER_1_KER_SIZE; k++)
+        stage[0].memA[1].write(i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k*IMG_C + j, fp_weights[i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k]);
+    stage[0].memA[2].write(i, bias[i]);
   }
   end = timer_get_count_us(TIMER);
   data_time = end - start;
@@ -433,112 +431,47 @@ void layer1() {
   //                            STAGE 0
   ///////////////////////////////////////////////////////////////////////////////
   
-  //configure mem0 to read 3x3 blocks from 54x34 channel0 FM
-  stage[0].memA[0].setIter(3);
+  //configure mem0 to read 3x3*3 blocks from 34x18x3 FM
+  stage[0].memA[0].setDuty(9);
+  stage[0].memA[0].setPer(9);
   stage[0].memA[0].setIncr(1);
-  stage[0].memA[0].setPer(3);
-  stage[0].memA[0].setDuty(3);
-  stage[0].memA[0].setShift(54-3);
-  stage[0].memA[0].setIter2(32);
-  stage[0].memA[0].setPer2(52);
-  stage[0].memA[0].setShift2(2);
-  stage[0].memA[0].setIncr2(1);
+  stage[0].memA[0].setIter(3);
+  stage[0].memA[0].setShift(34*3-9);
+  stage[0].memA[0].setPer2(32);
+  stage[0].memA[0].setIncr2(3);
+  stage[0].memA[0].setIter2(16);
+  stage[0].memA[0].setShift2(34*3-32*3);
 
-  //configure mem1 to read channel0 weights
-  stage[0].memA[1].setIter(32*52);
+  //configure mem1 to read weights
+  stage[0].memA[1].setDuty(27);
+  stage[0].memA[1].setPer(27);
   stage[0].memA[1].setIncr(1);
-  stage[0].memA[1].setPer(9);
-  stage[0].memA[1].setDuty(9);
-  stage[0].memA[1].setShift(-9);
- 
-  //configure mem3 to read bias
-  stage[0].memA[3].setIter(32*52);
-  stage[0].memA[3].setPer(9);
+  stage[0].memA[1].setIter(32*16);
+  stage[0].memA[1].setShift(-27);
 
-  //configure yolo0 to perform channel0 convolutions
+  //configure mem2 to read bias
+  stage[0].memA[2].setIter(32*16);
+  stage[0].memA[2].setPer(27);
+
+  //configure yolo0 to perform convolutions
   stage[0].yolo[0].setSelA(sMEMA[0]);
   stage[0].yolo[0].setSelB(sMEMA[1]);
-  stage[0].yolo[0].setIter(32*52);
-  stage[0].yolo[0].setPer(9);
+  stage[0].yolo[0].setSelC(sMEMA[2]);
+  stage[0].yolo[0].setIter(32*16);
+  stage[0].yolo[0].setPer(27);
   stage[0].yolo[0].setDelay(MEMP_LAT);
-  stage[0].yolo[0].setAccOUT(1);
-  stage[0].yolo[0].setSelC(sMEMA[3]);
   stage[0].yolo[0].setBias(1);
   stage[0].yolo[0].setShift(10);
-
-  //configure mem2 to read 3x3 blocks from 54x34 channel1 FM
-  stage[0].memA[2].setIter(3);
-  stage[0].memA[2].setIncr(1);
-  stage[0].memA[2].setDelay(YOLO_LAT+9);
-  stage[0].memA[2].setPer(3);
-  stage[0].memA[2].setDuty(3);
-  stage[0].memA[2].setShift(54-3);
-  stage[0].memA[2].setIter2(32);
-  stage[0].memA[2].setPer2(52);
-  stage[0].memA[2].setShift2(2);
-  stage[0].memA[2].setIncr2(1);
-
-  ///////////////////////////////////////////////////////////////////////////////
-  //                            STAGE 1
-  ///////////////////////////////////////////////////////////////////////////////
-
-  //configure mem0 to read channel1 weights
-  stage[1].memA[0].setIter(32*52);
-  stage[1].memA[0].setIncr(1);
-  stage[1].memA[0].setDelay(YOLO_LAT+9);
-  stage[1].memA[0].setPer(9);
-  stage[1].memA[0].setDuty(9);
-  stage[1].memA[0].setShift(-9);
-
-  //configure yolo0 to perform channel1 convolutions
-  stage[1].yolo[0].setSelA(sMEMA_p[2]);
-  stage[1].yolo[0].setSelB(sMEMA[0]);
-  stage[1].yolo[0].setIter(32*52);
-  stage[1].yolo[0].setPer(9);
-  stage[1].yolo[0].setDelay(MEMP_LAT+YOLO_LAT+9);
-  stage[1].yolo[0].setSelC(sYOLO_p[0]);
-  stage[1].yolo[0].setAccIN(1);
-  stage[1].yolo[0].setAccOUT(1);
-
-  //configure mem1 to read 3x3 blocks from 54x34 channel2 FM
-  stage[1].memA[1].setIter(3);
-  stage[1].memA[1].setIncr(1);
-  stage[1].memA[1].setDelay(2*(YOLO_LAT+9));
-  stage[1].memA[1].setPer(3);
-  stage[1].memA[1].setDuty(3);
-  stage[1].memA[1].setShift(54-3);
-  stage[1].memA[1].setIter2(32);
-  stage[1].memA[1].setPer2(52);
-  stage[1].memA[1].setShift2(2);
-  stage[1].memA[1].setIncr2(1);
-
-  //configure mem2 to read channel2 weights
-  stage[1].memA[2].setIter(32*52);
-  stage[1].memA[2].setIncr(1);
-  stage[1].memA[2].setDelay(2*(YOLO_LAT+9));
-  stage[1].memA[2].setPer(9);
-  stage[1].memA[2].setDuty(9);
-  stage[1].memA[2].setShift(-9);
-
-  //configure yolo1 to perform channel2 convolutions
-  stage[1].yolo[1].setSelA(sMEMA[1]);
-  stage[1].yolo[1].setSelB(sMEMA[2]);
-  stage[1].yolo[1].setIter(32*52);
-  stage[1].yolo[1].setPer(9);
-  stage[1].yolo[1].setDelay(MEMP_LAT+2*(YOLO_LAT+9));
-  stage[1].yolo[1].setShift(10);
-  stage[1].yolo[1].setSelC(sYOLO[0]);
-  stage[1].yolo[1].setAccIN(1);
-  stage[1].yolo[1].setLeaky(1);
+  stage[0].yolo[0].setLeaky(1);
 
   //configure mem3 to write convolution results
-  stage[1].memA[3].setIter(32*52);
-  stage[1].memA[3].setIncr(1);
-  stage[1].memA[3].setDelay(MEMP_LAT+3*(YOLO_LAT+9)-1);
-  stage[1].memA[3].setPer(9);
-  stage[1].memA[3].setDuty(1);
-  stage[1].memA[3].setSel(sYOLO[1]);
-  stage[1].memA[3].setInWr(1);
+  stage[0].memA[3].setDuty(1);
+  stage[0].memA[3].setPer(27);
+  stage[0].memA[3].setIncr(1);
+  stage[0].memA[3].setIter(32*16);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27-1);
+  stage[0].memA[3].setSel(sYOLO[0]);
+  stage[0].memA[3].setInWr(1);
 
   //end measuring config time
   end = timer_get_count_us(TIMER);
@@ -549,19 +482,16 @@ void layer1() {
   for(l = 0; l < 1; l++) {
     for(m = 0; m < 1; m++) {
 #else
-  for(l = 0; l < 13; l++) {
-    for(m = 0; m < 8; m++) {
+  for(l = 0; l < 26; l++) {
+    for(m = 0; m < 13; m++) {
 #endif
 
-      //Send input FM 54x34 tile
+      //Send input FM 34x18 tile (z-x-y format)
       start = timer_get_count_us(TIMER);
-      for(i = 0; i < 34; i++) {
-        for(j = 0; j < 54; j++) {
-          stage[0].memA[0].write(i*54+j, fp_data[(32*l+i)*418 + 52*m + j]);
-          stage[0].memA[2].write(i*54+j, fp_data[(32*l+i)*418 + 52*m + j + 418*418]);
-          stage[1].memA[1].write(i*54+j, fp_data[(32*l+i)*418 + 52*m + j + 418*418*2]);
-        }
-      }
+      for(i = 0; i < IMG_C; i++)
+        for(j = 0; j < 18; j++)
+          for(k = 0; k < 34; k++)
+            stage[0].memA[0].write((j*34+k)*IMG_C + i, fp_data[i*418*418 + j*418 + k + m*32 + l*16*418]);
       end = timer_get_count_us(TIMER);
       data_time += (end - start);
 
@@ -571,20 +501,22 @@ void layer1() {
       for(k = 0; k < LAYER_1_NUM_KER; k++) {
     #endif
 
-        //Configure weight mems start
-        start = timer_get_count_us(TIMER);
-        stage[0].memA[1].setStart(k*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE);
-        stage[1].memA[0].setStart(k*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE);
-        stage[1].memA[2].setStart(k*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE);
-
-	//configure bias mem start
-	stage[0].memA[3].setStart(k);
-        end = timer_get_count_us(TIMER);
-        start_config_time += (end - start);
-
         //run
         start = timer_get_count_us(TIMER);
         run();
+
+	//configure weight and bias mems start for next iteration
+      #ifdef SIM
+        if(k == 0) {
+      #else
+        if(k == LAYER_1_NUM_KER-1) {
+      #endif
+          stage[0].memA[1].setStart(0);
+          stage[0].memA[2].setStart(0);
+        } else {
+          stage[0].memA[1].setStart((k+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
+          stage[0].memA[2].setStart(k+1);
+        }
 
         //Wait until done
         while(done() == 0);
@@ -593,13 +525,13 @@ void layer1() {
 
         //store result in DDR
         start = timer_get_count_us(TIMER);
-        for(i = 0; i < 32; i++)
-          for(j = 0; j < 52; j++)
+	for(i = 0; i < 16; i++)
+          for(j = 0; j < 32; j++)
           #ifdef SIM
-            if(output[k*YOLO_INPUT*YOLO_INPUT + (32*l+i)*YOLO_INPUT + 52*m + j] != stage[1].memA[3].read(i*52+j)) num_err++;
-	  #else
-            output[k*YOLO_INPUT*YOLO_INPUT + (32*l+i)*YOLO_INPUT + 52*m + j] = stage[1].memA[3].read(i*52+j);
-	  #endif
+            if(output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] != stage[0].memA[3].read(i*32+j)) num_err++;
+          #else
+            output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] = stage[0].memA[3].read(i*32+j);
+          #endif
 
         //end measuring data load/store time
         end = timer_get_count_us(TIMER);
@@ -611,9 +543,9 @@ void layer1() {
   uart_printf("Layer 1 done with %d errors\n", num_err);
 #endif
   uart_printf("FU config time = %d us\n", config_time);
-  uart_printf("FU start config time = %d us\n", start_config_time);
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
+  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
 }
 
 //send detection results back
