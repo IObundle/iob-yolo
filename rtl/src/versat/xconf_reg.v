@@ -56,7 +56,7 @@ module xconf_reg # (
 	else begin
 	   
 	   // configure MEMs
-	  for (i=0; i<2*`nMEM; i=i+1) begin 
+	  for (i=0; i<`nMEM; i=i+1) begin 
 	     
 	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_ITER))
 	       conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
@@ -82,28 +82,36 @@ module xconf_reg # (
 	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_DELAY))
 	       conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-2*`PERIOD_W -`N_W -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
 
-	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_RVRS))
+	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_EXT))
 	       conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-3*`PERIOD_W -`N_W -: 1] <= ctr_data_in[0];
 
-	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_EXT))
+	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_IN_WR))
 	       conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-3*`PERIOD_W -`N_W-1 -: 1] <= ctr_data_in[0];
 
-	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_IN_WR))
-	       conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-3*`PERIOD_W -`N_W-2 -: 1] <= ctr_data_in[0];
-
 	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_ITER2))
-               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-3*`PERIOD_W -`N_W-3 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-4*`MEM_ADDR_W-3*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
 
              if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_PER2))
-               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-5*`MEM_ADDR_W-3*`PERIOD_W -`N_W-3 -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-5*`MEM_ADDR_W-3*`PERIOD_W -`N_W-2 -: `PERIOD_W] <= ctr_data_in[`PERIOD_W-1:0];
 
              if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_SHIFT2))
-               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-5*`MEM_ADDR_W-4*`PERIOD_W -`N_W-3 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-5*`MEM_ADDR_W-4*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
 
              if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_INCR2))
-               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-6*`MEM_ADDR_W-4*`PERIOD_W -`N_W-3 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];  
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-6*`MEM_ADDR_W-4*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
 
-	   end // for (i=0; i<2*`nMEM; i=i+1)
+	     if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_ITER3))
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-7*`MEM_ADDR_W-4*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+
+             if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_PER3))
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-8*`MEM_ADDR_W-4*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`PERIOD_W-1:0];
+
+             if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_SHIFT3))
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-8*`MEM_ADDR_W-5*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+
+             if(ctr_addr == (`CONF_MEM0A + i*`MEMP_CONF_OFFSET + `MEMP_CONF_INCR3))
+               conf_reg[`CONF_MEM0A_B-i*`MEMP_CONF_BITS-9*`MEM_ADDR_W-5*`PERIOD_W -`N_W-2 -: `MEM_ADDR_W] <= ctr_data_in[`MEM_ADDR_W-1:0];
+	   end // for (i=0; i<`nMEM; i=i+1)
 
       // configure VIs
 	  for (i=0; i<`nVI; i=i+1) begin

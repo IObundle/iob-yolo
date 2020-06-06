@@ -6,13 +6,13 @@
 read_verilog ../../../rtl/include/versat/xconfdefs.vh
 read_verilog ../../../rtl/include/versat/xdefs.vh
 read_verilog ../../../rtl/include/versat/xyolodefs.vh
+read_verilog ../../../rtl/include/versat/xmemdefs.vh
 read_verilog ../../../rtl/include/system.vh
 read_verilog ../../../submodules/iob-soc/submodules/iob-uart/rtl/include/iob-uart.vh
 read_verilog ../../../submodules/iob-eth/rtl/include/iob_eth_defs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xaludefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xalulitedefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xbsdefs.vh
-read_verilog ../../../submodules/iob-versat/rtl/include/xmemdefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuladddefs.vh
 read_verilog ../../../submodules/iob-versat/rtl/include/xmuldefs.vh
 read_verilog ../../../submodules/iob-versat/submodules/versat-io/rtl/include/versat-io.vh
@@ -59,6 +59,8 @@ read_verilog ../../../submodules/iob-timer/iob_timer.v
 read_verilog ../../../rtl/src/versat/xconf_reg.v
 read_verilog ../../../rtl/src/versat/xdata_eng.v
 read_verilog ../../../rtl/src/versat/xyolo.v
+read_verilog ../../../rtl/src/versat/xmem.v
+read_verilog ../../../rtl/src/versat/xaddrgen3.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xaddrgen2.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xalu.v
@@ -68,7 +70,6 @@ read_verilog ../../../submodules/iob-versat/rtl/src/xclz.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xconf.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xconf_mem.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xinmux.v
-read_verilog ../../../submodules/iob-versat/rtl/src/xmem.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmul_pipe.v
 read_verilog ../../../submodules/iob-versat/rtl/src/xmuladd.v
@@ -77,6 +78,7 @@ read_verilog ../../../submodules/iob-versat/rtl/src/xversat.v
 read_verilog ../../../submodules/iob-versat/submodules/mem/tdp_mem/iob_tdp_mem.v
 set_property file_type SystemVerilog [get_files xaddrgen.v]
 set_property file_type SystemVerilog [get_files xaddrgen2.v]
+set_property file_type SystemVerilog [get_files xaddrgen3.v]
 set_property file_type SystemVerilog [get_files xalu.v]
 set_property file_type SystemVerilog [get_files xalulite.v]
 set_property file_type SystemVerilog [get_files xbs.v]

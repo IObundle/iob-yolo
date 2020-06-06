@@ -445,23 +445,27 @@ void layer1() {
   stage[0].memA[0].setIncr2(3);
   stage[0].memA[0].setIter2(2);
   stage[0].memA[0].setShift2(34*3-2*3);
+  stage[0].memA[0].setPer3(16);
+  stage[0].memA[0].setIncr3(2*3);
+  stage[0].memA[0].setIter3(8);
+  stage[0].memA[0].setShift3(34*3*2-16*2*3);
 
   //configure mem1 to read weights
   stage[0].memA[1].setDuty(27);
   stage[0].memA[1].setPer(27);
   stage[0].memA[1].setIncr(1);
-  stage[0].memA[1].setIter(2*2);
+  stage[0].memA[1].setIter(32*16);
   stage[0].memA[1].setShift(-27);
 
   //configure mem2 to read bias
-  stage[0].memA[2].setIter(2*2);
+  stage[0].memA[2].setIter(32*16);
   stage[0].memA[2].setPer(27);
 
   //configure yolo0 to perform convolutions
   stage[0].yolo[0].setSelA(sMEMA[0]);
   stage[0].yolo[0].setSelB(sMEMA[1]);
   stage[0].yolo[0].setSelC(sMEMA[2]);
-  stage[0].yolo[0].setIter(2*2);
+  stage[0].yolo[0].setIter(32*16);
   stage[0].yolo[0].setPer(27);
   stage[0].yolo[0].setDelay(MEMP_LAT);
   stage[0].yolo[0].setBias(1);
@@ -473,7 +477,7 @@ void layer1() {
   stage[0].memA[3].setDuty(1);
   stage[0].memA[3].setPer(27*4);
   stage[0].memA[3].setIncr(1);
-  stage[0].memA[3].setIter(1);
+  stage[0].memA[3].setIter(32*16/4);
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27*4-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
@@ -506,34 +510,25 @@ void layer1() {
       for(k = 0; k < LAYER_1_NUM_KER; k++) {
     #endif
 
-        //configure weight and bias mems start
-        start = timer_get_count_us(TIMER);
-	stage[0].memA[1].setStart(k*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
-        stage[0].memA[2].setStart(k);
+	//run
+	start = timer_get_count_us(TIMER);
+        run();
 
-	//run for the all tiled FM^M
-	for(i = 0; i < 8; i++) {
-	  for(j = 0; j < 16; j++) {
+        //configure weight and bias mems start for next iteration
+        #ifdef SIM
+        if(k == 0) {
+     #else
+        if(k == LAYER_1_NUM_KER-1) {
+     #endif
+          stage[0].memA[1].setStart(0);
+          stage[0].memA[2].setStart(0);
+        } else {
+          stage[0].memA[1].setStart((k+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
+          stage[0].memA[2].setStart(k+1);
+        }
 
-	    //run
-	    run();
-
-	    //configure FM mems start
-	    if(i == 7 and j == 15) {
-              stage[0].memA[0].setStart(0);
-              stage[0].memA[3].setStart(0);
-            } else if(j == 15) {
-              stage[0].memA[0].setStart(34*IMG_C*2*(i+1));
-              stage[0].memA[3].setStart(16*(i+1));
-            } else {
-              stage[0].memA[0].setStart(34*IMG_C*2*i + IMG_C*2*(j+1));
-              stage[0].memA[3].setStart(16*i+j+1);
-            }
-
-            //Wait until done
-            while(done() == 0);
-	  }
-	}
+        //Wait until done
+	while(done() == 0);
         end = timer_get_count_us(TIMER);
         run_time += (end - start);
 

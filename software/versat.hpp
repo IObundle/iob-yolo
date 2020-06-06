@@ -22,9 +22,9 @@ class CMemPort {
     }
     
     //Constructor with an associated base
-    CMemPort (int versat_base, int i, int offset) {
+    CMemPort (int versat_base, int i) {
       this->versat_base = versat_base;
-      this->mem_base = CONF_BASE + CONF_MEM0A + (2*i+offset)*MEMP_CONF_OFFSET;
+      this->mem_base = CONF_BASE + CONF_MEM0A + i*MEMP_CONF_OFFSET;
       this->data_base = (i<<MEM_ADDR_W);
     }
 
@@ -56,9 +56,6 @@ class CMemPort {
     void setExt(int ext) {
       MEMSET(versat_base, (this->mem_base + MEMP_CONF_EXT), ext);
     } 
-    void setRvrs(int rvrs) {
-      MEMSET(versat_base, (this->mem_base + MEMP_CONF_RVRS), rvrs);
-    } 
     void setInWr(int in_wr) {
       MEMSET(versat_base, (this->mem_base + MEMP_CONF_IN_WR), in_wr);
     } 
@@ -73,6 +70,18 @@ class CMemPort {
     } 
     void setShift2(int shift2) {
       MEMSET(versat_base, (this->mem_base + MEMP_CONF_SHIFT2), shift2);
+    } 
+    void setIter3(int iter3) {
+      MEMSET(versat_base, (this->mem_base + MEMP_CONF_ITER3), iter3);
+    } 
+    void setPer3(int per3) {
+      MEMSET(versat_base, (this->mem_base + MEMP_CONF_PER3), per3);
+    } 
+    void setIncr3(int incr3) {
+      MEMSET(versat_base, (this->mem_base + MEMP_CONF_INCR3), incr3);
+    } 
+    void setShift3(int shift3) {
+      MEMSET(versat_base, (this->mem_base + MEMP_CONF_SHIFT3), shift3);
     } 
 
     //methods to read/write from/to memory
@@ -285,7 +294,6 @@ class CStage {
     int versat_base;
     //Versat Function Units
     CMemPort memA[nMEM];
-    CMemPort memB[nMEM];
   #if nALU>0
     CALU alu[nALU];
   #endif
@@ -317,8 +325,7 @@ class CStage {
 
       //Init functional units
       int i;
-      for (i=0; i<nMEM; i++) memA[i] = CMemPort(versat_base, i, 0);
-      for (i=0; i<nMEM; i++) memB[i] = CMemPort(versat_base, i, 1);
+      for (i=0; i<nMEM; i++) memA[i] = CMemPort(versat_base, i);
     #if nALU>0
       for (i=0; i<nALU; i++) alu[i] = CALU(versat_base, i);
     #endif
@@ -362,7 +369,7 @@ class CStage {
 //
 static int base;
 CStage stage[nSTAGE];
-int sMEMA[nMEM], sMEMA_p[nMEM], sMEMB[nMEM], sMEMB_p[nMEM];
+int sMEMA[nMEM], sMEMA_p[nMEM];
 #if nALU>0
   int sALU[nALU], sALU_p[nALU];
 #endif
@@ -398,11 +405,9 @@ inline void versat_init(int base_addr) {
 
   //Memories
   for(i=0; i<nMEM; i=i+1){                  
-    sMEMA[i] = s_cnt + 2*i;                                            
-    sMEMB[i] = sMEMA[i]+1;                                          
+    sMEMA[i] = s_cnt+i;                                            
     sMEMA_p[i] = sMEMA[i] + p_offset;
-    sMEMB_p[i] = sMEMB[i] + p_offset;
-  } s_cnt += 2*nMEM;                                               
+  } s_cnt += nMEM;                                               
 
 #if nALU>0                                                                      
   //ALUs
