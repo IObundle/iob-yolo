@@ -12,7 +12,7 @@
 `define dx_size (`NEW_W*2)
 `define dy_size (`NEW_H*4)
 `define IMAGE_INPUT (768*576*3)
-`define LAYER_1 (416*416*16)
+`define LAYER_1 (210*210*16)
 `define NETWORK_INPUT (418*418*3)
 `define STRINGIFY(x) `"x`"
 `define DDR_INITIAL (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size)*2)

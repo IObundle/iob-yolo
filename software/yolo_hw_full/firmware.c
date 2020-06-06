@@ -33,7 +33,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_2*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -84,7 +84,7 @@ void define_memory_regions() {
 void reset_DDR() {
   
   //local variables
-  unsigned int i;
+  unsigned int i, pos;
 
   //measure initial time
   uart_printf("\nSetting DDR positions to zero\n");
@@ -95,6 +95,10 @@ void reset_DDR() {
 
   //input network
   for(i = 0; i < NETWORK_INPUT; i++) fp_data[i] = 0;
+  pos += NETWORK_INPUT;
+
+  //layer 2
+  for(i = 0; i < DATA_LAYER_2; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -437,39 +441,40 @@ void layer1() {
   stage[0].memA[0].setIncr(1);
   stage[0].memA[0].setIter(3);
   stage[0].memA[0].setShift(34*3-9);
-  stage[0].memA[0].setPer2(32);
+  stage[0].memA[0].setPer2(2);
   stage[0].memA[0].setIncr2(3);
-  stage[0].memA[0].setIter2(16);
-  stage[0].memA[0].setShift2(34*3-32*3);
+  stage[0].memA[0].setIter2(2);
+  stage[0].memA[0].setShift2(34*3-2*3);
 
   //configure mem1 to read weights
   stage[0].memA[1].setDuty(27);
   stage[0].memA[1].setPer(27);
   stage[0].memA[1].setIncr(1);
-  stage[0].memA[1].setIter(32*16);
+  stage[0].memA[1].setIter(2*2);
   stage[0].memA[1].setShift(-27);
 
   //configure mem2 to read bias
-  stage[0].memA[2].setIter(32*16);
+  stage[0].memA[2].setIter(2*2);
   stage[0].memA[2].setPer(27);
 
   //configure yolo0 to perform convolutions
   stage[0].yolo[0].setSelA(sMEMA[0]);
   stage[0].yolo[0].setSelB(sMEMA[1]);
   stage[0].yolo[0].setSelC(sMEMA[2]);
-  stage[0].yolo[0].setIter(32*16);
+  stage[0].yolo[0].setIter(2*2);
   stage[0].yolo[0].setPer(27);
   stage[0].yolo[0].setDelay(MEMP_LAT);
   stage[0].yolo[0].setBias(1);
   stage[0].yolo[0].setShift(10);
   stage[0].yolo[0].setLeaky(1);
+  stage[0].yolo[0].setMaxpool(1);
 
   //configure mem3 to write convolution results
   stage[0].memA[3].setDuty(1);
-  stage[0].memA[3].setPer(27);
+  stage[0].memA[3].setPer(27*4);
   stage[0].memA[3].setIncr(1);
-  stage[0].memA[3].setIter(32*16);
-  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27-1);
+  stage[0].memA[3].setIter(1);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27*4-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
 
@@ -501,36 +506,45 @@ void layer1() {
       for(k = 0; k < LAYER_1_NUM_KER; k++) {
     #endif
 
-        //run
+        //configure weight and bias mems start
         start = timer_get_count_us(TIMER);
-        run();
+	stage[0].memA[1].setStart(k*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
+        stage[0].memA[2].setStart(k);
 
-	//configure weight and bias mems start for next iteration
-      #ifdef SIM
-        if(k == 0) {
-      #else
-        if(k == LAYER_1_NUM_KER-1) {
-      #endif
-          stage[0].memA[1].setStart(0);
-          stage[0].memA[2].setStart(0);
-        } else {
-          stage[0].memA[1].setStart((k+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
-          stage[0].memA[2].setStart(k+1);
-        }
+	//run for the all tiled FM^M
+	for(i = 0; i < 8; i++) {
+	  for(j = 0; j < 16; j++) {
 
-        //Wait until done
-        while(done() == 0);
+	    //run
+	    run();
+
+	    //configure FM mems start
+	    if(i == 7 and j == 15) {
+              stage[0].memA[0].setStart(0);
+              stage[0].memA[3].setStart(0);
+            } else if(j == 15) {
+              stage[0].memA[0].setStart(34*IMG_C*2*(i+1));
+              stage[0].memA[3].setStart(16*(i+1));
+            } else {
+              stage[0].memA[0].setStart(34*IMG_C*2*i + IMG_C*2*(j+1));
+              stage[0].memA[3].setStart(16*i+j+1);
+            }
+
+            //Wait until done
+            while(done() == 0);
+	  }
+	}
         end = timer_get_count_us(TIMER);
         run_time += (end - start);
 
         //store result in DDR
         start = timer_get_count_us(TIMER);
-	for(i = 0; i < 16; i++)
-          for(j = 0; j < 32; j++)
+	for(i = 0; i < 8; i++)
+          for(j = 0; j < 16; j++)
           #ifdef SIM
-            if(output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] != stage[0].memA[3].read(i*32+j)) num_err++;
+	    if(output[k*210*210 + (8*l+i+1)*210 + 16*m + j+1] != stage[0].memA[3].read(i*16+j)) num_err++;
           #else
-            output[k*YOLO_INPUT*YOLO_INPUT + (16*l+i)*YOLO_INPUT + 32*m + j] = stage[0].memA[3].read(i*32+j);
+	    output[k*210*210 + (8*l+i+1)*210 + 16*m + j+1] = stage[0].memA[3].read(i*16+j);
           #endif
 
         //end measuring data load/store time

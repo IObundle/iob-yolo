@@ -273,6 +273,9 @@ class CYolo {
     void setLeaky(int leaky) {
       MEMSET(versat_base, (this->yolo_base + YOLO_CONF_LEAKY), leaky);
     }
+    void setMaxpool(int maxpool) {
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_MAXPOOL), maxpool);
+    }
 };//end class CYOLO
 #endif
 

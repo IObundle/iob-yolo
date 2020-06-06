@@ -13,26 +13,30 @@ module xyolo # (
                 output [DATA_W-1:0] 	      flow_out,
 
                 // config interface
-                input [`YOLO_CONF_BITS-1:0] configdata
+                input [`YOLO_CONF_BITS-1:0]   configdata
                 );
 
    //data
    wire [2*DATA_W-1:0]                        shifted, adder;
    wire signed [DATA_W-1:0]                   op_a, op_b, op_c, act_fnc, shifted_half;
    wire [`MEM_ADDR_W-1:0]                     op_o;
-   reg signed [DATA_W-1:0]                    bias_reg;
-   reg [DATA_W-1:0]                           result;
+   reg signed [DATA_W-1:0]                    bias_reg, result;
+   wire [DATA_W-1:0]                          result_w;
 
    //config data
    wire [`N_W-1:0]                            sela, selb, selc;
    wire [`MEM_ADDR_W-1:0]		      iterations;
    wire [`PERIOD_W-1:0]                       period, delay;
    wire [`SHIFT_W-1:0]			      shift;
-   wire                                       bias, leaky;
+   wire                                       bias, leaky, maxpool;
 
    //accumulator load signal
    wire                                       ld_acc;
-   reg                                        ld_acc0, ld_acc1;
+   reg                                        ld_acc0, ld_acc1, ld_acc2;
+
+   //maxpool data
+   reg [1:0]                                  mp_cnt;
+   wire [DATA_W-1:0]                          mp_w;
 
    //unpack config bits
    assign sela = configdata[`YOLO_CONF_BITS-1 -: `N_W];
@@ -44,6 +48,7 @@ module xyolo # (
    assign shift = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W -: `SHIFT_W];
    assign bias = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
    assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
+   assign maxpool = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
 
    //input selection
    xinmux # (
@@ -96,13 +101,13 @@ module xyolo # (
      if (rst) begin
        ld_acc0 <= 1'b0;
        ld_acc1 <= 1'b0;
+       ld_acc2 <= 1'b0;
        bias_reg <= {DATA_W{1'b0}};
-       result <= {DATA_W{1'b0}};
      end else begin
        ld_acc0 <= ld_acc;
        ld_acc1 <= ld_acc0;
+       ld_acc2 <= ld_acc1;
        bias_reg <= op_c;
-       result <= act_fnc;
      end
    end
 
@@ -131,12 +136,24 @@ module xyolo # (
    //select accumulation initial value
    assign adder_w = bias ? adder << shift : {2*DATA_W{1'b0}};
 
-   //apply activation function
+   //activation function
    assign shifted = dsp_out >> shift;
    assign shifted_half = shifted[DATA_W-1:0];
    assign act_fnc = (leaky & shifted_half[DATA_W-1]) ? shifted_half >>> 3 : shifted_half;
 
+   //maxpooling
+   always @ (posedge clk, posedge rst)
+     if(rst) begin
+       mp_cnt <= 2'd2;
+       result <= {DATA_W{1'b0}};
+     end else if(ld_acc2) begin
+       mp_cnt <= mp_cnt + 1;
+       result <= result_w;
+     end
+   assign mp_w = |mp_cnt & result>act_fnc ? result : act_fnc;
+
    //result
+   assign result_w = maxpool ? mp_w : act_fnc;
    assign flow_out = result;
 
 endmodule
