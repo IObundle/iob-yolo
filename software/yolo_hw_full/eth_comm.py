@@ -83,7 +83,10 @@ f_weights = open(weights_filename, 'rb')
 
 #Frame parameters
 #weights_file_size = getsize(weights_filename)
-weights_file_size = (16 + 16*3*3*3)*2 #layer 1
+layer1_w = 16 + 16*3*3*3
+layer2_w = 32 + 32*3*3*16
+layer_w_total = layer1_w + layer2_w
+weights_file_size = layer_w_total*2
 num_frames_weights = int(weights_file_size/eth_nbytes)
 print("weights_file_size: %d" % weights_file_size)
 print("num_frames_weights: %d" % (num_frames_weights+1))
@@ -163,7 +166,8 @@ for j in range(num_frames_output+1):
             count_errors += 1
             
     #Send data back as ack
-    s.send(dst_addr + src_addr + eth_type + payload + padding)
+    if(j != num_frames_output):
+    	s.send(dst_addr + src_addr + eth_type + payload + padding)
         
 #Close file
 f_output.close()

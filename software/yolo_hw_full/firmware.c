@@ -16,6 +16,12 @@
 //define number of versats used in specific function
 #define RESIZE_NSTAGES 2 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26, 52)
 
+//define tiling of each layer
+#define LAYER1_TILING_W 32
+#define LAYER1_TILING_H 16
+#define LAYER3_TILING_W 8
+#define LAYER3_TILING_H 8
+
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
 #define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
@@ -33,7 +39,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_2*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_4*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -60,6 +66,9 @@ unsigned int start, end;
 //data base address pointers
 int16_t * fp_data, * fp_image, * fp_weights;
 int16_t * ix, * iy, * dx, * dy;
+
+//weights and data updatable pointers
+unsigned int weight_pos = 0, data_pos = 0;
 
 //define base address of data pointers
 void define_memory_regions() {
@@ -99,6 +108,10 @@ void reset_DDR() {
 
   //layer 2
   for(i = 0; i < DATA_LAYER_2; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_2;
+
+  //layer 4
+  for(i = 0; i < DATA_LAYER_4; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -400,73 +413,61 @@ void resize_image() {
   uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
 }
 
-//layer 1 (conv)
-void layer1() {
+//perform convolutional layer
+void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h) {
 
   //clear configuration of all stages
   globalClearConf();
 
   //update pointers
-  int16_t * output = (int16_t*) fp_data + NETWORK_INPUT;
-  int16_t * bias = (int16_t *) fp_weights + LAYER_1_NUM_KER*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C;
+  int16_t * input = (int16_t *) fp_data + data_pos;
+  data_pos += (w+2)*(w+2)*c;
+  int16_t * output = (int16_t *) fp_data + data_pos;
+  int16_t * weights = (int16_t *) fp_weights + weight_pos;
+  weight_pos += num_ker*ker_size*ker_size*c;
+  int16_t * bias = (int16_t *) fp_weights + weight_pos;
+  weight_pos += num_ker;
 
   //local variables
   int i, j, k, l, m;
 #ifdef SIM
   int num_err = 0;
 #endif
-  unsigned int data_time, config_time, run_time = 0;
+  unsigned int data_time = 0, config_time, run_time = 0;
 
-  //load weights (z-x-y format)
+  //configure mem0 to read ker_size*ker_size*c blocks from tiled FM
   start = timer_get_count_us(TIMER);
-  for(i = 0; i < LAYER_1_NUM_KER; i++) {
-    for(j = 0; j < IMG_C; j++)
-      for(k = 0; k < LAYER_1_KER_SIZE*LAYER_1_KER_SIZE; k++)
-        stage[0].memA[1].write(i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k*IMG_C + j, fp_weights[i*IMG_C*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + j*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE + k]);
-    stage[0].memA[2].write(i, bias[i]);
-  }
-  end = timer_get_count_us(TIMER);
-  data_time = end - start;
-
-  //loop to configure versat stages
-  start = timer_get_count_us(TIMER);
-
-  ///////////////////////////////////////////////////////////////////////////////
-  //                            STAGE 0
-  ///////////////////////////////////////////////////////////////////////////////
-  
-  //configure mem0 to read 3x3*3 blocks from 34x18x3 FM
-  stage[0].memA[0].setDuty(9);
-  stage[0].memA[0].setPer(9);
+  stage[0].memA[0].setDuty(ker_size*c);
+  stage[0].memA[0].setPer(ker_size*c);
   stage[0].memA[0].setIncr(1);
-  stage[0].memA[0].setIter(3);
-  stage[0].memA[0].setShift(34*3-9);
+  stage[0].memA[0].setIter(ker_size);
+  stage[0].memA[0].setShift((til_w+2)*c-ker_size*c);
   stage[0].memA[0].setPer2(2);
-  stage[0].memA[0].setIncr2(3);
+  stage[0].memA[0].setIncr2(c);
   stage[0].memA[0].setIter2(2);
-  stage[0].memA[0].setShift2(34*3-2*3);
-  stage[0].memA[0].setPer3(16);
-  stage[0].memA[0].setIncr3(2*3);
-  stage[0].memA[0].setIter3(8);
-  stage[0].memA[0].setShift3(34*3*2-16*2*3);
+  stage[0].memA[0].setShift2((til_w+2)*c-2*c);
+  stage[0].memA[0].setPer3(til_w/2);
+  stage[0].memA[0].setIncr3(2*c);
+  stage[0].memA[0].setIter3(til_h/2);
+  stage[0].memA[0].setShift3((til_w+2)*c*2-til_w*c);
 
   //configure mem1 to read weights
-  stage[0].memA[1].setDuty(27);
-  stage[0].memA[1].setPer(27);
+  stage[0].memA[1].setDuty(ker_size*ker_size*c);
+  stage[0].memA[1].setPer(ker_size*ker_size*c);
   stage[0].memA[1].setIncr(1);
-  stage[0].memA[1].setIter(32*16);
-  stage[0].memA[1].setShift(-27);
+  stage[0].memA[1].setIter(til_w*til_h);
+  stage[0].memA[1].setShift(-ker_size*ker_size*c);
 
   //configure mem2 to read bias
-  stage[0].memA[2].setIter(32*16);
-  stage[0].memA[2].setPer(27);
+   stage[0].memA[2].setIter(til_w*til_h);
+  stage[0].memA[2].setPer(ker_size*ker_size*c);
 
   //configure yolo0 to perform convolutions
   stage[0].yolo[0].setSelA(sMEMA[0]);
   stage[0].yolo[0].setSelB(sMEMA[1]);
   stage[0].yolo[0].setSelC(sMEMA[2]);
-  stage[0].yolo[0].setIter(32*16);
-  stage[0].yolo[0].setPer(27);
+  stage[0].yolo[0].setIter(til_w*til_h);
+  stage[0].yolo[0].setPer(ker_size*ker_size*c);
   stage[0].yolo[0].setDelay(MEMP_LAT);
   stage[0].yolo[0].setBias(1);
   stage[0].yolo[0].setShift(10);
@@ -475,71 +476,65 @@ void layer1() {
 
   //configure mem3 to write convolution results
   stage[0].memA[3].setDuty(1);
-  stage[0].memA[3].setPer(27*4);
+  stage[0].memA[3].setPer(ker_size*ker_size*c*4);
   stage[0].memA[3].setIncr(1);
-  stage[0].memA[3].setIter(32*16/4);
-  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+27*4-1);
+  stage[0].memA[3].setIter(til_w*til_h/4);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+ker_size*ker_size*c*4-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-
-  //end measuring config time
   end = timer_get_count_us(TIMER);
   config_time = end - start;
 
   //loops for performing convolution
-#ifdef SIM
-  for(l = 0; l < 1; l++) {
+  #ifdef SIM
+  for(l = 0; l < w/til_h; l++) {
     for(m = 0; m < 1; m++) {
 #else
-  for(l = 0; l < 26; l++) {
-    for(m = 0; m < 13; m++) {
+  for(l = 0; l < w/til_h; l++) {
+    for(m = 0; m < w/til_w; m++) {
 #endif
 
-      //Send input FM 34x18 tile (z-x-y format)
+      //Send input FM tile (z-x-y format)
       start = timer_get_count_us(TIMER);
-      for(i = 0; i < IMG_C; i++)
-        for(j = 0; j < 18; j++)
-          for(k = 0; k < 34; k++)
-            stage[0].memA[0].write((j*34+k)*IMG_C + i, fp_data[i*418*418 + j*418 + k + m*32 + l*16*418]);
+      for(i = 0; i < c; i++)
+        for(j = 0; j < til_h+2; j++)
+          for(k = 0; k < til_w+2; k++)
+            stage[0].memA[0].write((j*(til_w+2)+k)*c + i, input[i*(w+2)*(w+2) + (l*til_h+j)*(w+2) + (k+m*til_w)]);
       end = timer_get_count_us(TIMER);
       data_time += (end - start);
 
     #ifdef SIM
       for(k = 0; k < 1; k++) {
     #else
-      for(k = 0; k < LAYER_1_NUM_KER; k++) {
+      for(k = 0; k < num_ker; k++) {
     #endif
 
-	//run
-	start = timer_get_count_us(TIMER);
+        //load weights (z-x-y format)
+        start = timer_get_count_us(TIMER);
+        for(j = 0; j < c; j++)
+          for(i = 0; i < ker_size*ker_size; i++)
+            stage[0].memA[1].write(i*c + j, weights[k*c*ker_size*ker_size + j*ker_size*ker_size + i]);
+        stage[0].memA[2].write(0, bias[k]);
+        end = timer_get_count_us(TIMER);
+        data_time += end - start;
+
+        //run
+        start = timer_get_count_us(TIMER);
         run();
 
-        //configure weight and bias mems start for next iteration
-        #ifdef SIM
-        if(k == 0) {
-     #else
-        if(k == LAYER_1_NUM_KER-1) {
-     #endif
-          stage[0].memA[1].setStart(0);
-          stage[0].memA[2].setStart(0);
-        } else {
-          stage[0].memA[1].setStart((k+1)*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*IMG_C);
-          stage[0].memA[2].setStart(k+1);
-        }
-
         //Wait until done
-	while(done() == 0);
+        while(done() == 0);
         end = timer_get_count_us(TIMER);
         run_time += (end - start);
 
         //store result in DDR
         start = timer_get_count_us(TIMER);
-	for(i = 0; i < 8; i++)
-          for(j = 0; j < 16; j++)
+        for(i = 0; i < til_h/2; i++)
+          for(j = 0; j < til_w/2; j++)
           #ifdef SIM
-	    if(output[k*210*210 + (8*l+i+1)*210 + 16*m + j+1] != stage[0].memA[3].read(i*16+j)) num_err++;
+            if(output[k*(w/2+2)*(w/2+2) + ((til_h/2)*l+i+1)*(w/2+2) + ((til_w/2)*m+j+1)] != stage[0].memA[3].read(i*(til_w/2)+j)) num_err++;
           #else
-	    output[k*210*210 + (8*l+i+1)*210 + 16*m + j+1] = stage[0].memA[3].read(i*16+j);
+            output[k*(w/2+2)*(w/2+2) + ((til_h/2)*l+i+1)*(w/2+2) + ((til_w/2)*m+j+1)] = stage[0].memA[3].read(i*(til_w/2)+j);
           #endif
 
         //end measuring data load/store time
@@ -549,7 +544,7 @@ void layer1() {
     }
   }
 #ifdef SIM
-  uart_printf("Layer 1 done with %d errors\n", num_err);
+  uart_printf("Layer done with %d errors\n", num_err);
 #endif
   uart_printf("FU config time = %d us\n", config_time);
   uart_printf("FU run time = %d us\n", run_time);
@@ -563,7 +558,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT + DATA_LAYER_2)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -626,9 +621,13 @@ int main(int argc, char **argv) {
   resize_image();
 #endif
 
-  //layer1 (conv)
-  uart_printf("\nRunning layer 1...\n");
-  layer1();
+  //layer1,2 (conv + maxpool)
+  uart_printf("\nRunning layers 1 and 2...\n");
+  conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER1_TILING_W, LAYER1_TILING_H);
+
+  //layer3, 4 (conv + maxpool)
+  uart_printf("\nRunning layers 3 and 4...\n");
+  conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER3_TILING_W, LAYER3_TILING_H);
 
   //return data
 #ifndef SIM

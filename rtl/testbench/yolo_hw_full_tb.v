@@ -4,20 +4,30 @@
 `include "system.vh"
 `include "iob-uart.vh"
 
-//define constants
+//DDR initial constants
 `define NEW_W (416)
 `define NEW_H (312)
 `define ix_size (`NEW_W*4)
 `define iy_size (`NEW_H)
 `define dx_size (`NEW_W*2)
 `define dy_size (`NEW_H*4)
-`define IMAGE_INPUT (768*576*3)
-`define LAYER_1 (210*210*16)
-`define NETWORK_INPUT (418*418*3)
-`define STRINGIFY(x) `"x`"
 `define DDR_INITIAL (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size)*2)
+
+//FM constants
+`define IMAGE_INPUT (768*576*3)
+`define NETWORK_INPUT (418*418*3)
+`define LAYER_1 (210*210*16)
+`define LAYER_3 (106*106*32)
+`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT+`LAYER_1+`LAYER_3)*2)
+
+//Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
-`define FILE_SIZE ((`DDR_INITIAL + (`WEIGHTS_LAYER_1+`IMAGE_INPUT+`NETWORK_INPUT+`LAYER_1)*2)/4)
+`define WEIGHTS_LAYER_3 (32 + 32*3*3*16)
+`define TOTAL_WEIGHTS ((`WEIGHTS_LAYER_1+`WEIGHTS_LAYER_3)*2)
+
+//Total constants
+`define STRINGIFY(x) `"x`"
+`define FILE_SIZE ((`DDR_INITIAL + `TOTAL_WEIGHTS + `TOTAL_FM)/4)
 
 module yolo_hw_full_tb;
 
@@ -112,7 +122,7 @@ module yolo_hw_full_tb;
    wire 	       tester_rx_dv;   
 
    //define parameters
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer1.hex"};
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer3.hex"};
    parameter file_size = `FILE_SIZE;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
 
