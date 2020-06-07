@@ -17,10 +17,14 @@
 #define RESIZE_NSTAGES 2 //must be even and divisor of 312 (e.g. 2, 4, 6, 8, 12, 24, 26, 52)
 
 //define tiling of each layer
-#define LAYER1_TILING_W 32
-#define LAYER1_TILING_H 16
-#define LAYER3_TILING_W 8
-#define LAYER3_TILING_H 8
+#define LAYER1_TILING_W 32 //must be divisor of 416
+#define LAYER1_TILING_H 32
+#define LAYER3_TILING_W 52 //must be divisor of 208
+#define LAYER3_TILING_H 2
+#define LAYER5_TILING_W 26 //must be divisor of 104
+#define LAYER5_TILING_H 2
+#define LAYER7_TILING_W 4  //must be divisor of 52
+#define LAYER7_TILING_H 4
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -39,7 +43,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_4*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_8*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -112,6 +116,14 @@ void reset_DDR() {
 
   //layer 4
   for(i = 0; i < DATA_LAYER_4; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_4;
+
+  //layer 6
+  for(i = 0; i < DATA_LAYER_6; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_6;
+
+  //layer 8
+  for(i = 0; i < DATA_LAYER_8; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -476,7 +488,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h) {
 
   //configure mem3 to write convolution results
   stage[0].memA[3].setDuty(1);
-  stage[0].memA[3].setPer(ker_size*ker_size*c*4);
+  stage[0].memA[3].setPer(ker_size*ker_size*c*4); //CAREFUL WITH PERIOD_W!!!
   stage[0].memA[3].setIncr(1);
   stage[0].memA[3].setIter(til_w*til_h/4);
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+ker_size*ker_size*c*4-1);
@@ -487,7 +499,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h) {
 
   //loops for performing convolution
   #ifdef SIM
-  for(l = 0; l < w/til_h; l++) {
+  for(l = 0; l < 1; l++) {
     for(m = 0; m < 1; m++) {
 #else
   for(l = 0; l < w/til_h; l++) {
@@ -558,7 +570,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT + DATA_LAYER_2)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -619,15 +631,23 @@ int main(int argc, char **argv) {
   //resize input image
   uart_printf("\nResizing input image...\n");
   resize_image();
-#endif
 
   //layer1,2 (conv + maxpool)
   uart_printf("\nRunning layers 1 and 2...\n");
   conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER1_TILING_W, LAYER1_TILING_H);
 
-  //layer3, 4 (conv + maxpool)
+  //layer3,4 (conv + maxpool)
   uart_printf("\nRunning layers 3 and 4...\n");
   conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER3_TILING_W, LAYER3_TILING_H);
+
+  //layer5,6 (conv + maxpool)
+  uart_printf("\nRunning layers 5 and 6...\n");
+  conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER5_TILING_W, LAYER5_TILING_H);
+#endif
+
+  //layer7,8 (conv + maxpool)
+  uart_printf("\nRunning layers 7 and 8...\n");
+  conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER7_TILING_W, LAYER7_TILING_H);
 
   //return data
 #ifndef SIM
