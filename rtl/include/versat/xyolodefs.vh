@@ -3,9 +3,9 @@
 // iterations = MEM_ADDR_W
 // period, delay = PERIOD_W
 // shift = SHIFT_W
-// bias, leaky, maxpool = 1 bit
+// bias, leaky, maxpool, bypass = 1 bit
 `define SHIFT_W ($clog2(`DATAPATH_W)+1)
-`define YOLO_CONF_BITS (3*`N_W + `MEM_ADDR_W + 2*`PERIOD_W + `SHIFT_W + 3)
+`define YOLO_CONF_BITS (3*`N_W + `MEM_ADDR_W + 2*`PERIOD_W + `SHIFT_W + 4)
 
 //YOLO configuration offsets
 `define YOLO_CONF_SELA    0
@@ -18,7 +18,9 @@
 `define YOLO_CONF_BIAS    7
 `define YOLO_CONF_LEAKY   8
 `define YOLO_CONF_MAXPOOL 9
-`define YOLO_CONF_OFFSET  10
+`define YOLO_CONF_BYPASS  10
+`define YOLO_CONF_OFFSET  11
 
 //YOLO latency
 `define YOLO_LAT 5
+`define YOLO_BYPASS_LAT 2

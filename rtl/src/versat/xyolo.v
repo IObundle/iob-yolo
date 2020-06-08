@@ -20,7 +20,7 @@ module xyolo # (
    wire [2*DATA_W-1:0]                        shifted, adder;
    wire signed [DATA_W-1:0]                   op_a, op_b, op_c, act_fnc, shifted_half;
    wire [`MEM_ADDR_W-1:0]                     op_o;
-   reg signed [DATA_W-1:0]                    bias_reg, result;
+   reg signed [DATA_W-1:0]                    bias_reg, result, op_a_bypass;
    wire [DATA_W-1:0]                          result_w;
 
    //config data
@@ -28,7 +28,7 @@ module xyolo # (
    wire [`MEM_ADDR_W-1:0]		      iterations;
    wire [`PERIOD_W-1:0]                       period, delay;
    wire [`SHIFT_W-1:0]			      shift;
-   wire                                       bias, leaky, maxpool;
+   wire                                       bias, leaky, maxpool, bypass;
 
    //accumulator load signal
    wire                                       ld_acc;
@@ -36,7 +36,7 @@ module xyolo # (
 
    //maxpool data
    reg [1:0]                                  mp_cnt;
-   wire [DATA_W-1:0]                          mp_w;
+   wire signed [DATA_W-1:0]                   mp_w, bypass_w;
 
    //unpack config bits
    assign sela = configdata[`YOLO_CONF_BITS-1 -: `N_W];
@@ -49,6 +49,7 @@ module xyolo # (
    assign bias = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W -: 1];
    assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
    assign maxpool = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
+   assign bypass = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-3 -: 1];
 
    //input selection
    xinmux # (
@@ -103,11 +104,13 @@ module xyolo # (
        ld_acc1 <= 1'b0;
        ld_acc2 <= 1'b0;
        bias_reg <= {DATA_W{1'b0}};
+       op_a_bypass <= {DATA_W{1'b0}};
      end else begin
        ld_acc0 <= ld_acc;
        ld_acc1 <= ld_acc0;
        ld_acc2 <= ld_acc1;
        bias_reg <= op_c;
+       op_a_bypass <= op_a;
      end
    end
 
@@ -142,15 +145,16 @@ module xyolo # (
    assign act_fnc = (leaky & shifted_half[DATA_W-1]) ? shifted_half >>> 3 : shifted_half;
 
    //maxpooling
+   assign bypass_w = bypass ? op_a_bypass : act_fnc;
    always @ (posedge clk, posedge rst)
      if(rst) begin
        mp_cnt <= 2'd2;
        result <= {DATA_W{1'b0}};
-     end else if(ld_acc2) begin
+     end else if(ld_acc2 || bypass) begin
        mp_cnt <= mp_cnt + 1;
        result <= result_w;
      end
-   assign mp_w = |mp_cnt & result>act_fnc ? result : act_fnc;
+   assign mp_w = |mp_cnt & result>bypass_w ? result : bypass_w;
 
    //result
    assign result_w = maxpool ? mp_w : act_fnc;

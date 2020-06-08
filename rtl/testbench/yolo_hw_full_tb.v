@@ -22,7 +22,8 @@
 `define LAYER_5 (54*54*64)
 `define LAYER_7 (28*28*128)
 `define LAYER_9 (28*28*256)
-`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT_AUX+`NETWORK_INPUT+`LAYER_1+`LAYER_3+`LAYER_5+`LAYER_7+`LAYER_9)*2)
+`define LAYER_10 (15*15*256)
+`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT_AUX+`NETWORK_INPUT+`LAYER_1+`LAYER_3+`LAYER_5+`LAYER_7+`LAYER_9+`LAYER_10)*2)
 
 //Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
@@ -129,7 +130,7 @@ module yolo_hw_full_tb;
    wire 	       tester_rx_dv;   
 
    //define parameters
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer9.hex"};
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer10.hex"};
    parameter file_size = `FILE_SIZE;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
 

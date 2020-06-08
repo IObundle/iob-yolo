@@ -344,6 +344,9 @@ module xconf_reg # (
 
               if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_MAXPOOL))
                 conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-2 -: 1] <= ctr_data_in[0];
+
+              if(ctr_addr == (`CONF_YOLO0 + i*`YOLO_CONF_OFFSET + `YOLO_CONF_BYPASS))
+                conf_reg[`CONF_YOLO0_B - i*`YOLO_CONF_BITS - 3*`N_W - `MEM_ADDR_W - 2*`PERIOD_W - `SHIFT_W-3 -: 1] <= ctr_data_in[0];
            end
 
 	   // configure BSs

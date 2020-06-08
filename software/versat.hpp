@@ -285,6 +285,9 @@ class CYolo {
     void setMaxpool(int maxpool) {
       MEMSET(versat_base, (this->yolo_base + YOLO_CONF_MAXPOOL), maxpool);
     }
+    void setBypass(int bypass) {
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_BYPASS), bypass);
+    }
 };//end class CYOLO
 #endif
 
