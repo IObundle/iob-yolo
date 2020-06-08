@@ -88,7 +88,7 @@ module xyolo # (
 	.period(period),
 	.duty(period),
 	.start(`MEM_ADDR_W'b0),
-	.shift(-period),
+	.shift(-period[`MEM_ADDR_W-1:0]),
 	.incr(`MEM_ADDR_W'b1),
 	.delay(delay),
 	.addr(op_o),

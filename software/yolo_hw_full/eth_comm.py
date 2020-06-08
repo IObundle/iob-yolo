@@ -84,10 +84,11 @@ f_weights = open(weights_filename, 'rb')
 #Frame parameters
 #weights_file_size = getsize(weights_filename)
 layer1_w = 16 + 16*3*3*3
-layer2_w = 32 + 32*3*3*16
-layer3_w = 64 + 64*3*3*32
-layer4_w = 128 + 128*3*3*64
-layer_w_total = layer1_w + layer2_w + layer3_w + layer4_w
+layer3_w = 32 + 32*3*3*16
+layer5_w = 64 + 64*3*3*32
+layer7_w = 128 + 128*3*3*64
+layer9_w = 256 + 256*3*3*128
+layer_w_total = layer1_w + layer3_w + layer5_w + layer7_w + layer9_w
 weights_file_size = layer_w_total*2
 num_frames_weights = int(weights_file_size/eth_nbytes)
 print("weights_file_size: %d" % weights_file_size)
