@@ -12,6 +12,7 @@
 #define EXTRA_H ((NEW_W-NEW_H)/2)
 
 //Input network
+#define NETWORK_INPUT_AUX (NEW_W*2*NEW_H*IMG_C)
 #define NETWORK_INPUT ((YOLO_INPUT+2)*(YOLO_INPUT+2)*IMG_C)
 
 //Layer1,2 (conv + maxpool)
