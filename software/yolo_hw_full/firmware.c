@@ -24,6 +24,8 @@
 #define LAYER_7_TILING_H 4
 #define LAYER_9_TILING_W 2  //must be divisor of 26
 #define LAYER_9_TILING_H 2
+#define LAYER_11_TILING_W 1  //must be divisor of 13
+#define LAYER_11_TILING_H 1
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -42,7 +44,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_10*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_11*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -445,7 +447,7 @@ void resize_image() {
 }
 
 //perform convolutional layer
-void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, int maxpool) {
+void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, int maxpool, int outpadd) {
 
   //clear configuration of all stages
   globalClearConf();
@@ -572,23 +574,13 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
 
         //store result in DDR
         start = timer_get_count_us(TIMER);
-	if(maxpool) {
-          for(i = 0; i < til_h/2; i++)
-            for(j = 0; j < til_w/2; j++)
-            #ifdef SIM
-              if(output[k*(w/2+2)*(w/2+2) + ((til_h/2)*l+i+1)*(w/2+2) + ((til_w/2)*m+j+1)] != stage[0].memA[3].read(i*(til_w/2)+j)) num_err++;
-            #else
-              output[k*(w/2+2)*(w/2+2) + ((til_h/2)*l+i+1)*(w/2+2) + ((til_w/2)*m+j+1)] = stage[0].memA[3].read(i*(til_w/2)+j);
-            #endif
-        } else {
-          for(i = 0; i < til_h; i++)
-            for(j = 0; j < til_w; j++)
-            #ifdef SIM
-              if(output[k*(w+2)*(w+2) + (til_h*l+i+1)*(w+2) + (til_w*m+j+1)] != stage[0].memA[3].read(i*(til_w)+j)) num_err++;
-            #else
-              output[k*(w+2)*(w+2) + (til_h*l+i+1)*(w+2) + (til_w*m+j+1)] = stage[0].memA[3].read(i*til_w+j);
-            #endif
-        }
+	for(i = 0; i < til_h/(1+maxpool); i++)
+          for(j = 0; j < til_w/(1+maxpool); j++)
+          #ifdef SIM
+            if(output[k*(w/(1+maxpool)+2*outpadd)*(w/(1+maxpool)+2*outpadd) + ((til_h/(1+maxpool))*l+i+outpadd)*(w/(1+maxpool)+2*outpadd) + ((til_w/(1+maxpool))*m+j+outpadd)] != stage[0].memA[3].read(i*(til_w/(1+maxpool))+j)) num_err++;
+          #else
+            output[k*(w/(1+maxpool)+2*outpadd)*(w/(1+maxpool)+2*outpadd) + ((til_h/(1+maxpool))*l+i+outpadd)*(w/(1+maxpool)+2*outpadd) + ((til_w/(1+maxpool))*m+j+outpadd)] = stage[0].memA[3].read(i*(til_w/(1+maxpool))+j);
+          #endif
 
         //end measuring data load/store time
         end = timer_get_count_us(TIMER);
@@ -706,7 +698,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -770,31 +762,35 @@ int main(int argc, char **argv) {
 
   //layer1,2 (conv + maxpool)
   uart_printf("\nRunning layers 1 and 2...\n");
-  conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILING_W, LAYER_1_TILING_H, LAYER_1_MAXPOOL);
+  conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILING_W, LAYER_1_TILING_H, LAYER_1_MAXPOOL, LAYER_1_OUTPADD);
 
   //layer3,4 (conv + maxpool)
   uart_printf("\nRunning layers 3 and 4...\n");
-  conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILING_W, LAYER_3_TILING_H, LAYER_3_MAXPOOL);
+  conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILING_W, LAYER_3_TILING_H, LAYER_3_MAXPOOL, LAYER_3_OUTPADD);
 
   //layer5,6 (conv + maxpool)
   uart_printf("\nRunning layers 5 and 6...\n");
-  conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILING_W, LAYER_5_TILING_H, LAYER_5_MAXPOOL);
+  conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILING_W, LAYER_5_TILING_H, LAYER_5_MAXPOOL, LAYER_5_OUTPADD);
 
   //layer7,8 (conv + maxpool)
   uart_printf("\nRunning layers 7 and 8...\n");
-  conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILING_W, LAYER_7_TILING_H, LAYER_7_MAXPOOL);
+  conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILING_W, LAYER_7_TILING_H, LAYER_7_MAXPOOL, LAYER_7_OUTPADD);
 
   //layer9 (conv)
   uart_printf("\nRunning layer 9...\n");
-  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL);
-#else
-  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9;
-  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
-#endif
+  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD);
 
   //layer10 (maxpool)
   uart_printf("\nRunning layer 10...\n");
   maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER);
+#else
+  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9;
+  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9;
+#endif
+
+  //layer11 (conv)
+  uart_printf("\nRunning layer 11...\n");
+  conv_layer(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_11_MAXPOOL, LAYER_11_OUTPADD);
 
   //return data
   uart_printf("\nTotal execution time = %d seconds\n", total_time/1000);
