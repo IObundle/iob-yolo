@@ -44,7 +44,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_11*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_12*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -138,6 +138,10 @@ void reset_DDR() {
 
   //layer 11
   for(i = 0; i < DATA_LAYER_11; i++) fp_data[pos + i] = 0x8000; //min value
+  pos += DATA_LAYER_11;
+
+  //layer 12
+  for(i = 0; i < DATA_LAYER_12; i++) fp_data[pos + i] = 0; //min value
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -603,14 +607,15 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
 }
 
 //perform maxpool layer
-void maxpool_layer(int w, int c) {
+//when inpadd = 1, it does downsampling
+void maxpool_layer(int w, int c, int inpadd, int stride) {
 
   //clear configuration of all stages
   globalClearConf();
 
   //update pointers
   int16_t * input = (int16_t *) fp_data + data_pos;
-  data_pos += (w+2)*(w+2)*c;
+  data_pos += (w+2*inpadd+stride)*(w+2*inpadd+stride)*c;
   int16_t * output = (int16_t *) fp_data + data_pos;
 
   //local variables
@@ -626,16 +631,16 @@ void maxpool_layer(int w, int c) {
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
   stage[0].memA[0].setIter(2);
-  stage[0].memA[0].setShift(w-2);
-  stage[0].memA[0].setPer2(w/2);
-  stage[0].memA[0].setIncr2(2);
-  stage[0].memA[0].setIter2(w/2);
-  stage[0].memA[0].setShift2(w);
+  stage[0].memA[0].setShift(w+stride-2);
+  stage[0].memA[0].setPer2(w/(1+inpadd));
+  stage[0].memA[0].setIncr2(1+inpadd);
+  stage[0].memA[0].setIter2(w/(1+inpadd));
+  stage[0].memA[0].setShift2(w+stride-w*stride);
 
   //configure yolo0 to perform maxpool
   stage[0].yolo[0].setSelA(sMEMA[0]);
-  stage[0].yolo[0].setIter(w);
-  stage[0].yolo[0].setPer(w);
+  stage[0].yolo[0].setIter(w*(1+stride));
+  stage[0].yolo[0].setPer(w*(1+stride));
   stage[0].yolo[0].setDelay(MEMP_LAT);
   stage[0].yolo[0].setMaxpool(1);
   stage[0].yolo[0].setBypass(1);
@@ -644,7 +649,7 @@ void maxpool_layer(int w, int c) {
   stage[0].memA[3].setDuty(1);
   stage[0].memA[3].setIncr(1);
   stage[0].memA[3].setPer(4);
-  stage[0].memA[3].setIter(w*w/4);
+  stage[0].memA[3].setIter(w*w/(1+3*inpadd));
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT+4-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
@@ -659,9 +664,9 @@ void maxpool_layer(int w, int c) {
 
     //Send input FM tile (x-y-z format)
     start = timer_get_count_us(TIMER);
-    for(j = 0; j < w; j++)
-      for(i = 0; i < w; i++)
-        stage[0].memA[0].write(j*w + i, input[k*(w+2)*(w+2) + (j+1)*(w+2) + i+1]);
+    for(j = 0; j < w+stride; j++)
+      for(i = 0; i < w+stride; i++)
+        stage[0].memA[0].write(j*(w+stride) + i, input[k*(w+2*inpadd+stride)*(w+2*inpadd+stride) + (j+inpadd)*(w+2*inpadd+stride) + i+inpadd]);
     end = timer_get_count_us(TIMER);
     data_time += (end - start);
 
@@ -676,12 +681,12 @@ void maxpool_layer(int w, int c) {
 
     //store result in DDR
     start = timer_get_count_us(TIMER);
-    for(j = 0; j < w/2; j++)
-      for(i = 0; i < w/2; i++)
+    for(j = 0; j < w/(1+inpadd); j++)
+      for(i = 0; i < w/(1+inpadd); i++)
       #ifdef SIM
-        if(output[k*(w/2+2)*(w/2+2) + (j+1)*(w/2+2) + i+1] != stage[0].memA[3].read(j*(w/2) + i)) num_err++;
+        if(output[k*(w/(1+inpadd)+2)*(w/(1+inpadd)+2) + (j+1)*(w/(1+inpadd)+2) + i+1] != stage[0].memA[3].read(j*(w/(1+inpadd)) + i)) num_err++;
       #else
-        output[k*(w/2+2)*(w/2+2) + (j+1)*(w/2+2) + i+1] = stage[0].memA[3].read(j*(w/2) + i);
+        output[k*(w/(1+inpadd)+2)*(w/(1+inpadd)+2) + (j+1)*(w/(1+inpadd)+2) + i+1] = stage[0].memA[3].read(j*(w/(1+inpadd)) + i);
       #endif
     end = timer_get_count_us(TIMER);
     data_time += (end - start);
@@ -702,7 +707,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -786,15 +791,19 @@ int main(int argc, char **argv) {
 
   //layer10 (maxpool)
   uart_printf("\nRunning layer 10...\n");
-  maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER);
-#else
-  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9;
-  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9;
-#endif
+  maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE);
 
   //layer11 (conv)
   uart_printf("\nRunning layer 11...\n");
   conv_layer(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_11_MAXPOOL, LAYER_11_OUTPADD, LAYER_11_STRIDE);
+#else
+  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11;
+  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10;
+#endif
+
+  //layer12 (maxpool)
+  uart_printf("\nRunning layer 12...\n");
+  maxpool_layer(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE);
 
   //return data
   uart_printf("\nTotal execution time = %d seconds\n", total_time/1000);
