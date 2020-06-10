@@ -46,7 +46,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_16*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_19*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -461,14 +461,15 @@ void resize_image() {
 }
 
 //perform convolutional layer
-void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, int maxpool, int outpadd, int stride, int inpadd) {
+void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, int maxpool, int outpadd, int stride, int inpadd, int ignorepadd, unsigned int outpos) {
 
   //clear configuration of all stages
   globalClearConf();
 
   //update pointers
   int16_t * input = (int16_t *) fp_data + data_pos;
-  data_pos += (w+2*inpadd)*(w+2*inpadd)*c;
+  if(outpos == 0) data_pos += (w+2*inpadd)*(w+2*inpadd)*c;
+  else data_pos = outpos;
   int16_t * output = (int16_t *) fp_data + data_pos;
   int16_t * weights = (int16_t *) fp_weights + weight_pos;
   weight_pos += num_ker*ker_size*ker_size*c;
@@ -558,7 +559,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
       for(i = 0; i < c; i++)
 	for(j = 0; j < til_h+2*inpadd; j++)
           for(k = 0; k < til_w+2*inpadd; k++)
-            stage[0].memA[0].write((j*(til_w+2*inpadd)+k)*c + i, input[i*(w+2*inpadd)*(w+2*inpadd) + (l*til_h+j)*(w+2*inpadd) + (k+m*til_w)]);
+	    stage[0].memA[0].write((j*(til_w+2*inpadd)+k)*c + i, input[i*(w+2*inpadd+2*ignorepadd)*(w+2*inpadd+2*ignorepadd) + (l*til_h+j+ignorepadd)*(w+2*inpadd+2*ignorepadd) + (k+m*til_w+ignorepadd)]);
       end = timer_get_count_us(TIMER);
       data_time += (end - start);
 
@@ -713,7 +714,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -762,6 +763,10 @@ int main(int argc, char **argv) {
   //define memory regions
   define_memory_regions();
 
+  //Stores initial address of layers 14 and 19 output for first route layer
+  unsigned int data_pos_layer14 = data_pos + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13;
+  unsigned int data_pos_layer19 = data_pos_layer14 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17;
+
   //load data and reset DDR to zero
 #ifndef SIM
   reset_DDR();
@@ -777,23 +782,23 @@ int main(int argc, char **argv) {
 
   //layer1,2 (conv + maxpool)
   uart_printf("\nRunning layers 1 and 2...\n");
-  conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILING_W, LAYER_1_TILING_H, LAYER_1_MAXPOOL, LAYER_1_OUTPADD, LAYER_1_STRIDE, 1);
+  conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILING_W, LAYER_1_TILING_H, LAYER_1_MAXPOOL, LAYER_1_OUTPADD, LAYER_1_STRIDE, 1, LAYER_1_IGNOREPAD, 0);
 
   //layer3,4 (conv + maxpool)
   uart_printf("\nRunning layers 3 and 4...\n");
-  conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILING_W, LAYER_3_TILING_H, LAYER_3_MAXPOOL, LAYER_3_OUTPADD, LAYER_3_STRIDE, LAYER_1_OUTPADD);
+  conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILING_W, LAYER_3_TILING_H, LAYER_3_MAXPOOL, LAYER_3_OUTPADD, LAYER_3_STRIDE, LAYER_1_OUTPADD, LAYER_3_IGNOREPAD, 0);
 
   //layer5,6 (conv + maxpool)
   uart_printf("\nRunning layers 5 and 6...\n");
-  conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILING_W, LAYER_5_TILING_H, LAYER_5_MAXPOOL, LAYER_5_OUTPADD, LAYER_5_STRIDE, LAYER_3_OUTPADD);
+  conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILING_W, LAYER_5_TILING_H, LAYER_5_MAXPOOL, LAYER_5_OUTPADD, LAYER_5_STRIDE, LAYER_3_OUTPADD, LAYER_5_IGNOREPAD, 0);
 
   //layer7,8 (conv + maxpool)
   uart_printf("\nRunning layers 7 and 8...\n");
-  conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILING_W, LAYER_7_TILING_H, LAYER_7_MAXPOOL, LAYER_7_OUTPADD, LAYER_7_STRIDE, LAYER_5_OUTPADD);
+  conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILING_W, LAYER_7_TILING_H, LAYER_7_MAXPOOL, LAYER_7_OUTPADD, LAYER_7_STRIDE, LAYER_5_OUTPADD, LAYER_7_IGNOREPAD, 0);
 
   //layer9 (conv)
   uart_printf("\nRunning layer 9...\n");
-  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_7_OUTPADD);
+  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_7_OUTPADD, LAYER_9_IGNOREPAD, 0);
 
   //layer10 (maxpool)
   uart_printf("\nRunning layer 10...\n");
@@ -801,7 +806,7 @@ int main(int argc, char **argv) {
 
   //layer11 (conv)
   uart_printf("\nRunning layer 11...\n");
-  conv_layer(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_11_MAXPOOL, LAYER_11_OUTPADD, LAYER_11_STRIDE, 1);
+  conv_layer(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_11_MAXPOOL, LAYER_11_OUTPADD, LAYER_11_STRIDE, 1, LAYER_11_IGNOREPAD, 0);
 
   //layer12 (maxpool)
   uart_printf("\nRunning layer 12...\n");
@@ -809,23 +814,28 @@ int main(int argc, char **argv) {
 
   //layer13 (conv)
   uart_printf("\nRunning layer 13...\n");
-  conv_layer(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_13_MAXPOOL, LAYER_13_OUTPADD, LAYER_13_STRIDE, 1);
+  conv_layer(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_13_MAXPOOL, LAYER_13_OUTPADD, LAYER_13_STRIDE, 1, LAYER_13_IGNOREPAD, 0);
 
   //layer14 (conv)
   uart_printf("\nRunning layer 14...\n");
-  conv_layer(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_14_MAXPOOL, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_13_OUTPADD);
+  conv_layer(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_14_MAXPOOL, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_13_OUTPADD, LAYER_14_IGNOREPAD, 0);
 
   //layer15 (conv)
   uart_printf("\nRunning layer 15...\n");
-  conv_layer(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_15_MAXPOOL, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_14_OUTPADD);
-#else
-  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15;
-  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14;
-#endif
+  conv_layer(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_15_MAXPOOL, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_14_OUTPADD, LAYER_15_IGNOREPAD, 0);
 
   //layer16 (conv)
   uart_printf("\nRunning layer 16...\n");
-  conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD);
+  conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD, LAYER_16_IGNOREPAD, 0);
+#else
+  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15 + WEIGHTS_LAYER_16;
+  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15;
+#endif
+
+  //layer19 (conv)
+  data_pos = data_pos_layer14;
+  uart_printf("\nRunning layer 19...\n");
+  conv_layer(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_19_MAXPOOL, LAYER_19_OUTPADD, LAYER_19_STRIDE, 0, LAYER_19_IGNOREPAD, data_pos_layer19);
 
   //return data
   uart_printf("\nTotal execution time = %d seconds\n", total_time/1000);
