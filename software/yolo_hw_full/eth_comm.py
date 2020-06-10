@@ -82,20 +82,7 @@ weights_filename = "../yolov3-tiny_batch-fixed.weights"
 f_weights = open(weights_filename, 'rb')
 
 #Frame parameters
-#weights_file_size = getsize(weights_filename)
-layer1_w = 16 + 16*3*3*3
-layer3_w = 32 + 32*3*3*16
-layer5_w = 64 + 64*3*3*32
-layer7_w = 128 + 128*3*3*64
-layer9_w = 256 + 256*3*3*128
-layer11_w = 512 + 512*3*3*256
-layer13_w = 1024 + 1024*3*3*512
-layer14_w = 256 + 256*1*1*1024
-layer15_w = 512 + 512*3*3*256
-layer16_w = 255 + 255*1*1*512
-layer19_w = 128 + 128*1*1*256
-layer_w_total = layer1_w + layer3_w + layer5_w + layer7_w + layer9_w + layer11_w + layer13_w + layer14_w + layer15_w + layer16_w + layer19_w
-weights_file_size = layer_w_total*2
+weights_file_size = getsize(weights_filename)
 num_frames_weights = int(weights_file_size/eth_nbytes)
 print("weights_file_size: %d" % weights_file_size)
 print("num_frames_weights: %d" % (num_frames_weights+1))

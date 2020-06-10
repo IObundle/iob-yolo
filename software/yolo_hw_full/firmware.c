@@ -28,6 +28,10 @@
 #define LAYER_11_TILING_H 1
 #define LAYER_16_TILING_W 13 //must be divisor of 13
 #define LAYER_16_TILING_H 1
+#define LAYER_22_TILING_W 2  //must be divisor of 26
+#define LAYER_22_TILING_H 2
+#define LAYER_23_TILING_W 26  //must be divisor of 26
+#define LAYER_23_TILING_H 1
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -46,7 +50,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_19*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -68,7 +72,8 @@ char data_rcv[ETH_NBYTES+18];
 unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 
 //TIMER variables
-unsigned int start, end, total_time;
+unsigned int start, end; 
+unsigned int total_data_time, total_config_time, total_run_time, total_time;
 
 //data base address pointers
 int16_t * fp_data, * fp_image, * fp_weights;
@@ -130,10 +135,6 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_8; i++) fp_data[pos + i] = 0;
   pos += DATA_LAYER_8;
 
-  //layer 9
-  for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
-  pos += DATA_LAYER_9;
-
   //layer 10
   for(i = 0; i < DATA_LAYER_10; i++) fp_data[pos + i] = 0;
   pos += DATA_LAYER_10;
@@ -148,6 +149,10 @@ void reset_DDR() {
 
   //layer 14
   for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19;
+
+  //layer 20 and 9
+  for(i = 0; i < DATA_LAYER_20 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_get_count_us(TIMER);
@@ -457,6 +462,9 @@ void resize_image() {
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
   uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  total_config_time = config_time;
+  total_run_time = run_time;
+  total_data_time = data_time;
   total_time = (config_time + run_time + data_time)/1000;
 }
 
@@ -610,19 +618,23 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
   uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  total_config_time += config_time;
+  total_run_time += run_time;
+  total_data_time += data_time;
   total_time += (config_time + run_time + data_time)/1000;
 }
 
 //perform maxpool layer
 //when inpadd = 1, it does downsampling
-void maxpool_layer(int w, int c, int inpadd, int stride) {
+void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
 
   //clear configuration of all stages
   globalClearConf();
 
   //update pointers
   int16_t * input = (int16_t *) fp_data + data_pos;
-  data_pos += (w+2*inpadd+stride)*(w+2*inpadd+stride)*c;
+  if(outpos == 0) data_pos += (w+2*inpadd+stride)*(w+2*inpadd+stride)*c;
+  else data_pos = outpos;
   int16_t * output = (int16_t *) fp_data + data_pos;
 
   //local variables
@@ -705,6 +717,105 @@ void maxpool_layer(int w, int c, int inpadd, int stride) {
   uart_printf("FU run time = %d us\n", run_time);
   uart_printf("FU load/store data time = %d us\n", data_time);
   uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  total_config_time += config_time;
+  total_run_time += run_time;
+  total_data_time += data_time;
+  total_time += (config_time + run_time + data_time)/1000;
+}
+
+//perform upsample layer
+void upsample() {
+
+  //clear configuration of all stages
+  globalClearConf();
+
+  //update pointers
+  int16_t * input = (int16_t *) fp_data + data_pos;
+  data_pos += DATA_LAYER_19;
+  int16_t * output = (int16_t *) fp_data + data_pos;
+
+  //local variables
+  int i, j, k, l;
+#ifdef SIM
+  int num_err = 0;
+#endif
+  unsigned int data_time = 0, config_time, run_time = 0;
+
+  //configure mem0 to read same pixel 4 times
+  start = timer_get_count_us(TIMER);
+  stage[0].memA[0].setDuty(4);
+  stage[0].memA[0].setPer(4);
+  stage[0].memA[0].setIter(1);
+  stage[0].memA[0].setPer2(13);
+  stage[0].memA[0].setIncr2(1);
+  stage[0].memA[0].setIter2(13);
+
+  //configure yolo0 to perform bypass
+  stage[0].yolo[0].setSelA(sMEMA[0]);
+  stage[0].yolo[0].setDelay(MEMP_LAT);
+  stage[0].yolo[0].setBypass(1);
+
+  //configure mem3 to write maxpool results
+  stage[0].memA[3].setDuty(2);
+  stage[0].memA[3].setPer(2);
+  stage[0].memA[3].setIncr(1);
+  stage[0].memA[3].setIter(2);
+  stage[0].memA[3].setShift(26-2);
+  stage[0].memA[3].setPer2(13);
+  stage[0].memA[3].setIncr2(2);
+  stage[0].memA[3].setIter2(13);
+  stage[0].memA[3].setShift2(26);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT);
+  stage[0].memA[3].setSel(sYOLO[0]);
+  stage[0].memA[3].setInWr(1);
+  end = timer_get_count_us(TIMER);
+  config_time = end - start;
+
+#ifdef SIM
+  for(k = 0; k < 1; k++) {
+#else
+  for(k = 0; k < 128; k++) {
+#endif
+
+    //Send input FM tile (x-y-z format)
+    start = timer_get_count_us(TIMER);
+    for(j = 0; j < 13; j++)
+      for(i = 0; i < 13; i++)
+        stage[0].memA[0].write(j*13 + i, input[k*13*13 + j*13 + i]);
+    end = timer_get_count_us(TIMER);
+    data_time += (end - start);
+
+    //run
+    start = timer_get_count_us(TIMER);
+    run();
+
+    //Wait until done
+    while(done() == 0);
+    end = timer_get_count_us(TIMER);
+    run_time += (end - start);
+
+    //store result in DDR
+    start = timer_get_count_us(TIMER);
+    for(j = 0; j < 26; j++)
+      for(i = 0; i < 26; i++)
+      #ifdef SIM
+        if(output[k*28*28 + (j+1)*28 + i+1] != stage[0].memA[3].read(j*26 + i)) num_err++;
+      #else
+        output[k*28*28 + (j+1)*28 + i+1] = stage[0].memA[3].read(j*26 + i);
+      #endif
+    end = timer_get_count_us(TIMER);
+    data_time += (end - start);
+  }
+#ifdef SIM
+  uart_printf("Layer done with %d errors\n", num_err);
+#endif
+  uart_printf("FU config time = %d us\n", config_time);
+  uart_printf("FU run time = %d us\n", run_time);
+  uart_printf("FU load/store data time = %d us\n", data_time);
+  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  total_config_time += config_time;
+  total_run_time += run_time;
+  total_data_time += data_time;
   total_time += (config_time + run_time + data_time)/1000;
 }
 
@@ -714,7 +825,7 @@ void send_data() {
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17)*2;
+  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20 + DATA_LAYER_22)*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -763,9 +874,11 @@ int main(int argc, char **argv) {
   //define memory regions
   define_memory_regions();
 
-  //Stores initial address of layers 14 and 19 output for first route layer
-  unsigned int data_pos_layer14 = data_pos + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13;
+  //Stores initial address of layers 9/10/14/19 output
+  unsigned int data_pos_layer10 = data_pos + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
+  unsigned int data_pos_layer14 = data_pos_layer10 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13;
   unsigned int data_pos_layer19 = data_pos_layer14 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17;
+  unsigned int data_pos_layer9 = data_pos_layer19 + DATA_LAYER_19 + DATA_LAYER_20;
 
   //load data and reset DDR to zero
 #ifndef SIM
@@ -798,11 +911,11 @@ int main(int argc, char **argv) {
 
   //layer9 (conv)
   uart_printf("\nRunning layer 9...\n");
-  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_7_OUTPADD, LAYER_9_IGNOREPAD, 0);
+  conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_7_OUTPADD, LAYER_9_IGNOREPAD, data_pos_layer9);
 
   //layer10 (maxpool)
   uart_printf("\nRunning layer 10...\n");
-  maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE);
+  maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
 
   //layer11 (conv)
   uart_printf("\nRunning layer 11...\n");
@@ -810,7 +923,7 @@ int main(int argc, char **argv) {
 
   //layer12 (maxpool)
   uart_printf("\nRunning layer 12...\n");
-  maxpool_layer(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE);
+  maxpool_layer(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0);
 
   //layer13 (conv)
   uart_printf("\nRunning layer 13...\n");
@@ -827,18 +940,33 @@ int main(int argc, char **argv) {
   //layer16 (conv)
   uart_printf("\nRunning layer 16...\n");
   conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD, LAYER_16_IGNOREPAD, 0);
-#else
-  weight_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15 + WEIGHTS_LAYER_16;
-  data_pos += NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15;
-#endif
 
   //layer19 (conv)
   data_pos = data_pos_layer14;
   uart_printf("\nRunning layer 19...\n");
   conv_layer(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_19_MAXPOOL, LAYER_19_OUTPADD, LAYER_19_STRIDE, 0, LAYER_19_IGNOREPAD, data_pos_layer19);
 
+  //layer20 (upsample)
+  uart_printf("\nRunning layer 20...\n");
+  upsample();
+
+  //layer22 (conv)
+  uart_printf("\nRunning layer 22...\n");
+  conv_layer(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_TILING_W, LAYER_22_TILING_H, LAYER_22_MAXPOOL, LAYER_22_OUTPADD, LAYER_22_STRIDE, 1, LAYER_22_IGNOREPAD, 0);
+#else
+  weight_pos = WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15 + WEIGHTS_LAYER_16 + WEIGHTS_LAYER_19 + WEIGHTS_LAYER_22;
+  data_pos = data_pos_layer9 + DATA_LAYER_9;
+#endif
+
+  //layer23 (conv)
+  uart_printf("\nRunning layer 23...\n");
+  conv_layer(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_TILING_W, LAYER_23_TILING_H, LAYER_23_MAXPOOL, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_22_OUTPADD, LAYER_23_IGNOREPAD, 0);
+
   //return data
-  uart_printf("\nTotal execution time = %d seconds\n", total_time/1000);
+  uart_printf("\nTotal config time = %d us\n", total_config_time);
+  uart_printf("Total run time = %d ms\n", total_run_time/1000);
+  uart_printf("Total data time = %d seconds\n", total_data_time/1000/1000);
+  uart_printf("Total execution time = %d seconds\n", total_time/1000);
 #ifndef SIM
   send_data();
 #endif

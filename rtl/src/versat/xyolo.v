@@ -157,7 +157,7 @@ module xyolo # (
    assign mp_w = |mp_cnt & result>bypass_w ? result : bypass_w;
 
    //result
-   assign result_w = maxpool ? mp_w : act_fnc;
+   assign result_w = maxpool ? mp_w : bypass_w;
    assign flow_out = result;
 
 endmodule
