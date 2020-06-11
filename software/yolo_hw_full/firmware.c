@@ -14,24 +14,24 @@
 #include <stdlib.h>
 
 //define tiling of each layer
-#define LAYER_1_TILING_W 32 //must be divisor of 416
-#define LAYER_1_TILING_H 32
-#define LAYER_3_TILING_W 52 //must be divisor of 208
-#define LAYER_3_TILING_H 2
-#define LAYER_5_TILING_W 26 //must be divisor of 104
-#define LAYER_5_TILING_H 2
-#define LAYER_7_TILING_W 4  //must be divisor of 52
-#define LAYER_7_TILING_H 4
-#define LAYER_9_TILING_W 2  //must be divisor of 26
-#define LAYER_9_TILING_H 2
-#define LAYER_11_TILING_W 1  //must be divisor of 13
-#define LAYER_11_TILING_H 1
+#define LAYER_1_TILING_W 208 //must be divisor of 416
+#define LAYER_1_TILING_H 208
+#define LAYER_3_TILING_W 104 //must be divisor of 208
+#define LAYER_3_TILING_H 104
+#define LAYER_5_TILING_W 104 //must be divisor of 104
+#define LAYER_5_TILING_H 52
+#define LAYER_7_TILING_W 52  //must be divisor of 52
+#define LAYER_7_TILING_H 52
+#define LAYER_9_TILING_W 26  //must be divisor of 26
+#define LAYER_9_TILING_H 26
+#define LAYER_11_TILING_W 13  //must be divisor of 13
+#define LAYER_11_TILING_H 13
 #define LAYER_16_TILING_W 13 //must be divisor of 13
-#define LAYER_16_TILING_H 1
-#define LAYER_22_TILING_W 2  //must be divisor of 26
-#define LAYER_22_TILING_H 2
+#define LAYER_16_TILING_H 13
+#define LAYER_22_TILING_W 13  //must be divisor of 26
+#define LAYER_22_TILING_H 26
 #define LAYER_23_TILING_W 26  //must be divisor of 26
-#define LAYER_23_TILING_H 1
+#define LAYER_23_TILING_H 26
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))

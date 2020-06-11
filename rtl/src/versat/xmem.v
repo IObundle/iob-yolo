@@ -101,7 +101,7 @@ module xmem #(
 		      );
 
    //define addresses based on ext and rvrs
-   assign addr_w = valid ? addr[`MEM_ADDR_W-1:0] : ext? in[`MEM_ADDR_W-1:0] : addr_int[`MEM_ADDR_W-1:0];
+   assign addr_w = valid ? addr[`MEM_ADDR_W-1:0] : ext ? in : addr_int[`MEM_ADDR_W-1:0];
 
    //register mem inputs
    reg [DATA_W-1:0] data_reg;

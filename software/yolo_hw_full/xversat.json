@@ -1,5 +1,5 @@
 {
-	"nSTAGE" : 		2,
+	"nSTAGE" : 		1,
 	"DATAPATH_W" :          16,
 	"nVI" :                 0,
 	"nVO" :                 0,
@@ -10,8 +10,8 @@
 	"nMULADD":		0,
 	"nYOLO":                1,
 	"nBS":			0,
-	"MEM_ADDR_W":		13,
-	"PERIOD_W":		13,
+	"MEM_ADDR_W":		18,
+	"PERIOD_W":		18,
 	"CONF_MEM_ADDR_W": 	3,
 	"CONF_MEM_USE": 	false,
 	"MULADD_COMB":		false,

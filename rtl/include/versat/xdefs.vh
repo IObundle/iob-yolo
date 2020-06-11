@@ -1,5 +1,5 @@
 //Number of bits required for nSTAGE
-`define nSTAGE_W ($clog2(`nSTAGE))
+`define nSTAGE_W 1 //($clog2(`nSTAGE))
 
 // Number of bits to select memory
 `define nMEM_W ($clog2(`nMEM))
