@@ -313,7 +313,7 @@ void resize_image() {
   stage[0].yolo[0].setShift(7); //Q10.22 to Q1.15
 
   //store res0 in mem3
-  stage[0].memA[3].setDelay(2*MEMP_LAT+YOLO_LAT+(2-1));
+  stage[0].memA[3].setDelay(2*MEMP_LAT+YOLO_LAT-1);
   stage[0].memA[3].setDuty(1);
   stage[0].memA[3].setPer(2);
   stage[0].memA[3].setIncr(1);
@@ -324,7 +324,7 @@ void resize_image() {
   config_time = end - start;
 
   //loops for performing resizing 1st step
-  #ifdef SIM
+#ifdef SIM
   for(k = 0; k < 1; k++) {
     for(j = 0; j < 1; j++) {
 #else
@@ -400,7 +400,7 @@ void resize_image() {
   stage[0].yolo[0].setShift(21); //Q3.29 to Q8.8
 
   //store res1 in mem3
-  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+(2-1));
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT-1);
   stage[0].memA[3].setDuty(1);
   stage[0].memA[3].setPer(2);
   stage[0].memA[3].setIncr(1);
@@ -411,7 +411,7 @@ void resize_image() {
   config_time += end - start;
 
   //loops for performing resizing 2nd step
-  #ifdef SIM
+#ifdef SIM
   for(k = 0; k < 1; k++) {
     for(j = 0; j < 1; j++) {
 #else
@@ -431,12 +431,14 @@ void resize_image() {
       run();
 
       //configure mem1 start
-      #ifndef SIM
+    #ifdef SIM
+      if(j == 0)
+    #else
       if(j == NEW_H-1)
+    #endif
         stage[0].memA[0].setStart(0);
       else
         stage[0].memA[1].setStart(2*(j+1));
-    #endif
 
       //Wait until done
       while(done() == 0);
@@ -507,7 +509,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
     stage[0].memA[0].setIncr3(2*c);
     stage[0].memA[0].setIter3(til_h/2);
     stage[0].memA[0].setShift3((til_w+2)*c*2-til_w*c);
-  } else {
+  } else if (til_w != 1 || til_h != 1) {
     stage[0].memA[0].setPer2(til_w);
     stage[0].memA[0].setIter2(til_h);
     stage[0].memA[0].setShift2((til_w+2*inpadd)*c-til_w*c);
@@ -537,17 +539,11 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   stage[0].yolo[0].setMaxpool(maxpool);
 
   //configure mem3 to write convolution results
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT-1);
   stage[0].memA[3].setDuty(1);
   stage[0].memA[3].setIncr(1);
-  if(maxpool) {
-    stage[0].memA[3].setPer(ker_size*ker_size*c*4); //CAREFUL WITH PERIOD_W!!!
-    stage[0].memA[3].setIter(til_w*til_h/4);
-    stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+ker_size*ker_size*c*4-1);
-  } else {
-    stage[0].memA[3].setPer(ker_size*ker_size*c);
-    stage[0].memA[3].setIter(til_w*til_h);
-    stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT+ker_size*ker_size*c-1);
-  }
+  stage[0].memA[3].setPer(ker_size*ker_size*c*(1+3*maxpool)); //CAREFUL WITH PERIOD_W!!!
+  stage[0].memA[3].setIter(til_w*til_h/(1+3*maxpool));
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
   end = timer_get_count_us(TIMER);
@@ -669,7 +665,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
   stage[0].memA[3].setIncr(1);
   stage[0].memA[3].setPer(4);
   stage[0].memA[3].setIter(w*w/(1+3*inpadd));
-  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT+4-1);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
   end = timer_get_count_us(TIMER);
@@ -963,11 +959,11 @@ int main(int argc, char **argv) {
   conv_layer(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_TILING_W, LAYER_23_TILING_H, LAYER_23_MAXPOOL, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_22_OUTPADD, LAYER_23_IGNOREPAD, 0);
 
   //return data
+#ifndef SIM
   uart_printf("\nTotal config time = %d us\n", total_config_time);
   uart_printf("Total run time = %d ms\n", total_run_time/1000);
   uart_printf("Total data time = %d seconds\n", total_data_time/1000/1000);
   uart_printf("Total execution time = %d seconds\n", total_time/1000);
-#ifndef SIM
   send_data();
 #endif
   uart_putc(4);
