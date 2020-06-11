@@ -14,12 +14,12 @@
 #include <stdlib.h>
 
 //define tiling of each layer
-#define LAYER_1_TILING_W 208 //must be divisor of 416
-#define LAYER_1_TILING_H 208
-#define LAYER_3_TILING_W 104 //must be divisor of 208
-#define LAYER_3_TILING_H 104
+#define LAYER_1_TILING_W 416 //must be divisor of 416
+#define LAYER_1_TILING_H 416
+#define LAYER_3_TILING_W 208 //must be divisor of 208
+#define LAYER_3_TILING_H 208
 #define LAYER_5_TILING_W 104 //must be divisor of 104
-#define LAYER_5_TILING_H 52
+#define LAYER_5_TILING_H 104
 #define LAYER_7_TILING_W 52  //must be divisor of 52
 #define LAYER_7_TILING_H 52
 #define LAYER_9_TILING_W 26  //must be divisor of 26
@@ -28,7 +28,7 @@
 #define LAYER_11_TILING_H 13
 #define LAYER_16_TILING_W 13 //must be divisor of 13
 #define LAYER_16_TILING_H 13
-#define LAYER_22_TILING_W 13  //must be divisor of 26
+#define LAYER_22_TILING_W 26  //must be divisor of 26
 #define LAYER_22_TILING_H 26
 #define LAYER_23_TILING_W 26  //must be divisor of 26
 #define LAYER_23_TILING_H 26
@@ -962,8 +962,8 @@ int main(int argc, char **argv) {
 #ifndef SIM
   uart_printf("\nTotal config time = %d us\n", total_config_time);
   uart_printf("Total run time = %d ms\n", total_run_time/1000);
-  uart_printf("Total data time = %d seconds\n", total_data_time/1000/1000);
-  uart_printf("Total execution time = %d seconds\n", total_time/1000);
+  uart_printf("Total data time = %d ms\n", total_data_time/1000);
+  uart_printf("Total execution time = %d ms\n", total_time);
   send_data();
 #endif
   uart_putc(4);

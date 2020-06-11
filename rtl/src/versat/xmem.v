@@ -4,6 +4,7 @@
 
 module xmem #(
               parameter MEM_INIT_FILE="none",
+	      parameter MEM_ADDR_W = `MEM_ADDR_W,
 	      parameter DATA_W = 32
               )
     (
@@ -15,7 +16,7 @@ module xmem #(
 
     //mem interface
     input                         we,
-    input [`MEM_ADDR_W-1:0]       addr,
+    input [MEM_ADDR_W-1:0]        addr,
     input [DATA_W-1:0]            rdata,
     input                         valid,
 
@@ -101,11 +102,11 @@ module xmem #(
 		      );
 
    //define addresses based on ext and rvrs
-   assign addr_w = valid ? addr[`MEM_ADDR_W-1:0] : ext ? in : addr_int[`MEM_ADDR_W-1:0];
+   assign addr_w = valid ? addr[MEM_ADDR_W-1:0] : ext ? in : addr_int[MEM_ADDR_W-1:0];
 
    //register mem inputs
    reg [DATA_W-1:0] data_reg;
-   reg [`MEM_ADDR_W-1:0] addr_reg;
+   reg [MEM_ADDR_W-1:0] addr_reg;
    reg en_reg, we_reg;
    always @ (posedge clk) begin
       data_reg <= data_to_wr;
@@ -117,7 +118,7 @@ module xmem #(
    iob_1p_mem #(
                    .FILE(MEM_INIT_FILE),
 		   .DATA_W(DATA_W),
-		   .ADDR_W(`MEM_ADDR_W))
+		   .ADDR_W(MEM_ADDR_W))
    mem
      (
       .data_in(data_reg),
