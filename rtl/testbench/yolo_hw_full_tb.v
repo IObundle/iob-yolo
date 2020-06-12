@@ -29,12 +29,13 @@
 `define LAYER_14 (15*15*256)
 `define LAYER_15 (13*13*512)
 `define LAYER_16 (13*13*255)
-`define LAYER_17 (13*13*255)
 `define LAYER_19 (13*13*128)
 `define LAYER_20 (28*28*128)
 `define LAYER_22 (26*26*256)
 `define LAYER_23 (26*26*255)
-`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT_AUX+`NETWORK_INPUT+`LAYER_1+`LAYER_3+`LAYER_5+`LAYER_7+`LAYER_9+`LAYER_10+`LAYER_11+`LAYER_12+`LAYER_13+`LAYER_14+`LAYER_15+`LAYER_16+`LAYER_17+`LAYER_19+`LAYER_20+`LAYER_22+`LAYER_23)*2)
+`define NBOXES 8
+`define YOLO (`NBOXES*84)
+`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT_AUX+`NETWORK_INPUT+`LAYER_1+`LAYER_3+`LAYER_5+`LAYER_7+`LAYER_9+`LAYER_10+`LAYER_11+`LAYER_12+`LAYER_13+`LAYER_14+`LAYER_15+`LAYER_16+`LAYER_19+`LAYER_20+`LAYER_22+`LAYER_23+`YOLO)*2)
 
 //Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
@@ -149,7 +150,7 @@ module yolo_hw_full_tb;
    wire 	       tester_rx_dv;   
 
    //define parameters
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer23.hex"};
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "yolo.hex"};
    parameter file_size = `FILE_SIZE;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
 

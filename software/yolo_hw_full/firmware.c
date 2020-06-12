@@ -14,24 +14,45 @@
 #include <stdlib.h>
 
 //define tiling of each layer
-#define LAYER_1_TILING_W 416 //must be divisor of 416
-#define LAYER_1_TILING_H 416
-#define LAYER_3_TILING_W 208 //must be divisor of 208
-#define LAYER_3_TILING_H 208
-#define LAYER_5_TILING_W 104 //must be divisor of 104
-#define LAYER_5_TILING_H 104
-#define LAYER_7_TILING_W 52  //must be divisor of 52
-#define LAYER_7_TILING_H 52
-#define LAYER_9_TILING_W 26  //must be divisor of 26
-#define LAYER_9_TILING_H 26
-#define LAYER_11_TILING_W 13  //must be divisor of 13
-#define LAYER_11_TILING_H 13
-#define LAYER_16_TILING_W 13 //must be divisor of 13
-#define LAYER_16_TILING_H 13
-#define LAYER_22_TILING_W 26  //must be divisor of 26
-#define LAYER_22_TILING_H 26
-#define LAYER_23_TILING_W 26  //must be divisor of 26
-#define LAYER_23_TILING_H 26
+#ifdef SIM
+  #define LAYER_1_TILING_W 1 //must be divisor of 416
+  #define LAYER_1_TILING_H 1
+  #define LAYER_3_TILING_W 1 //must be divisor of 208
+  #define LAYER_3_TILING_H 1
+  #define LAYER_5_TILING_W 1 //must be divisor of 104
+  #define LAYER_5_TILING_H 1
+  #define LAYER_7_TILING_W 1  //must be divisor of 52
+  #define LAYER_7_TILING_H 1
+  #define LAYER_9_TILING_W 1  //must be divisor of 26
+  #define LAYER_9_TILING_H 1
+  #define LAYER_11_TILING_W 1  //must be divisor of 13
+  #define LAYER_11_TILING_H 1
+  #define LAYER_16_TILING_W 1 //must be divisor of 13
+  #define LAYER_16_TILING_H 1
+  #define LAYER_22_TILING_W 1  //must be divisor of 26
+  #define LAYER_22_TILING_H 1
+  #define LAYER_23_TILING_W 1  //must be divisor of 26
+  #define LAYER_23_TILING_H 1
+#else
+  #define LAYER_1_TILING_W 416 //must be divisor of 416
+  #define LAYER_1_TILING_H 416
+  #define LAYER_3_TILING_W 208 //must be divisor of 208
+  #define LAYER_3_TILING_H 208
+  #define LAYER_5_TILING_W 104 //must be divisor of 104
+  #define LAYER_5_TILING_H 104
+  #define LAYER_7_TILING_W 52  //must be divisor of 52
+  #define LAYER_7_TILING_H 52
+  #define LAYER_9_TILING_W 26  //must be divisor of 26
+  #define LAYER_9_TILING_H 26
+  #define LAYER_11_TILING_W 13  //must be divisor of 13
+  #define LAYER_11_TILING_H 13
+  #define LAYER_16_TILING_W 13 //must be divisor of 13
+  #define LAYER_16_TILING_H 13
+  #define LAYER_22_TILING_W 26  //must be divisor of 26
+  #define LAYER_22_TILING_H 26
+  #define LAYER_23_TILING_W 26  //must be divisor of 26
+  #define LAYER_23_TILING_H 26
+#endif
 
 //define peripheral base addresses
 #define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
@@ -50,7 +71,7 @@
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define WEIGHTS_FILE_SIZE (TOTAL_WEIGHTS*2) //16 bits per weight
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits per output
+#define OUTPUT_FILE_SIZE (nboxes*84*2) //16 bits per output
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 #define ix_size (NEW_W*4)
 #define iy_size (NEW_H)
@@ -81,6 +102,20 @@ int16_t * ix, * iy, * dx, * dy;
 
 //weights and data updatable pointers
 unsigned int weight_pos = 0, data_pos = NETWORK_INPUT_AUX;
+
+//Constants for bounding boxes
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define yolo1_div ((int16_t)(((float)1/LAYER_16_W)*((int32_t)1<<15))) //Q1.15
+#define yolo2_div ((int16_t)(((float)1/LAYER_23_W)*((int32_t)1<<15))) //Q1.15
+#define x_scales ((int16_t)(((float)YOLO_INPUT/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define x_bias ((int16_t)(((float)(YOLO_INPUT-NEW_W)/(NEW_W*2))*((int32_t)1<<14))) //Q2.14
+#define y_scales ((int16_t)(((float)YOLO_INPUT/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define y_bias ((int16_t)(((float)(YOLO_INPUT-NEW_H)/(NEW_H*2))*((int32_t)1<<14))) //Q2.14
+#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
+#define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
+uint8_t nboxes = 0;
 
 //define base address of data pointers
 void define_memory_regions() {
@@ -149,7 +184,7 @@ void reset_DDR() {
 
   //layer 14
   for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
-  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19;
+  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19;
 
   //layer 20 and 9
   for(i = 0; i < DATA_LAYER_20 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
@@ -815,13 +850,134 @@ void upsample() {
   total_time += (config_time + run_time + data_time)/1000;
 }
 
+//linear approximation of sigmoid function
+int16_t sigmoid(int16_t val) {
+  int16_t fp2375 = 0x260, fp084375 = 0xD8, fp0625 = 0xA0, fp05 = 0x80; //Q8.8
+  int16_t fp5 = 0x500, fp1 = 0x100; //Q8.8
+  int16_t val_out;
+  if(val < 0.) val_out = ~val + 1; //emulates multiplying by -1
+  else val_out = val;
+  if(val_out >= fp5) val_out = fp1;
+  else if(val_out >= fp2375) val_out = fp084375 + (val_out >> 5); //emulates multiplying by 0.03125 = 2^(-5)
+  else if(val_out >= fp1) val_out = fp0625 + (val_out >> 3); //emulates multiplying by 0.125 = 2^(-3)
+  else val_out = fp05 + (val_out >> 2); //emulates multiplying by 0.25 = 2^(-2);
+  if(val < 0.) val_out = fp1 - val_out;
+  return val_out;
+}
+
+//polynomial approximation of exponential function
+int16_t exp_fnc(int16_t val) {
+  int16_t val_16, exp_val_fixed;
+  int32_t val_32;
+  exp_val_fixed = val + 0x0100; //1+w -> Q8.8
+  exp_val_fixed = exp_val_fixed << 6; //Q8.8 to Q2.14
+  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q8.8*Q8.8 = Q16.16
+  val_16 = (int16_t)(val_32 >> 2); //w^2 -> Q16.16 to Q2.14
+  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^3 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^4 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q4.28 to Q2.14
+  return exp_val_fixed; //Q2.14
+}
+
+//apply sigmoid to input FM
+void yolo_layer(int w, int16_t xy_div, int first_yolo, unsigned int in_pos, unsigned int out_pos) {
+
+  //locate data pointers
+  int16_t * input = (int16_t *) fp_data + in_pos;
+  int16_t * output = (int16_t *) fp_data + out_pos;
+
+  //local variables
+  int16_t i, j, k, m;
+  int16_t obj_score, pred_score;
+  int32_t val_32;
+  int16_t yolo_bias[12] = {0x0280, 0x0380, 0x05C0, 0x06C0, 0x0940, 0x0E80, 0x1440, 0x1480, 0x21C0, 0x2A40, 0x5600, 0x4FC0}; //Q10.6
+#ifdef SIM
+  int num_err = 0;
+#endif
+
+  //loops to go through yolo layer output
+  for(i = 0; i < 3; i++) {
+    for(j = 0; j < w; j++) {
+      for(k = 0; k < w; k++) {
+
+        //sigmoid of objectness score
+        obj_score = sigmoid(input[(4+85*i)*w*w + j*w + k]);
+
+        //check if objectness score is above threshold
+        if(obj_score > threshold) {
+
+          //Calculate x
+          val_32 = (int32_t)((int32_t)(sigmoid(input[85*i*w*w + j*w + k]) + (k<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+        #ifdef SIM
+          if(output[84*nboxes] != (int16_t)(val_32 >> 9)) num_err++;
+        #else
+          output[84*nboxes] = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+        #endif
+
+          //Calculate y
+          val_32 = (int32_t)((int32_t)(sigmoid(input[(1+85*i)*w*w + j*w + k]) + (j<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+          val_32 = (int32_t)((int32_t)(int16_t)(val_32 >> 9)*(int32_t)y_scales); //Q2.14 * Q2.14 = Q4.28
+        #ifdef SIM
+          if(output[84*nboxes+1] != (int16_t)(val_32 >> 14) - (int16_t)y_bias) num_err++;
+        #else
+          output[84*nboxes+1] = (int16_t)(val_32 >> 14) - (int16_t)y_bias; //Q4.28 to Q2.14
+        #endif
+
+          //Calculate w
+          val_32 = (int32_t)((int32_t)exp_fnc(input[(2+85*i)*w*w + j*w + k])*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
+          val_32 = (int32_t)((int32_t)(int16_t)(val_32 >> 14)*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+        #ifdef SIM
+          if(output[84*nboxes+2] != (int16_t)(val_32 >> 6)) num_err++;
+        #else
+          output[84*nboxes+2] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+        #endif
+
+          //Calculate h
+          val_32 = (int32_t)((int32_t)exp_fnc(input[(3+85*i)*w*w + j*w + k])*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
+          val_32 = (int32_t)((int32_t)(int16_t)(val_32 >> 14)*(int32_t)yolo_bias[2*(i+(1-first_yolo)+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+        #ifdef SIM
+          if(output[84*nboxes+3] != (int16_t)(val_32 >> 6)) num_err++;
+        #else
+          output[84*nboxes+3] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+        #endif
+
+          //Calculate probability scores
+          for(m = 0; m < 80; m++) {
+            val_32 = (int32_t)((int32_t)sigmoid(input[(5+m+85*i)*w*w + j*w + k])*(int32_t)obj_score<<6); //Q8.8 * Q2.14 = Q10.22
+            pred_score = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
+            if(pred_score <= (threshold << 6)) pred_score = 0; //Q2.14
+        #ifdef SIM
+            if(output[84*nboxes+4+m] != pred_score) num_err++;
+        #else
+            output[84*nboxes+4+m] = pred_score; // prediction scores
+        #endif
+          }
+
+          //Update number of candidate boxes
+          nboxes++;
+        }
+      }
+    }
+  }
+#ifdef SIM
+  uart_printf("Layer done with %d errors\n", num_err);
+#endif
+}
+
 //send detection results back
-void send_data() {
+void send_data(unsigned int pos) {
 
   //Loop to send output of yolo layer
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image + (IMAGE_INPUT + NETWORK_INPUT_AUX + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20 + DATA_LAYER_22)*2;
+  char * fp_data_char = (char *) fp_data + pos*2;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
@@ -873,8 +1029,9 @@ int main(int argc, char **argv) {
   //Stores initial address of layers 9/10/14/19 output
   unsigned int data_pos_layer10 = data_pos + NETWORK_INPUT + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
   unsigned int data_pos_layer14 = data_pos_layer10 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13;
-  unsigned int data_pos_layer19 = data_pos_layer14 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17;
+  unsigned int data_pos_layer19 = data_pos_layer14 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16;
   unsigned int data_pos_layer9 = data_pos_layer19 + DATA_LAYER_19 + DATA_LAYER_20;
+  unsigned int box_pos = data_pos_layer9 + DATA_LAYER_9 + DATA_LAYER_22 + DATA_LAYER_23;
 
   //load data and reset DDR to zero
 #ifndef SIM
@@ -888,6 +1045,7 @@ int main(int argc, char **argv) {
   //resize input image
   uart_printf("\nResizing input image...\n");
   resize_image();
+#endif
 
   //layer1,2 (conv + maxpool)
   uart_printf("\nRunning layers 1 and 2...\n");
@@ -937,6 +1095,13 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 16...\n");
   conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD, LAYER_16_IGNOREPAD, 0);
 
+  //layer17 (yolo)
+  start = timer_get_count_us(TIMER);
+  uart_printf("\nRunning layer 17...\n");
+  yolo_layer(LAYER_16_W, yolo1_div, 1, data_pos, box_pos);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Total time = %d us\n", end-start);
+
   //layer19 (conv)
   data_pos = data_pos_layer14;
   uart_printf("\nRunning layer 19...\n");
@@ -949,14 +1114,17 @@ int main(int argc, char **argv) {
   //layer22 (conv)
   uart_printf("\nRunning layer 22...\n");
   conv_layer(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_TILING_W, LAYER_22_TILING_H, LAYER_22_MAXPOOL, LAYER_22_OUTPADD, LAYER_22_STRIDE, 1, LAYER_22_IGNOREPAD, 0);
-#else
-  weight_pos = WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15 + WEIGHTS_LAYER_16 + WEIGHTS_LAYER_19 + WEIGHTS_LAYER_22;
-  data_pos = data_pos_layer9 + DATA_LAYER_9;
-#endif
 
   //layer23 (conv)
   uart_printf("\nRunning layer 23...\n");
   conv_layer(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_TILING_W, LAYER_23_TILING_H, LAYER_23_MAXPOOL, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_22_OUTPADD, LAYER_23_IGNOREPAD, 0);
+
+  //layer24 (yolo)
+  start = timer_get_count_us(TIMER);
+  uart_printf("\nRunning layer 24...\n");
+  yolo_layer(LAYER_23_W, yolo2_div, 0, data_pos, box_pos);
+  end = timer_get_count_us(TIMER);
+  uart_printf("Total time = %d us\n", end-start);
 
   //return data
 #ifndef SIM
@@ -964,7 +1132,7 @@ int main(int argc, char **argv) {
   uart_printf("Total run time = %d ms\n", total_run_time/1000);
   uart_printf("Total data time = %d ms\n", total_data_time/1000);
   uart_printf("Total execution time = %d ms\n", total_time);
-  send_data();
+  send_data(box_pos);
 #endif
   uart_putc(4);
   return 0;
