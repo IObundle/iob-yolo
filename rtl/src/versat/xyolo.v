@@ -17,6 +17,7 @@ module xyolo # (
                 );
 
    //data
+   reg signed [2*DATA_W-1:0]                  int_acc;
    wire [2*DATA_W-1:0]                        shifted, adder;
    wire signed [DATA_W-1:0]                   op_a, op_b, op_c, act_fnc, shifted_half;
    wire [`MEM_ADDR_W-1:0]                     op_o;
@@ -28,11 +29,11 @@ module xyolo # (
    wire [`MEM_ADDR_W-1:0]		      iterations;
    wire [`PERIOD_W-1:0]                       period, delay;
    wire [`SHIFT_W-1:0]			      shift;
-   wire                                       bias, leaky, maxpool, bypass;
+   wire                                       bias, leaky, maxpool, bypass, accumulator;
 
    //accumulator load signal
    wire                                       ld_acc;
-   reg                                        ld_acc0, ld_acc1, ld_acc2;
+   reg                                        ld_acc0, ld_acc1, ld_acc2, ld_acc3;
 
    //maxpool data
    reg [1:0]                                  mp_cnt;
@@ -50,6 +51,7 @@ module xyolo # (
    assign leaky = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-1 -: 1];
    assign maxpool = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-2 -: 1];
    assign bypass = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-3 -: 1];
+   assign accumulator = configdata[`YOLO_CONF_BITS-1-3*`N_W-`MEM_ADDR_W-2*`PERIOD_W-`SHIFT_W-4 -: 1];
 
    //input selection
    xinmux # (
@@ -103,12 +105,14 @@ module xyolo # (
        ld_acc0 <= 1'b0;
        ld_acc1 <= 1'b0;
        ld_acc2 <= 1'b0;
+       ld_acc3 <= 1'b0;
        bias_reg <= {DATA_W{1'b0}};
        op_a_bypass <= {DATA_W{1'b0}};
      end else begin
        ld_acc0 <= ld_acc;
        ld_acc1 <= ld_acc0;
        ld_acc2 <= ld_acc1;
+       ld_acc3 <= ld_acc2;
        bias_reg <= op_c;
        op_a_bypass <= op_a;
      end
@@ -137,7 +141,7 @@ module xyolo # (
    assign acc_w = ld_acc1 ? op_c_reg : acc;
 
    //select accumulation initial value
-   assign adder_w = bias ? adder << shift : {2*DATA_W{1'b0}};
+   assign adder_w = bias ? adder << shift : accumulator ? int_acc : {2*DATA_W{1'b0}};
 
    //activation function
    assign shifted = dsp_out >> shift;
@@ -155,6 +159,13 @@ module xyolo # (
        result <= result_w;
      end
    assign mp_w = |mp_cnt & result>bypass_w ? result : bypass_w;
+
+   //internal accumulator
+   always @ (posedge clk, posedge addrgen_rst)
+     if(addrgen_rst)
+       int_acc <= {2*DATA_W{1'b0}};
+     else if(!ld_acc3 && mp_cnt==0)
+       int_acc <= result_w;
 
    //result
    assign result_w = maxpool ? mp_w : bypass_w;

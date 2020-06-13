@@ -288,6 +288,9 @@ class CYolo {
     void setBypass(int bypass) {
       MEMSET(versat_base, (this->yolo_base + YOLO_CONF_BYPASS), bypass);
     }
+    void setAcc(int acc) {
+      MEMSET(versat_base, (this->yolo_base + YOLO_CONF_ACC), acc);
+    }
 };//end class CYOLO
 #endif
 

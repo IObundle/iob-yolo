@@ -15,14 +15,14 @@
 
 //define tiling of each layer
 #ifdef SIM
-  #define LAYER_1_TILING_W 1 //must be divisor of 416
-  #define LAYER_1_TILING_H 1
-  #define LAYER_3_TILING_W 1 //must be divisor of 208
-  #define LAYER_3_TILING_H 1
-  #define LAYER_5_TILING_W 1 //must be divisor of 104
-  #define LAYER_5_TILING_H 1
-  #define LAYER_7_TILING_W 1  //must be divisor of 52
-  #define LAYER_7_TILING_H 1
+  #define LAYER_1_TILING_W 4 //must be divisor of 416
+  #define LAYER_1_TILING_H 4
+  #define LAYER_3_TILING_W 4 //must be divisor of 208
+  #define LAYER_3_TILING_H 4
+  #define LAYER_5_TILING_W 4 //must be divisor of 104
+  #define LAYER_5_TILING_H 4
+  #define LAYER_7_TILING_W 4  //must be divisor of 52
+  #define LAYER_7_TILING_H 4
   #define LAYER_9_TILING_W 1  //must be divisor of 26
   #define LAYER_9_TILING_H 1
   #define LAYER_11_TILING_W 1  //must be divisor of 13
@@ -1134,6 +1134,63 @@ int main(int argc, char **argv) {
   uart_printf("Total execution time = %d ms\n", total_time);
   send_data(box_pos);
 #endif
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  // test xyolo accumulator function by performing 3x3x3 convolution in 3 configs
+  ///////////////////////////////////////////////////////////////////////////////////////
+  globalClearConf();
+
+  //transfer pixels and weights to versat
+  int16_t i, pixels[27], weights[27], exp_res = 0;
+  for(i = 0; i < 3*3*3; i++) {
+    pixels[i] = rand()%50-25;
+    weights[i] = rand()%10-5;
+    stage[0].memA[0].write(i, pixels[i]);
+    stage[0].memA[1].write(i, weights[i]);
+    exp_res += pixels[i] * weights[i];
+  }
+
+  //first configuration
+  stage[0].memA[0].setDuty(9);
+  stage[0].memA[0].setPer(9);
+  stage[0].memA[0].setIncr(1);
+  stage[0].memA[0].setIter(1);
+  stage[0].memA[1].setDuty(9);
+  stage[0].memA[1].setPer(9);
+  stage[0].memA[1].setIncr(1);
+  stage[0].memA[1].setIter(1);
+  stage[0].yolo[0].setSelA(sMEMA[0]);
+  stage[0].yolo[0].setSelB(sMEMA[1]);
+  stage[0].yolo[0].setPer(9);
+  stage[0].yolo[0].setIter(1);
+  stage[0].yolo[0].setDelay(MEMP_LAT);
+  run();
+  while(done()==0);
+
+  //second configuration
+  stage[0].memA[0].setStart(9);
+  stage[0].memA[1].setStart(9);
+  stage[0].yolo[0].setAcc(1);
+  run();
+  while(done()==0);
+
+  //third configuration
+  stage[0].memA[0].setStart(18);
+  stage[0].memA[1].setStart(18);
+  stage[0].memA[3].setDuty(1);
+  stage[0].memA[3].setDelay(MEMP_LAT+YOLO_LAT-1);
+  stage[0].memA[3].setPer(9);
+  stage[0].memA[3].setIter(1);
+  stage[0].memA[3].setSel(sYOLO[0]);
+  stage[0].memA[3].setInWr(1);
+  run();
+  while(done()==0);
+
+  //check result
+  if(stage[0].memA[3].read(0) == exp_res) uart_printf("xyolo acc feature tested successfully!\n");
+  else uart_printf("xyolo acc feature failed!\n");
+
+  //finish
   uart_putc(4);
   return 0;
 }
