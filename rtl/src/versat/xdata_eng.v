@@ -94,11 +94,11 @@ module xdata_eng # (
       data_reg = {DATA_W{1'b0}};
       for (j=0; j < `nMEM; j= j+1)
 	    if (addr_reg == j[`nMEM_W-1:0])
-	      data_reg = data_bus[`DATA_MEM0A_B - 2*j*`DATAPATH_W  -: `DATAPATH_W]; //Port A
+	      data_reg = data_bus[`DATA_MEM0A_B - j*`DATAPATH_W  -: `DATAPATH_W]; //Port A
    end
    
    // read: select output data
-   wire [2*`nMEM-1:0] mem_done;
+   wire [`nMEM-1:0] mem_done;
    wire               io_done;
 `ifdef IO
    wire [2*`nVI-1:0]  read_port_done;
@@ -144,31 +144,31 @@ module xdata_eng # (
 
    // generate iterator
    genvar                                      i;
-
+   parameter integer MEM_ADDR_W[0 : `nMEM-1] = `MEM_ADDR_W_ARR;
    generate for (i=0; i < `nMEM; i=i+1) begin : mem_array
       xmem # (
-              .DATA_W(`DATAPATH_W)
+              .DATA_W(`DATAPATH_W),
+	      .MEM_ADDR_W(MEM_ADDR_W[i])
               )
       mem (
 	       .clk(clk),
 	       .rst(rst),
 
 	       .run(run_reg),
-	       .doneA(mem_done[2*i]),
-	       .doneB(mem_done[2*i+1]),
+	       .done(mem_done[i]),
 
 	       // data/control interface
 	       .valid(mem_valid[i]),
 	       .we(we),
-	       .addr(addr[`MEM_ADDR_W-1:0]),
+	       .addr(addr[MEM_ADDR_W[i]-1:0]),
 	       .rdata(rdata[`DATAPATH_W-1:0]),
 
 	       // flow interface
 	       .flow_in(data_bus),
-	       .flow_out(data_bus[`DATA_MEM0A_B - 2*i*`DATAPATH_W -: 2*`DATAPATH_W]),
+	       .flow_out(data_bus[`DATA_MEM0A_B - i*`DATAPATH_W -: `DATAPATH_W]),
 
 	       // configuration interface
-	       .config_bits(config_reg_shadow[`CONF_MEM0A_B - 2*i*`MEMP_CONF_BITS -: 2*`MEMP_CONF_BITS])
+	       .config_bits(config_reg_shadow[`CONF_MEM0A_B - i*`MEMP_CONF_BITS -: `MEMP_CONF_BITS])
 	       );
    end
    endgenerate

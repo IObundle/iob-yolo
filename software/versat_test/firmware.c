@@ -45,16 +45,16 @@ int main(int argc, char **argv) {
       stage[j].memA[0].write(i, pixels[25*j+i]);
     }
 
-    //write 3x3 kernel and bias in mem1
+    //write 3x3 kernel in mem1
     for(i = 0; i < 9; i++) {
       weights[9*j+i] = rand()%10-5;
       stage[j].memA[1].write(i, weights[9*j+i]);
     }
 
-    //write bias after weights of VERSAT 0
+    //write bias in mem2 of versat0
     if(j == 0) {
       bias = rand()%20-10;
-      stage[j].memA[1].write(9, bias);
+      stage[j].memA[2].write(0, bias);
     }
   }
   end = timer_get_count_us(TIMER);
@@ -83,9 +83,14 @@ int main(int argc, char **argv) {
 
   uart_printf("\n3D CONVOLUTION WITH 2-LOOP ADDRGEN\n");
 
-  //loop to configure versat stages
-  int delay = 0, in_1_alulite = sMEMA[1];
+  //configure mem2A to read bias
+  int delay = 0, in_1_alulite = sMEMA[2];
   start = timer_get_count_us(TIMER);
+  stage[0].memA[2].setIter(1);
+  stage[0].memA[2].setPer(9);
+  stage[0].memA[2].setDuty(9);
+
+  //loop to configure versat stages
   for(i = 0; i < nSTAGE; i++) {
 
     //configure mem0A to read 3x3 block from feature map
@@ -100,8 +105,8 @@ int main(int argc, char **argv) {
     stage[i].memA[1].setIter(1);
     stage[i].memA[1].setIncr(1);
     stage[i].memA[1].setDelay(delay);
-    stage[i].memA[1].setPer(10);
-    stage[i].memA[1].setDuty(10);
+    stage[i].memA[1].setPer(9);
+    stage[i].memA[1].setDuty(9);
 
     //configure muladd0
     stage[i].muladd[0].setSelA(sMEMA[0]);
@@ -165,14 +170,11 @@ int main(int argc, char **argv) {
   uart_printf("\n3D CONVOLUTION WITH 4-LOOP ADDRGEN\n");
 
   //loop to configure versat stages
-  delay = 0, in_1_alulite = sMEMB[1];
+  delay = 0, in_1_alulite = sMEMA[2];
   start = timer_get_count_us(TIMER);
 
-  //configure mem1B to read bias
-  stage[0].memB[1].setStart(9);
-  stage[0].memB[1].setIter(9);
-  stage[0].memB[1].setPer(9);
-  stage[0].memB[1].setDuty(9);
+  //configure mem2A of versat0 to read bias
+  stage[0].memA[2].setIter(9);
 
   for(i = 0; i < nSTAGE; i++) {
 
@@ -207,7 +209,7 @@ int main(int argc, char **argv) {
   stage[nSTAGE-1].memA[2].setStart(10);
   stage[nSTAGE-1].memA[2].setIter(9);
   stage[nSTAGE-1].memA[2].setIncr(1);
-  stage[nSTAGE-1].memA[2].setDelay(MEMP_LAT + 8 + MULADD_LAT + ALULITE_LAT + delay);
+  stage[nSTAGE-1].memA[2].setDelay(MEMP_LAT + MULADD_LAT + ALULITE_LAT + delay - 1);
   stage[nSTAGE-1].memA[2].setPer(9);
   stage[nSTAGE-1].memA[2].setDuty(1);
   stage[nSTAGE-1].memA[2].setSel(sALULITE[0]);

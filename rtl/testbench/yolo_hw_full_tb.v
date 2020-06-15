@@ -4,20 +4,58 @@
 `include "system.vh"
 `include "iob-uart.vh"
 
-//define constants
+//DDR initial constants
 `define NEW_W (416)
 `define NEW_H (312)
 `define ix_size (`NEW_W*4)
 `define iy_size (`NEW_H)
 `define dx_size (`NEW_W*2)
-`define dy_size (`NEW_H*4)
-`define IMAGE_INPUT (768*576*3)
-`define LAYER_1 (416*416*16)
-`define NETWORK_INPUT (418*418*3)
-`define STRINGIFY(x) `"x`"
+`define dy_size (`NEW_H*2)
 `define DDR_INITIAL (2**`MAINRAM_ADDR_W + (`ix_size+`iy_size+`dx_size+`dy_size)*2)
+
+//FM constants
+`define IMAGE_INPUT (768*576*3)
+`define NETWORK_INPUT_AUX (416*2*312*3)
+`define NETWORK_INPUT (418*418*3)
+`define LAYER_1 (210*210*16)
+`define LAYER_3 (106*106*32)
+`define LAYER_5 (54*54*64)
+`define LAYER_7 (28*28*128)
+`define LAYER_9 (28*28*256)
+`define LAYER_10 (15*15*256)
+`define LAYER_11 (14*14*512)
+`define LAYER_12 (15*15*512)
+`define LAYER_13 (13*13*1024)
+`define LAYER_14 (15*15*256)
+`define LAYER_15 (13*13*512)
+`define LAYER_16 (13*13*255)
+`define LAYER_19 (13*13*128)
+`define LAYER_20 (28*28*128)
+`define LAYER_22 (26*26*256)
+`define LAYER_23 (26*26*255)
+`define NBOXES 8
+`define YOLO (`NBOXES*84)
+`define TOTAL_FM ((`IMAGE_INPUT+`NETWORK_INPUT_AUX+`NETWORK_INPUT+`LAYER_1+`LAYER_3+`LAYER_5+`LAYER_7+`LAYER_9+`LAYER_10+`LAYER_11+`LAYER_12+`LAYER_13+`LAYER_14+`LAYER_15+`LAYER_16+`LAYER_19+`LAYER_20+`LAYER_22+`LAYER_23+`YOLO)*2)
+
+//Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*3*3*3)
-`define FILE_SIZE ((`DDR_INITIAL + (`WEIGHTS_LAYER_1+`IMAGE_INPUT+`NETWORK_INPUT+`LAYER_1)*2)/4)
+`define WEIGHTS_LAYER_3 (32 + 32*3*3*16)
+`define WEIGHTS_LAYER_5 (64 + 64*3*3*32)
+`define WEIGHTS_LAYER_7 (128 + 128*3*3*64)
+`define WEIGHTS_LAYER_9 (256 + 256*3*3*128)
+`define WEIGHTS_LAYER_11 (512 + 512*3*3*256)
+`define WEIGHTS_LAYER_13 (1024 + 1024*3*3*512)
+`define WEIGHTS_LAYER_14 (256 + 256*1*1*1024)
+`define WEIGHTS_LAYER_15 (512 + 512*3*3*256)
+`define WEIGHTS_LAYER_16 (255 + 255*1*1*512)
+`define WEIGHTS_LAYER_19 (128 + 128*1*1*256)
+`define WEIGHTS_LAYER_22 (256 + 256*3*3*384)
+`define WEIGHTS_LAYER_23 (255 + 255*1*1*256)
+`define TOTAL_WEIGHTS ((`WEIGHTS_LAYER_1+`WEIGHTS_LAYER_3+`WEIGHTS_LAYER_5+`WEIGHTS_LAYER_7+`WEIGHTS_LAYER_9+`WEIGHTS_LAYER_11+`WEIGHTS_LAYER_13+`WEIGHTS_LAYER_14+`WEIGHTS_LAYER_15+`WEIGHTS_LAYER_16+`WEIGHTS_LAYER_19+`WEIGHTS_LAYER_22+`WEIGHTS_LAYER_23)*2)
+
+//Total constants
+`define STRINGIFY(x) `"x`"
+`define FILE_SIZE ((`DDR_INITIAL + `TOTAL_WEIGHTS + `TOTAL_FM)/4)
 
 module yolo_hw_full_tb;
 
@@ -112,7 +150,7 @@ module yolo_hw_full_tb;
    wire 	       tester_rx_dv;   
 
    //define parameters
-   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "layer1.hex"};
+   parameter file_ddr = {`STRINGIFY(`FILES_DIR), "yolo.hex"};
    parameter file_size = `FILE_SIZE;
    parameter file_addr_w = `ADDR_W-`N_SLAVES_W;
 
