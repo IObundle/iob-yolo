@@ -1,0 +1,12 @@
+[submodule "submodules/iob-soc"]
+	path = submodules/iob-soc
+	url = git@github.com:IObundle/iob-soc
+[submodule "submodules/TIMER"]
+	path = submodules/TIMER
+	url = git@github.com:IObundle/iob-timer
+[submodule "submodules/ETHERNET"]
+	path = submodules/ETHERNET
+	url = git@github.com:IObundle/iob-eth
+[submodule "submodules/VERSAT"]
+	path = submodules/VERSAT
+	url = git@github.com:IObundle/iob-versat
