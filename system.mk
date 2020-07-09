@@ -6,17 +6,17 @@ SRAM_ADDR_W=13
 
 #DDR
 USE_DDR:=1
-RUN_DDR:=1
+RUN_DDR:=0
 DDR_ADDR_W:=30
 
 #ROM
 BOOTROM_ADDR_W:=12
 
 #Init memory (only works in simulation or FPGA not running DDR)
-INIT_MEM:=0
+INIT_MEM:=1
 
 #Choose Firmware (in SW_DIR)
-TEST:=firmware
+TEST:=system
 
 #Versat
 USE_VERSAT:=0
@@ -47,6 +47,10 @@ SIM_DIR:=$(HW_DIR)/simulation/$(SIMULATOR)
 FPGA_DIR:=$(HW_DIR)/fpga/$(FPGA_BOARD)
 
 SW_DIR:=$(ROOT_DIR)/software
+#submodule paths
+SUBMODULES_DIR=$(ROOT_DIR)/submodules
+
+SOC_DIR=$(SUBMODULES_DIR)/iob-soc
 SOC_SW_DIR:=$(SOC_DIR)/software
 
 FIRM_DIR:=$(SW_DIR)/$(TEST)
@@ -59,11 +63,7 @@ CONSOLE_SRC_DIR:=$(SOC_SW_DIR)/console
 
 PYTHON_DIR:=$(SOC_SW_DIR)/python
 
-#submodule paths
-SUBMODULES_DIR=$(ROOT_DIR)/submodules
-
 #IOb-SoC - special submodule
-SOC_DIR=$(SUBMODULES_DIR)/iob-soc
 SOC_SUBMODULES_DIR=$(SOC_DIR)/submodules
 
 # iob-soc submodules
@@ -130,6 +130,6 @@ endif
 PUDIM:=146.193.44.48
 BABA:=146.193.44.179
 
-REMOTE_ROOT_DIR=./sandbox/iob-soc-yolo
+REMOTE_ROOT_DIR=./sandbox/pm-iob-soc-yolo
 
 .PHONY: all
