@@ -13,7 +13,7 @@ DDR_ADDR_W:=30
 BOOTROM_ADDR_W:=12
 
 #Init memory (only works in simulation or FPGA not running DDR)
-INIT_MEM:=1
+INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
 TEST:=system
@@ -126,9 +126,18 @@ else ifeq ($(FPGA_BOARD),CYCLONEV-GT-DK)
 FPGA_BOARD_SERVER=$(PUDIM)
 endif
 
+ifeq ($(SIMULATOR),ncsim)
+SIM_SERVER=$(MICRO)
+endif
+
 #server list
 PUDIM:=146.193.44.48
 BABA:=146.193.44.179
+MICRO:=micro5.lx.it.pt
+
+#user list
+MICRO_USER=user14
+MICRO_ROOT_DIR=./$(USER)/sandbox/iob-soc
 
 REMOTE_ROOT_DIR=./sandbox/pm-iob-soc-yolo
 
