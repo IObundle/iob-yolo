@@ -28,7 +28,7 @@ $(MEM_DIR)/sp_rom/sp_rom.v
 
 #ram
 VSRC+=$(SOC_SRC_DIR)/int_mem.v \
-$(SRC_DIR)/sram.v \
+$(SOC_SRC_DIR)/sram.v \
 $(MEM_DIR)/tdp_ram/iob_tdp_ram.v
 
 #ddr
@@ -41,7 +41,7 @@ VSRC+=$(SRC_DIR)/system.v
 
 # peripherals
 periphs:
-	include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk
+	$(eval include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk)
 	$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/hardware/hardware.mk))
 
 # data files
