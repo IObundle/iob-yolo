@@ -1,0 +1,22 @@
+hardware/simulation/icarus/*.vcd
+hardware/simulation/ncsim/*.vcd
+
+hardware/fpga/AES-KU040-DB-G/ip
+hardware/fpga/AES-KU040-DB-G/*.log
+hardware/fpga/AES-KU040-DB-G/synth_system.bit
+
+# following lines ignore everything 'make' command produces
+hardware/simulation/icarus/*
+!hardware/simulation/icarus/Makefile
+
+software/bootloader/*
+!software/bootloader/boot.c
+!software/bootloader/boot.S
+!software/bootloader/Makefile
+
+software/*/*
+!software/*/firmware.c
+!software/*/firmware.S
+!software/*/Makefile
+
+software/periphs.h

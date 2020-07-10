@@ -137,7 +137,7 @@ MICRO:=micro5.lx.it.pt
 
 #user list
 MICRO_USER=user14
-MICRO_ROOT_DIR=./$(USER)/sandbox/iob-soc
+MICRO_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
 
 REMOTE_ROOT_DIR=./sandbox/pm-iob-soc-yolo
 
