@@ -33,7 +33,7 @@ $(MEM_DIR)/tdp_ram/iob_tdp_ram.v
 
 #ddr
 ifeq ($(USE_DDR),1)
-VSRC+=$(SOC_SRC_DIR)/ext_mem.v
+VSRC+=$(SRC_DIR)/ext_mem.v
 endif
 
 #system
