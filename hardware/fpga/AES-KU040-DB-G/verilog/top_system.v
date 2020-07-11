@@ -48,8 +48,8 @@ module top_system(
    wire 			sys_awvalid;
    wire 			sys_awready;
    //write
-   wire [31:0]                  sys_wdata;
-   wire [3:0] 			sys_wstrb;
+   wire [`MIG_BUS_W-1:0]        sys_wdata;
+   wire [`MIG_BUS_W/8-1:0] 	sys_wstrb;
    wire 			sys_wlast;
    wire 			sys_wvalid;
    wire 			sys_wready;
@@ -72,7 +72,7 @@ module top_system(
    wire 			sys_arready;
    //read
    wire [0:0]			sys_rid;
-   wire [`DATA_W-1:0]           sys_rdata;   
+   wire [`MIG_BUS_W-1:0]        sys_rdata;   
    wire [1:0]                   sys_rresp;   
    wire 			sys_rlast;
    wire 			sys_rvalid;
@@ -92,8 +92,8 @@ module top_system(
    wire 			ddr_awvalid;
    wire 			ddr_awready;
    //Write data
-   wire [31:0] 			ddr_wdata;
-   wire [3:0] 			ddr_wstrb;
+   wire [`MIG_BUS_W-1:0]	ddr_wdata;
+   wire [`MIG_BUS_W/8-1:0] 	ddr_wstrb;
    wire 			ddr_wlast;
    wire 			ddr_wvalid;
    wire 			ddr_wready;
@@ -116,7 +116,7 @@ module top_system(
    wire 			ddr_arready;
    //Read data
    wire [3:0]			ddr_rid;
-   wire [31:0] 			ddr_rdata;
+   wire [`MIG_BUS_W-1:0]	ddr_rdata;
    wire [1:0] 			ddr_rresp;
    wire 			ddr_rlast;
    wire 			ddr_rvalid;

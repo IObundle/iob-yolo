@@ -73,6 +73,9 @@ INTERCON_DIR:=$(CACHE_DIR)/submodules/iob-interconnect
 MEM_DIR:=$(CACHE_DIR)/submodules/iob-mem
 AXI_MEM_DIR:=$(CACHE_DIR)/submodules/axi-mem
 
+#MIG Bus - NOTE: need to manually change fpga .tcl
+MIG_BUS_W:=256
+
 #defines
 DEFINE+=$(define)BOOTROM_ADDR_W=$(BOOTROM_ADDR_W)
 DEFINE+=$(define)SRAM_ADDR_W=$(SRAM_ADDR_W)
@@ -80,6 +83,7 @@ DEFINE+=$(define)FIRM_ADDR_W=$(FIRM_ADDR_W)
 ifeq ($(USE_DDR),1)
 DEFINE+=$(define)USE_DDR
 DEFINE+=$(define)DDR_ADDR_W=$(DDR_ADDR_W)
+DEFINE+=$(define)MIG_BUS_W=$(MIG_BUS_W)
 ifeq ($(RUN_DDR),1)
 DEFINE+=$(define)RUN_DDR
 endif

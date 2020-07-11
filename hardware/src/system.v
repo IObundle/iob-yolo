@@ -25,8 +25,8 @@ module system
    input                    m_axi_awready,
 
    //write
-   output [`DATA_W-1:0]     m_axi_wdata,
-   output [`DATA_W/8-1:0]   m_axi_wstrb,
+   output [`MIG_BUS_W-1:0]  m_axi_wdata,
+   output [`MIG_BUS_W/8-1:0]m_axi_wstrb,
    output                   m_axi_wlast,
    output                   m_axi_wvalid, 
    input                    m_axi_wready,
@@ -52,7 +52,7 @@ module system
 
    //read
    input [0:0]              m_axi_rid,
-   input [`DATA_W-1:0]      m_axi_rdata,
+   input [`MIG_BUS_W-1:0]   m_axi_rdata,
    input [1:0]              m_axi_rresp,
    input                    m_axi_rlast, 
    input                    m_axi_rvalid, 

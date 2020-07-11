@@ -86,8 +86,8 @@ module system_tb;
    wire                    ddr_awvalid;
    wire                    ddr_awready;
    //Write data
-   wire [31:0]             ddr_wdata;
-   wire [3:0]              ddr_wstrb;
+   wire [`MIG_BUS_W-1:0]   ddr_wdata;
+   wire [`MIG_BUS_W/8-1:0] ddr_wstrb;
    wire                    ddr_wlast;
    wire                    ddr_wvalid;
    wire                    ddr_wready;
@@ -98,7 +98,7 @@ module system_tb;
    wire                    ddr_bready;
    //Read address
    wire [0:0]              ddr_arid;
-   wire [`DDR_ADDR_W-1:0] ddr_araddr;
+   wire [`DDR_ADDR_W-1:0]  ddr_araddr;
    wire [7:0]              ddr_arlen;
    wire [2:0]              ddr_arsize;
    wire [1:0]              ddr_arburst;
@@ -110,7 +110,7 @@ module system_tb;
    wire                    ddr_arready;
    //Read data
    wire [7:0]              ddr_rid;
-   wire [31:0]             ddr_rdata;
+   wire [`MIG_BUS_W-1:0]             ddr_rdata;
    wire [1:0]              ddr_rresp;
    wire                    ddr_rlast;
    wire                    ddr_rvalid;
@@ -214,7 +214,7 @@ module system_tb;
        .FILE("firmware.hex"),
  `endif
        .FILE_SIZE(2**(`FIRM_ADDR_W-2)),
-       .DATA_WIDTH (`DATA_W),
+       .DATA_WIDTH (`MIG_BUS_W),
        .ADDR_WIDTH (`DDR_ADDR_W-5) //Simulation with full sized DDR takes some time to start
        )
    ddr_model_mem(

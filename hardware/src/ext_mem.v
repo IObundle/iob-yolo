@@ -33,8 +33,8 @@ module ext_mem
    output                   axi_awvalid,
    input                    axi_awready,
    //Write
-   output [`DATA_W-1:0]     axi_wdata,
-   output [`DATA_W/8-1:0]   axi_wstrb,
+   output [`MIG_BUS_W-1:0]  axi_wdata,
+   output [`MIG_BUS_W/8-1:0]axi_wstrb,
    output                   axi_wlast,
    output                   axi_wvalid, 
    input                    axi_wready,
@@ -56,7 +56,7 @@ module ext_mem
    input                    axi_arready,
    //Read
    input [0:0]              axi_rid,
-   input [`DATA_W-1:0]      axi_rdata,
+   input [`MIG_BUS_W-1:0]   axi_rdata,
    input [1:0]              axi_rresp,
    input                    axi_rlast, 
    input                    axi_rvalid, 
@@ -201,7 +201,8 @@ module ext_mem
       .WTBUF_DEPTH_W(4), //FIFO's depth
       .BE_ADDR_W (`DDR_ADDR_W),
       .CTRL_CACHE (0),
-      .CTRL_CNT(0)       //Remove counters
+      .CTRL_CNT(0),       //Remove counters
+      .BE_DATA_W(`MIG_BUS_W)
       )
    l2cache (
             .clk   (clk),
