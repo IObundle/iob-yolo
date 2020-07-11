@@ -6,7 +6,7 @@ include $(CACHE_DIR)/software/software.mk
 CFLAGS+=-Wl,-Bstatic,-T,../template.lds,-Map,boot.map,--strip-debug
 
 #specific sources
-SRC+=$(BOOT_SRC_DIR)/boot.S $(BOOT_SRC_DIR)/boot.c 
+SRC+=$(BOOT_SRC_DIR)/boot.S boot.c 
 
 run: boot.elf
 
