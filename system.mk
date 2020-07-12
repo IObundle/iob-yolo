@@ -1,4 +1,4 @@
-#FIRMWARE
+FIRMWARE
 FIRM_ADDR_W:=13
 
 #SRAM
@@ -135,8 +135,8 @@ SIM_SERVER=$(MICRO)
 endif
 
 #server list
-PUDIM:=146.193.44.48
-BABA:=146.193.44.179
+PUDIM:=pudim-flan.iobundle.com
+BABA:=baba-de-camelo.iobundle.com
 MICRO:=micro5.lx.it.pt
 
 #user list
