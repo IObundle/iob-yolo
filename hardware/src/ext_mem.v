@@ -4,6 +4,20 @@
 `include "system.vh"
 `include "interconnect.vh"
 
+// REQ/RESP MIG BUS DEFINES
+`define REQ_MIG_BUS_W (`VALID_W+ADDR_W+`MIG_BUS_W+(`MIG_BUS_W/8))
+`define RESP_MIG_BUS_W (`MIG_BUS_W+`READY_W)
+
+`define WDATA_MIG_BUS_P (`MIG_BUS_W/8)
+`define ADDR_MIG_BUS_P (`WDATA_MIG_BUS_P + `MIG_BUS_W)
+
+`define valid_MIG_BUS(I) (I+1)*`REQ_MIG_BUS_W-1
+`define address_MIG_BUS(I,W,LSB) I*`REQ_MIG_BUS_W+`ADDR_MIG_BUS_P+W-1 -: W-LSB
+`define wdata_MIG_BUS(I) I*`REQ_MIG_BUS_W+`WDATA_MIG_BUS_P +: `MIG_BUS_W
+`define wstrb_MIG_BUS(I) I*`REQ_MIG_BUS_W +: (`MIG_BUS_W/8)
+`define rdata_MIG_BUS(I) I*`RESP_MIG_BUS_W+`RDATA_P +: `MIG_BUS_W
+`define ready_MIG_BUS(I) I*`RESP_MIG_BUS_W
+
 module ext_mem
   #(
     parameter ADDR_W=32,
@@ -67,6 +81,7 @@ module ext_mem
    output                   axi_rready
    );
 
+   
 `ifdef RUN_DDR_USE_SRAM
    //
    // INSTRUCTION CACHE
@@ -81,8 +96,8 @@ module ext_mem
    assign i_resp = icache_fe_resp;
 
    // Back-end bus
-   wire [`REQ_W-1:0]      icache_be_req;
-   wire [`RESP_W-1:0]     icache_be_resp;
+   wire [`REQ_MIG_BUS_W-1:0]      icache_be_req;
+   wire [`RESP_MIG_BUS_W-1:0]     icache_be_resp;
 
    // Instruction cache instance
    iob_cache # (
@@ -92,7 +107,8 @@ module ext_mem
                 .WORD_OFF_W(4),    //Word Offset (number of words per line)
                 .WTBUF_DEPTH_W(4), //FIFO's depth
                 .CTRL_CACHE (0),
-                .CTRL_CNT(0)       //Removes counters - Needed to find a way to access the icache controller (using c-drive ctrl functions will always result in the access of dcache) - Change this to 1 when solution found.
+                .CTRL_CNT(0),       //Removes counters - Needed to find a way to access the icache controller (using c-drive ctrl functions will always result in the access of dcache) - Change this to 1 when solution found.
+		.BE_DATA_W(`MIG_BUS_W)
                 )
    icache (
            .clk   (clk),
@@ -107,12 +123,12 @@ module ext_mem
            .ready (icache_fe_resp[`ready(0)]),
 
            // Back-end interface
-           .mem_valid (icache_be_req[`valid(0)]),
-           .mem_addr  (icache_be_req[`address(0, `DDR_ADDR_W, 0)]),
-           .mem_wdata (icache_be_req[`wdata(0)]),
-           .mem_wstrb (icache_be_req[`wstrb(0)]),
-           .mem_rdata (icache_be_resp[`rdata(0)]),
-           .mem_ready (icache_be_resp[`ready(0)])
+           .mem_valid (icache_be_req[`valid_MIG_BUS(0)]),
+           .mem_addr  (icache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W, 0)]),
+           .mem_wdata (icache_be_req[`wdata_MIG_BUS(0)]),
+           .mem_wstrb (icache_be_req[`wstrb_MIG_BUS(0)]),
+           .mem_rdata (icache_be_resp[`rdata_MIG_BUS(0)]),
+           .mem_ready (icache_be_resp[`ready_MIG_BUS(0)])
            );
 `endif
    //
@@ -127,8 +143,8 @@ module ext_mem
    assign d_resp = dcache_fe_resp;
 
    // Back-end bus
-   wire [`REQ_W-1:0]      dcache_be_req;
-   wire [`RESP_W-1:0]     dcache_be_resp;
+   wire [`REQ_MIG_BUS_W-1:0]      dcache_be_req;
+   wire [`RESP_MIG_BUS_W-1:0]     dcache_be_resp;
 
    // Data cache instance
    iob_cache # 
@@ -138,7 +154,8 @@ module ext_mem
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
       .WTBUF_DEPTH_W(4), //FIFO's depth
-      .CTRL_CNT(1)       //Counters for hits and misses (since previous parameter is 0)
+      .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
+      .BE_DATA_W(`MIG_BUS_W)
       )
    dcache (
            .clk   (clk),
@@ -151,34 +168,38 @@ module ext_mem
            .wstrb (dcache_fe_req[`wstrb(0)]),
            .rdata (dcache_fe_resp[`rdata(0)]),
            .ready (dcache_fe_resp[`ready(0)]),
-
+	   
            // Back-end interface
-           .mem_valid (dcache_be_req[`valid(0)]),
-           .mem_addr  (dcache_be_req[`address(0,`DDR_ADDR_W, 0)]),
-           .mem_wdata (dcache_be_req[`wdata(0)]),
-           .mem_wstrb (dcache_be_req[`wstrb(0)]),
-           .mem_rdata (dcache_be_resp[`rdata(0)]),
-           .mem_ready (dcache_be_resp[`ready(0)])
+           .mem_valid (dcache_be_req[`valid_MIG_BUS(0)]),
+           .mem_addr  (dcache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W, 0)]),
+           .mem_wdata (dcache_be_req[`wdata_MIG_BUS(0)]),
+           .mem_wstrb (dcache_be_req[`wstrb_MIG_BUS(0)]),
+           .mem_rdata (dcache_be_resp[`rdata_MIG_BUS(0)]),
+           .mem_ready (dcache_be_resp[`ready_MIG_BUS(0)])
            );
 
    // Merge caches back-ends
-   wire [`REQ_W-1:0]      l2cache_req;
-   wire [`RESP_W-1:0]     l2cache_resp;
+   wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
+   wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
 
 `ifdef RUN_DDR_USE_SRAM
-   assign icache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
+   // assign icache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
+   assign icache_be_req[(`MIG_BUS_W/8)+`MIG_BUS_W+`ADDR_W-1 -: `ADDR_W-`DDR_ADDR_W] = 0;
+   
 `endif
-   assign dcache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
-
+   // assign dcache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
+   assign dcache_be_req[(`MIG_BUS_W/8)+`MIG_BUS_W+`ADDR_W-1 -: `ADDR_W-`DDR_ADDR_W] = 0;
+   
    
    
    merge
      #(
 `ifdef RUN_DDR_USE_SRAM
-      .N_MASTERS(2)
+     .N_MASTERS(2),
 `else
-      .N_MASTERS(1)
+       .N_MASTERS(1),
 `endif
+       .DATA_W(`MIG_BUS_W)
        )
      merge_i_d_buses_into_l2
        (
@@ -206,6 +227,7 @@ module ext_mem
       .BE_ADDR_W (`DDR_ADDR_W),
       .CTRL_CACHE (0),
       .CTRL_CNT(0),       //Remove counters
+      .FE_DATA_W(`MIG_BUS_W),
       .BE_DATA_W(`MIG_BUS_W)
       )
    l2cache (
@@ -213,13 +235,14 @@ module ext_mem
             .reset (rst),
       
             // Native interface
-            .valid    (l2cache_req[`valid(0)]),
-            .addr     (l2cache_req[`address(0, `DDR_ADDR_W+1, 2)]),
-            .wdata    (l2cache_req[`wdata(0)]),
-            .wstrb    (l2cache_req[`wstrb(0)]),
-            .rdata    (l2cache_resp[`rdata(0)]),
-            .ready    (l2cache_resp[`ready(0)]),
+            .valid    (l2cache_req[`valid_MIG_BUS(0)]),
+            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1,$clog2(`MIG_BUS_W/8))]),
+            .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
+	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
+            .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
+            .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
 
+	    
             // AXI interface
             // Address write
             .axi_awid(axi_awid), 
