@@ -1,90 +1,68 @@
 #include "system.h"
+#include "periphs.h"
+
 #include "iob-uart.h"
 #include "iob_timer.h"
 
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+//Set DDR pointer
+#ifdef PCSIM
+static int ddr[10000];
+#else
+  #if (USE_DDR==1)
+    #if (RUN_DDR==0)
+      int *ddr = (int*) EXTRA_BASE;
+    #else
+      int *ddr = (int*) (1<<(FIRM_ADDR_W+1));
+    #endif
+  #endif
+#endif //ifdef PCSIM
 
-#define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
-#define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
-#define WEIGHTS (DDR_MEM + 0x00004000) //weights 0x0000 4000 to 0x0280 3FFF
-#define DATA (DDR_MEM + 0x02804000) //data 0x0280 4000 to 0x0500 3FFF
-#define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
 
-//note that the DDR is only addresses with 0x8000 0000 check this
+int main()
+{ 
+  //init uart 
+  uart_init(UART_BASE,FREQ/BAUD);   
+  
+  //timer variables
+  unsigned int start, end;
 
-int main() {
+  timer_reset(TIMER_BASE);
+  start = timer_time_us(TIMER_BASE);
 
-  //init UART
-  uart_init(UART, UART_CLK_FREQ/UART_BAUD_RATE);
+  uart_printf("\n\n\nHello world!\n\n\n");
 
-  //send init message
-  uart_printf("\nDDR TEST\n");
-  uart_txwait();
+#if (USE_DDR==1)
+  int i=0;
+  int N=1024;
+  int count=0;
+  //test DDR:
+  uart_printf("Performing DDR test:\n");
 
-  //Write loops
+  uart_printf("\tWriting to DDR...");
+  
+  for(i=0;i<N;i++){
+    ddr[i] = N-i;
+  }
 
-  //Weights vector
-  int i = 0;
-  volatile int *weights = (volatile int*) (WEIGHTS);
-  int num_weights = (DATA - WEIGHTS)/sizeof(int);
-  int w_step = num_weights/100000;
-  uart_printf("\nWriting weights to DDR...\n");
-  unsigned int start = timer_get_count_us(TIMER);
-  for(i = 0; i < num_weights; i += w_step) weights[i] = i;
-  unsigned int end = timer_get_count_us(TIMER);
-  uart_printf("done in %d us\n", end-start);
-  timer_reset(TIMER);
+  uart_printf("done!\n");
+  
+  uart_printf("\tReading from DDR...\n");
+  int j;
 
-  //Data vector
-  volatile int *data = (volatile int*) (DATA);
-  int num_data = (DATA - WEIGHTS)/sizeof(int);
-  int d_step = num_data/100000;
-  uart_printf("\nWriting data to DDR...\n");
-  start = timer_get_count_us(TIMER);
-  for( i = 0; i < num_data; i += d_step) data[i] = i;
-  end = timer_get_count_us(TIMER);
-  uart_printf("done in %d us\n", end-start);
-  uart_printf("num_weights = %d\tnum_data = %d\n", num_weights, num_data);
-  timer_reset(TIMER);
-
-  //Read loops
-  int w = -1, d = -1;
-  int err=0;
-  int acc=0;
-
-  //Weights vector
-  uart_printf("\nReading and verifying weights...\n");
-  start = timer_get_count_us(TIMER);
-  for(i = 0; i < num_weights; i += w_step) {
-    w = weights[i];
-    acc++;
-    if(w != i) {
-      uart_printf("Wrong weight %d: %d at pos %p\n", i, w, weights[i]);
-      err++;
+  for(i=0;i<N;i++){
+    if(ddr[i] != (N-i)){
+      uart_printf("ddr[%d]=%d, expected %d\n", i, ddr[i], N-i);
+      count++;
     }
   }
-  end = timer_get_count_us(TIMER);
-  uart_printf("done in %d us\n", end-start);
-  timer_reset(TIMER);
 
-  //Data vector
-  uart_printf("\nReading and verifying data...\n");
-  start = timer_get_count_us(TIMER);
-  for(i = 0; i < num_data; i += d_step){
-    d = data[i];
-    acc++;
-    if(d != i) {
-      uart_printf("Wrong data %d: %d at pos %p\n", i, d, data[i]);
-      err++;
-    }
-  }
-  end = timer_get_count_us(TIMER);
-  uart_printf("done in %d us\n", end-start);
-  uart_printf("\nDDR Test terminated with %d errors out of %d read operations\n", err, acc);
+  uart_printf("Test complete with %d errors out of %d\n", count, N);
 
-  //end program
-  uart_putc(4);
-  return 0;
+  
+#endif
+  
+  end = timer_time_us(TIMER_BASE);
+
+  uart_printf("Elapsed time: %dus\n", (end-start));
+
 }

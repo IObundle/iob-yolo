@@ -17,15 +17,25 @@ HDR=$(SW_DIR)/system.h
 #sources (none so far)
 #SRC=$(SW_DIR)/*.c
 
-#compiler settings
-TOOLCHAIN_PREFIX:=riscv32-unknown-elf-
-CFLAGS:=-Os -ffreestanding -nostdlib -march=rv32im -mabi=ilp32 --std=gnu99
+# PCSIM: runs firmware on host machine
+ifeq ($(PCSIM),1)
+  CFLAGS:=-Os --std=gnu99 -g
+  #include peripherals
+  # UART special case
+  include $(UART_DIR)/software/pc/pc.mk
+  # Other peripherals 
+  dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/pc/pc.mk))
+else #Compile for riscv
+  #compiler settings
+  TOOLCHAIN_PREFIX:=riscv32-unknown-elf-
+  CFLAGS:=-Os -ffreestanding -nostdlib -march=rv32im -mabi=ilp32 --std=gnu99
 
-#include peripherals
-# UART special case
-include $(UART_DIR)/software/embedded/embedded.mk
-# Other peripherals 
-dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
+  #include peripherals
+  # UART special case
+  include $(UART_DIR)/software/embedded/embedded.mk
+  # Other peripherals 
+  dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
+endif
 
 $(SW_DIR)/periphs.h:
 	$(shell echo "#define UART_BASE (1<<P) |(UART<<(ADDR_W-2-N_SLAVES_W))" >> ../periphs.h)

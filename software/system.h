@@ -1,7 +1,7 @@
-#define NEEDS_BIT(N, B)     (((unsigned long)N >> B) > 0)
+#define NEEDS_BIT(N, B)     ((((unsigned long)N >> B) > 0)&&(N>(1<<B)))
 
 #define BITS_TO_REPRESENT(N)                            \
-        (NEEDS_BIT(N,  0) + NEEDS_BIT(N,  1) + \
+        (1 + NEEDS_BIT(N,  1) + \
          NEEDS_BIT(N,  2) + NEEDS_BIT(N,  3) + \
          NEEDS_BIT(N,  4) + NEEDS_BIT(N,  5) + \
          NEEDS_BIT(N,  6) + NEEDS_BIT(N,  7) + \

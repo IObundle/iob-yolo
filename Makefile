@@ -46,6 +46,9 @@ firmware:
 bootloader: firmware
 	make -C $(BOOT_DIR) BAUD=$(BAUD)
 
+pcsim:
+	make -C $(FIRM_DIR) pcsim BAUD=$(BAUD) PCSIM=1
+
 clean: 
 ifeq ($(SIMULATOR),ncsim)
 	ssh $(MICRO_USER)@$(SIM_SERVER) "cd $(MICRO_ROOT_DIR); make -C $(SIM_DIR) clean"
