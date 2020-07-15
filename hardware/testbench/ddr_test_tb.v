@@ -3,7 +3,7 @@
 `include "system.vh"
 `include "iob_uart.vh"
 
-module system_tb;
+module ddr_test_tb;
 
    //clock
    reg clk = 1;

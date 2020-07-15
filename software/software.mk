@@ -33,6 +33,11 @@ else #Compile for riscv
   #include peripherals
   # UART special case
   include $(UART_DIR)/software/embedded/embedded.mk
+
+  # Boot sources do not include peripheral sources
+  BOOT_SRC:=$(SRC)
+  BOOT_INCLUDE:=$(INCLUDE)
+
   # Other peripherals 
   dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
 endif

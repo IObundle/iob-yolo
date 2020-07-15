@@ -16,7 +16,7 @@ BOOTROM_ADDR_W:=12
 INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
-TEST:=ddr_test
+TEST:=eth_repeat
 
 #Versat
 USE_VERSAT:=0
@@ -25,7 +25,7 @@ USE_VERSAT:=0
 VCD:=0
 
 #Peripheral list (must match respective submodule name)
-PERIPHERALS:=TIMER #UART is implicit
+PERIPHERALS:=TIMER ETHERNET #UART is implicit
 
 #RTL simulator
 SIMULATOR:=icarus

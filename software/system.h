@@ -19,7 +19,7 @@
          NEEDS_BIT(N, 30) + NEEDS_BIT(N, 31)   \
         )
 
-//Architecural parameters
+//Architectural parameters
 #define ADDR_W 32
 #define N_SLAVES_W BITS_TO_REPRESENT(N_SLAVES)
 

@@ -3,68 +3,81 @@
 `include "iob_uart.vh"
 `include "interconnect.vh"
 `include "iob_timer.vh"
+`include "iob_eth_defs.vh"
 
 module system 
   (
-   input                    clk,
-   input                    reset,
-   output                   trap,
+   input 		     clk,
+   input 		     reset,
+   output 		     trap,
 
 `ifdef USE_DDR //AXI MASTER INTERFACE
 
    //address write
-   output [0:0]             m_axi_awid, 
-   output [`DDR_ADDR_W-1:0] m_axi_awaddr,
-   output [7:0]             m_axi_awlen,
-   output [2:0]             m_axi_awsize,
-   output [1:0]             m_axi_awburst,
-   output [0:0]             m_axi_awlock,
-   output [3:0]             m_axi_awcache,
-   output [2:0]             m_axi_awprot,
-   output [3:0]             m_axi_awqos,
-   output                   m_axi_awvalid,
-   input                    m_axi_awready,
+   output [0:0] 	     m_axi_awid, 
+   output [`DDR_ADDR_W-1:0]  m_axi_awaddr,
+   output [7:0] 	     m_axi_awlen,
+   output [2:0] 	     m_axi_awsize,
+   output [1:0] 	     m_axi_awburst,
+   output [0:0] 	     m_axi_awlock,
+   output [3:0] 	     m_axi_awcache,
+   output [2:0] 	     m_axi_awprot,
+   output [3:0] 	     m_axi_awqos,
+   output 		     m_axi_awvalid,
+   input 		     m_axi_awready,
 
    //write
-   output [`MIG_BUS_W-1:0]  m_axi_wdata,
-   output [`MIG_BUS_W/8-1:0]m_axi_wstrb,
-   output                   m_axi_wlast,
-   output                   m_axi_wvalid, 
-   input                    m_axi_wready,
+   output [`MIG_BUS_W-1:0]   m_axi_wdata,
+   output [`MIG_BUS_W/8-1:0] m_axi_wstrb,
+   output 		     m_axi_wlast,
+   output 		     m_axi_wvalid, 
+   input 		     m_axi_wready,
 
    //write response
-   input [0:0]              m_axi_bid,
-   input [1:0]              m_axi_bresp,
-   input                    m_axi_bvalid,
-   output                   m_axi_bready,
+   input [0:0] 		     m_axi_bid,
+   input [1:0] 		     m_axi_bresp,
+   input 		     m_axi_bvalid,
+   output 		     m_axi_bready,
   
    //address read
-   output [0:0]             m_axi_arid,
-   output [`DDR_ADDR_W-1:0] m_axi_araddr, 
-   output [7:0]             m_axi_arlen,
-   output [2:0]             m_axi_arsize,
-   output [1:0]             m_axi_arburst,
-   output [0:0]             m_axi_arlock,
-   output [3:0]             m_axi_arcache,
-   output [2:0]             m_axi_arprot,
-   output [3:0]             m_axi_arqos,
-   output                   m_axi_arvalid, 
-   input                    m_axi_arready,
+   output [0:0] 	     m_axi_arid,
+   output [`DDR_ADDR_W-1:0]  m_axi_araddr, 
+   output [7:0] 	     m_axi_arlen,
+   output [2:0] 	     m_axi_arsize,
+   output [1:0] 	     m_axi_arburst,
+   output [0:0] 	     m_axi_arlock,
+   output [3:0] 	     m_axi_arcache,
+   output [2:0] 	     m_axi_arprot,
+   output [3:0] 	     m_axi_arqos,
+   output 		     m_axi_arvalid, 
+   input 		     m_axi_arready,
 
    //read
-   input [0:0]              m_axi_rid,
-   input [`MIG_BUS_W-1:0]   m_axi_rdata,
-   input [1:0]              m_axi_rresp,
-   input                    m_axi_rlast, 
-   input                    m_axi_rvalid, 
-   output                   m_axi_rready,
+   input [0:0] 		     m_axi_rid,
+   input [`MIG_BUS_W-1:0]    m_axi_rdata,
+   input [1:0] 		     m_axi_rresp,
+   input 		     m_axi_rlast, 
+   input 		     m_axi_rvalid, 
+   output 		     m_axi_rready,
 `endif //  `ifdef USE_DDR
 
    //UART
-   output                   uart_txd,
-   input                    uart_rxd,
-   output                   uart_rts,
-   input                    uart_cts
+   output 		     uart_txd,
+   input 		     uart_rxd,
+   output 		     uart_rts,
+   input 		     uart_cts,
+   
+   //ETHERNET
+   output 		     ETH_PHY_RESETN,
+   input 		     PLL_LOCKED,
+
+   input 		     RX_CLK,
+   input [3:0] 		     RX_DATA,
+   input 		     RX_DV,
+
+   input 		     TX_CLK,
+   output 		     TX_EN,
+   output [3:0] 	     TX_DATA
    );
 
    localparam ADDR_W=32;
@@ -339,6 +352,35 @@ module system
       .wdata(slaves_req[`wdata(`TIMER)]),
       .rdata(slaves_resp[`rdata(`TIMER)]),
       .ready(slaves_resp[`ready(`TIMER)])
+      );
+
+   //
+   // ETHERNET
+   //
+   iob_eth eth
+     (
+      .clk      (clk),
+      .rst      (reset),
+
+      //cpu interface
+      .sel(slaves_req[`valid(`ETHERNET)]),
+      .addr(slaves_req[`address(`ETHERNET, `ETH_ADDR_W+2, 2)]),
+      .data_in(slaves_req[`wdata(`ETHERNET)]),
+      .we(|(slaves_req[`wstrb(`ETHERNET)])),
+      .data_out(slaves_resp[`rdata(`ETHERNET)]),
+      .ready(slaves_resp[`ready(`ETHERNET)]),
+
+      // ethernet interface
+      .ETH_PHY_RESETN(ETH_PHY_RESETN),
+      .PLL_LOCKED(PLL_LOCKED),
+
+      .RX_CLK(RX_CLK),
+      .RX_DATA(RX_DATA),
+      .RX_DV(RX_DV),
+
+      .TX_CLK(TX_CLK),
+      .TX_DATA(TX_DATA),
+      .TX_EN(TX_EN)
       );
    
 endmodule
