@@ -12,7 +12,7 @@
 `define ADDR_MIG_BUS_P (`WDATA_MIG_BUS_P + `MIG_BUS_W)
 
 `define valid_MIG_BUS(I) (I+1)*`REQ_MIG_BUS_W-1
-`define address_MIG_BUS(I,W,LSB) I*`REQ_MIG_BUS_W+`ADDR_MIG_BUS_P+W-1 -: W-LSB
+`define address_MIG_BUS(I,W) I*`REQ_MIG_BUS_W+`ADDR_MIG_BUS_P+W-1 -: W
 `define wdata_MIG_BUS(I) I*`REQ_MIG_BUS_W+`WDATA_MIG_BUS_P +: `MIG_BUS_W
 `define wstrb_MIG_BUS(I) I*`REQ_MIG_BUS_W +: (`MIG_BUS_W/8)
 `define rdata_MIG_BUS(I) I*`RESP_MIG_BUS_W+`RDATA_P +: `MIG_BUS_W
@@ -116,7 +116,7 @@ module ext_mem
 
            // Front-end interface
            .valid (icache_fe_req[`valid(0)]),
-           .addr  (icache_fe_req[`address(0, `DDR_ADDR_W+1, 2)]),
+           .addr  (icache_fe_req[`address(0, `DDR_ADDR_W+1)-2]),
            .wdata (icache_fe_req[`wdata(0)]),
            .wstrb (icache_fe_req[`wstrb(0)]),
            .rdata (icache_fe_resp[`rdata(0)]),
@@ -124,7 +124,7 @@ module ext_mem
 
            // Back-end interface
            .mem_valid (icache_be_req[`valid_MIG_BUS(0)]),
-           .mem_addr  (icache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W, 0)]),
+           .mem_addr  (icache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W)]),
            .mem_wdata (icache_be_req[`wdata_MIG_BUS(0)]),
            .mem_wstrb (icache_be_req[`wstrb_MIG_BUS(0)]),
            .mem_rdata (icache_be_resp[`rdata_MIG_BUS(0)]),
@@ -163,7 +163,7 @@ module ext_mem
 
            // Front-end interface
            .valid (dcache_fe_req[`valid(0)]),
-           .addr  (dcache_fe_req[`address(0,`DDR_ADDR_W+1, 2)]),
+           .addr  (dcache_fe_req[`address(0,`DDR_ADDR_W+1)-2]),
            .wdata (dcache_fe_req[`wdata(0)]),
            .wstrb (dcache_fe_req[`wstrb(0)]),
            .rdata (dcache_fe_resp[`rdata(0)]),
@@ -171,7 +171,7 @@ module ext_mem
 	   
            // Back-end interface
            .mem_valid (dcache_be_req[`valid_MIG_BUS(0)]),
-           .mem_addr  (dcache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W, 0)]),
+           .mem_addr  (dcache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W)]),
            .mem_wdata (dcache_be_req[`wdata_MIG_BUS(0)]),
            .mem_wstrb (dcache_be_req[`wstrb_MIG_BUS(0)]),
            .mem_rdata (dcache_be_resp[`rdata_MIG_BUS(0)]),
@@ -183,12 +183,9 @@ module ext_mem
    wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
 
 `ifdef RUN_DDR_USE_SRAM
-   // assign icache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
-   assign icache_be_req[(`MIG_BUS_W/8)+`MIG_BUS_W+`ADDR_W-1 -: `ADDR_W-`DDR_ADDR_W] = 0;
-   
+   assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
 `endif
-   // assign dcache_be_req[`address(0,`ADDR_W,`DDR_ADDR_W)] = 0;
-   assign dcache_be_req[(`MIG_BUS_W/8)+`MIG_BUS_W+`ADDR_W-1 -: `ADDR_W-`DDR_ADDR_W] = 0;
+   assign dcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
    
    
    
@@ -236,7 +233,7 @@ module ext_mem
       
             // Native interface
             .valid    (l2cache_req[`valid_MIG_BUS(0)]),
-            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1,$clog2(`MIG_BUS_W/8))]),
+            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
             .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
 	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
             .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),

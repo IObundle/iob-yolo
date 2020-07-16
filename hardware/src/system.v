@@ -323,7 +323,7 @@ module system
       
       //cpu interface
       .valid(slaves_req[`valid(`UART)]),
-      .address(slaves_req[`address(`UART,`UART_ADDR_W+2,2)]),
+      .address(slaves_req[`address(`UART,`UART_ADDR_W+2)-2]),
       .wdata(slaves_req[`wdata(`UART)]),
       .wstrb(|slaves_req[`wstrb(`UART)]),
       .rdata(slaves_resp[`rdata(`UART)]),
@@ -348,7 +348,7 @@ module system
 
       //cpu interface
       .valid(slaves_req[`valid(`TIMER)]),
-      .address(slaves_req[`address(`TIMER,`TIMER_ADDR_W+2, 2)]),
+      .address(slaves_req[`address(`TIMER,`TIMER_ADDR_W+2)-2]),
       .wdata(slaves_req[`wdata(`TIMER)]),
       .rdata(slaves_resp[`rdata(`TIMER)]),
       .ready(slaves_resp[`ready(`TIMER)])
@@ -364,7 +364,7 @@ module system
 
       //cpu interface
       .sel(slaves_req[`valid(`ETHERNET)]),
-      .addr(slaves_req[`address(`ETHERNET, `ETH_ADDR_W+2, 2)]),
+      .addr(slaves_req[`address(`ETHERNET, `ETH_ADDR_W+2)-2]),
       .data_in(slaves_req[`wdata(`ETHERNET)]),
       .we(|(slaves_req[`wstrb(`ETHERNET)])),
       .data_out(slaves_resp[`rdata(`ETHERNET)]),
