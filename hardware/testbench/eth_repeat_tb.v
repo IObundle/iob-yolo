@@ -25,7 +25,9 @@ module eth_repeat_tb;
    //received by getchar
    reg [7:0] cpu_char = 0;
 
-
+   reg 	     start_flag = 0;
+   
+   
    //tester uart
    reg       uart_valid;
    reg [`UART_ADDR_W-1:0] uart_addr;
@@ -34,6 +36,38 @@ module eth_repeat_tb;
    reg [`DATA_W-1:0]      uart_rdata;
    wire                   uart_ready;
 
+   //test uart signals
+   wire                    tester_txd, tester_rxd;       
+   wire                    tester_rts, tester_cts;       
+
+   //test ethernet signals
+   // cpu interface
+   reg 			   eth_sel, eth_we, eth_ready;
+   reg [`ETH_ADDR_W-1:0]   eth_addr;
+   reg [31:0] 		   eth_data_in, eth_data_out;
+
+   // ethernet interface
+   wire 		   tester_pll_locked;
+   wire 		   tester_eth_phy_resetn;
+   wire 		   tester_rx_clk;
+   wire [3:0] 		   tester_rx_data;
+   wire 		   tester_rx_dv;
+   wire 		   tester_tx_clk;
+   wire [3:0] 		   tester_tx_data;
+   wire 		   tester_tx_en;
+
+   wire 		   eth_phy_resetn;
+   
+
+   assign tester_pll_locked = 1'b1;
+   assign tester_rx_clk = RX_CLK;
+   assign tester_tx_clk = TX_CLK;
+   
+   
+   //cpu trap signal
+   wire                    trap;
+
+   
    //iterator
    integer                i;
 
@@ -71,6 +105,7 @@ module eth_repeat_tb;
       //cpu_receivefile();
 `endif      
       //run firmware
+      start_flag = 1;
       cpu_run();
       $finish;
 
@@ -82,7 +117,7 @@ module eth_repeat_tb;
 
    //ethernet aux signals
    reg [7:0] data[`ETH_NBYTES+30-1:0];
-   reg [47:0] mac_addr = `ETH_RMAC_ADDR;
+   reg [47:0] mac_addr = `ETH_TESTER_MAC;
    reg [`ETH_NBYTES*8-1:0] data_tmp;
     
    
@@ -170,37 +205,6 @@ module eth_repeat_tb;
    wire                    ddr_rvalid;
    wire                    ddr_rready;
 `endif
-
-   //test uart signals
-   wire                    tester_txd, tester_rxd;       
-   wire                    tester_rts, tester_cts;       
-
-   //test ethernet signals
-   // cpu interface
-   reg 			   eth_sel, eth_we, eth_ready;
-   reg [`ETH_ADDR_W-1:0]   eth_addr;
-   reg [31:0] 		   eth_data_in, eth_data_out;
-
-   // ethernet interface
-   wire 		   tester_pll_locked;
-   wire 		   tester_eth_phy_resetn;
-   wire 		   tester_rx_clk;
-   wire [3:0] 		   tester_rx_data;
-   wire 		   tester_rx_dv;
-   wire 		   tester_tx_clk;
-   wire [3:0] 		   tester_tx_data;
-   wire 		   tester_tx_en;
-
-   wire 		   eth_phy_resetn;
-   
-
-   assign tester_pll_locked = 1'b1;
-   assign tester_rx_clk = RX_CLK;
-   assign tester_tx_clk = TX_CLK;
-   
-   
-   //cpu trap signal
-   wire                    trap;
    
    //
    // UNIT UNDER TEST
@@ -298,7 +302,7 @@ module eth_repeat_tb;
    //
    
    iob_eth #(
-	     .ETH_MAC_ADDR(`ETH_RMAC_ADDR)
+	     .ETH_MAC_ADDR(`ETH_TESTER_MAC)
 	    )
    test_eth (
 	     .clk             (clk), //in
@@ -431,7 +435,7 @@ module eth_repeat_tb;
          mac_addr = mac_addr<<8;
       end
       //source mac address
-      mac_addr = `ETH_RMAC_ADDR;
+      mac_addr = `ETH_TESTER_MAC;
       for(i=0; i < 6; i= i+1) begin
          data[i+22] = mac_addr[47:40];
          mac_addr = mac_addr<<8;

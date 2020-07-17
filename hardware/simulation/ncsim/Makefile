@@ -12,7 +12,7 @@ SFLAGS = -errormax 15 -status -CMDFILE $(ROOT_DIR)/hardware/testbench
 
 #simulate
 run: $(VSRC) $(VHDR) firmware.hex boot.hex periphs
-	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" ./run_ncsim.sh
+	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" ./run_ncsim.sh $(TEST)
 
 sim_clean:
 	@rm -rf xcelium.d xmsim.key *.log
