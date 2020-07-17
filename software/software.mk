@@ -27,7 +27,7 @@ ifeq ($(PCSIM),1)
   dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/pc/pc.mk))
 else #Compile for riscv
   #compiler settings
-  TOOLCHAIN_PREFIX:=riscv32-unknown-elf-
+  TOOLCHAIN_PREFIX:=riscv64-unknown-elf-
   CFLAGS:=-Os -ffreestanding -nostdlib -march=rv32im -mabi=ilp32 --std=gnu99
 
   #include peripherals
