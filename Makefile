@@ -35,7 +35,7 @@ fpga-clean-ip: fpga-clean
 	ssh $(USER)@$(FPGA_COMPILE_SERVER) "if [ -d $(REMOTE_ROOT_DIR) ]; then cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) clean-ip; fi"
 
 
-run-firmware:
+run-firmware: firmware
 	ssh $(USER)@$(FPGA_BOARD_SERVER) "if [ ! -d $(REMOTE_ROOT_DIR) ]; then mkdir -p $(REMOTE_ROOT_DIR); fi"
 	rsync -avz --exclude .git . $(USER)@$(FPGA_BOARD_SERVER):$(REMOTE_ROOT_DIR) 
 	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(CONSOLE_DIR) run"
@@ -59,4 +59,4 @@ endif
 	make -C $(BOOT_DIR) clean
 
 
-.PHONY: sim fpga fpga-clean fpga-clean-ip fpga-load firmware bootloader clean
+.PHONY: sim fpga fpga-clean fpga-clean-ip fpga-load firmware bootloader clean run-firmware

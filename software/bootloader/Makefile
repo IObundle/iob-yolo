@@ -15,7 +15,6 @@ run: boot.elf
 boot.elf: ../template.lds  $(HDR) $(BOOT_SRC)
 	$(TOOLCHAIN_PREFIX)gcc -o $@ $(CFLAGS) $(DEFINE) $(BOOT_INCLUDE) $(BOOT_SRC) -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary boot.elf boot.bin
-	$(PYTHON_DIR)/makehex.py boot.bin $(BOOTROM_ADDR_W) > boot.hex
 
 clean:
 	@rm -rf boot.bin boot.elf boot.map *.hex ../periphs.h *~
