@@ -3,7 +3,7 @@ include ./system.mk
 
 run: sim
 
-sim: firmware bootloader
+sim: setsim firmware bootloader
 ifeq ($(SIMULATOR),ncsim)
 	ssh $(MICRO_USER)@$(SIM_SERVER) "if [ ! -d $(MICRO_ROOT_DIR) ]; then mkdir -p $(MICRO_ROOT_DIR); fi"
 	rsync -avz --exclude .git . $(MICRO_USER)@$(SIM_SERVER):$(MICRO_ROOT_DIR) 
@@ -41,13 +41,16 @@ run-firmware: firmware
 	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(CONSOLE_DIR) run"
 
 firmware:
-	make -C $(FIRM_DIR) BAUD=$(BAUD)
+	make -C $(FIRM_DIR) BAUD=$(BAUD) SIM=$(SIM)
 
 bootloader: firmware
 	make -C $(BOOT_DIR) BAUD=$(BAUD)
 
 pcsim:
 	make -C $(FIRM_DIR) pcsim BAUD=$(BAUD) PCSIM=1
+
+setsim:
+	$(eval SIM=1)
 
 clean: 
 ifeq ($(SIMULATOR),ncsim)

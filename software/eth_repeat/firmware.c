@@ -37,6 +37,6 @@ int main() {
   uart_puts("Data Sent\n");
 
   //end program
-  uart_putc(4);
+  uart_putc(ETX);
   return 0;
 }

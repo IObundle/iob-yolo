@@ -40,6 +40,12 @@ else #Compile for riscv
 
   # Other peripherals 
   dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
+
+  #Define SIM
+ifeq ($(SIM),1)
+DEFINE+=$(define)SIM
+endif
+
 endif
 
 $(SW_DIR)/periphs.h:

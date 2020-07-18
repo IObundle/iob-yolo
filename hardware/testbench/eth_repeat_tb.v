@@ -94,7 +94,7 @@ module eth_repeat_tb;
 
       // configure uart
       cpu_inituart();
-
+      
       //connect with bootloader
       cpu_connect();
 
@@ -107,6 +107,8 @@ module eth_repeat_tb;
       //run firmware
       start_flag = 1;
       cpu_run();
+      repeat (10000) @(posedge clk)#1;
+           
       $finish;
 
    end
@@ -117,7 +119,7 @@ module eth_repeat_tb;
 
    //ethernet aux signals
    reg [7:0] data[`ETH_NBYTES+30-1:0];
-   reg [47:0] mac_addr = `ETH_TESTER_MAC;
+   reg [47:0] mac_addr = `ETH_RMAC_ADDR;
    reg [`ETH_NBYTES*8-1:0] data_tmp;
     
    
@@ -133,12 +135,12 @@ module eth_repeat_tb;
       //init ethernet module
       do
 	repeat (200) @(posedge clk) #1;
-      while(start_flag==0); //TODO add start flag, set to 1 after sendfile() in console simulation
+      while(start_flag==0);
       cpu_ethinit();
       cpu_ethset_rx_payload_size();
 
       //send frame
-      repeat (100000) @(posedge clk) #1;
+      repeat (30000) @(posedge clk) #1;
       data_tmp = {`ETH_NBYTES*8{1'b0}};
       data_tmp[`ETH_NBYTES*8-1 -: 14*8] = "Hello from PC!";
       for(i=0; i<`ETH_NBYTES; i=i+1) data[i+30] = data_tmp[`ETH_NBYTES*8-i*8-1 -: 8];
@@ -302,7 +304,7 @@ module eth_repeat_tb;
    //
    
    iob_eth #(
-	     .ETH_MAC_ADDR(`ETH_TESTER_MAC)
+	     .ETH_MAC_ADDR(`ETH_RMAC_ADDR)
 	    )
    test_eth (
 	     .clk             (clk), //in
@@ -339,14 +341,14 @@ module eth_repeat_tb;
  `endif
        .FILE_SIZE(2**(`FIRM_ADDR_W-2)),
        .DATA_WIDTH (`MIG_BUS_W),
-       .ADDR_WIDTH (`DDR_ADDR_W-5) //Simulation with full sized DDR takes some time to start
+       .ADDR_WIDTH (`DDR_ADDR_W-10) //Simulation with full sized DDR takes some time to start
        )
    ddr_model_mem(
                  //address write
                  .clk            (clk),
                  .rst            (reset),
 		 .s_axi_awid     ({8{ddr_awid}}),
-		 .s_axi_awaddr   (ddr_awaddr[`DDR_ADDR_W-5-1:0]),
+		 .s_axi_awaddr   (ddr_awaddr[`DDR_ADDR_W-10-1:0]),
                  .s_axi_awlen    (ddr_awlen),
                  .s_axi_awsize   (ddr_awsize),
                  .s_axi_awburst  (ddr_awburst),
@@ -371,7 +373,7 @@ module eth_repeat_tb;
       
 		 //address read
 		 .s_axi_arid     ({8{ddr_arid}}),
-		 .s_axi_araddr   (ddr_araddr[`DDR_ADDR_W-5-1:0]),
+		 .s_axi_araddr   (ddr_araddr[`DDR_ADDR_W-10-1:0]),
 		 .s_axi_arlen    (ddr_arlen), 
 		 .s_axi_arsize   (ddr_arsize),    
                  .s_axi_arburst  (ddr_arburst),
@@ -435,7 +437,7 @@ module eth_repeat_tb;
          mac_addr = mac_addr<<8;
       end
       //source mac address
-      mac_addr = `ETH_TESTER_MAC;
+      mac_addr = `ETH_RMAC_ADDR;
       for(i=0; i < 6; i= i+1) begin
          data[i+22] = mac_addr[47:40];
          mac_addr = mac_addr<<8;
