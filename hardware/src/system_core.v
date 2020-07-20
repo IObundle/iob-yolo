@@ -1,16 +1,16 @@
 `timescale 1 ns / 1 ps
 `include "system.vh"
-`include "iob_uart.vh"
 `include "interconnect.vh"
-`include "iob_timer.vh"
-`include "iob_eth_defs.vh"
+
+//do not remove line below
+//PHEADER
 
 module system 
   (
-   input 		     clk,
-   input 		     reset,
-   output 		     trap,
+   //do not remove line below
+   //PIO
 
+   
 `ifdef USE_DDR //AXI MASTER INTERFACE
 
    //address write
@@ -60,24 +60,9 @@ module system
    input 		     m_axi_rvalid, 
    output 		     m_axi_rready,
 `endif //  `ifdef USE_DDR
-
-   //UART
-   output 		     uart_txd,
-   input 		     uart_rxd,
-   output 		     uart_rts,
-   input 		     uart_cts,
-   
-   //ETHERNET
-   output 		     ETH_PHY_RESETN,
-   input 		     PLL_LOCKED,
-
-   input 		     RX_CLK,
-   input [3:0] 		     RX_DATA,
-   input 		     RX_DV,
-
-   input 		     TX_CLK,
-   output 		     TX_EN,
-   output [3:0] 	     TX_DATA
+   input 		     clk,
+   input 		     reset,
+   output 		     trap
    );
 
    localparam ADDR_W=32;
@@ -312,75 +297,5 @@ module system
         );
 `endif
 
-   //
-   // UART
-   //
-
-   iob_uart uart
-     (
-      .clk       (clk),
-      .rst       (reset),
-      
-      //cpu interface
-      .valid(slaves_req[`valid(`UART)]),
-      .address(slaves_req[`address(`UART,`UART_ADDR_W+2)-2]),
-      .wdata(slaves_req[`wdata(`UART)]),
-      .wstrb(|slaves_req[`wstrb(`UART)]),
-      .rdata(slaves_resp[`rdata(`UART)]),
-      .ready(slaves_resp[`ready(`UART)]),
-      
-      
-      //RS232 interface
-      .txd       (uart_txd),
-      .rxd       (uart_rxd),
-      .rts       (uart_rts),
-      .cts       (uart_cts)
-      );
-
-
-   //
-   // TIMER
-   //
-   iob_timer timer
-     (
-      .clk      (clk),
-      .rst      (reset),
-
-      //cpu interface
-      .valid(slaves_req[`valid(`TIMER)]),
-      .address(slaves_req[`address(`TIMER,`TIMER_ADDR_W+2)-2]),
-      .wdata(slaves_req[`wdata(`TIMER)]),
-      .rdata(slaves_resp[`rdata(`TIMER)]),
-      .ready(slaves_resp[`ready(`TIMER)])
-      );
-
-   //
-   // ETHERNET
-   //
-   iob_eth eth
-     (
-      .clk      (clk),
-      .rst      (reset),
-
-      //cpu interface
-      .sel(slaves_req[`valid(`ETHERNET)]),
-      .addr(slaves_req[`address(`ETHERNET, `ETH_ADDR_W+2)-2]),
-      .data_in(slaves_req[`wdata(`ETHERNET)]),
-      .we(|(slaves_req[`wstrb(`ETHERNET)])),
-      .data_out(slaves_resp[`rdata(`ETHERNET)]),
-      .ready(slaves_resp[`ready(`ETHERNET)]),
-
-      // ethernet interface
-      .ETH_PHY_RESETN(ETH_PHY_RESETN),
-      .PLL_LOCKED(PLL_LOCKED),
-
-      .RX_CLK(RX_CLK),
-      .RX_DATA(RX_DATA),
-      .RX_DV(RX_DV),
-
-      .TX_CLK(TX_CLK),
-      .TX_DATA(TX_DATA),
-      .TX_EN(TX_EN)
-      );
    
 endmodule

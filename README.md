@@ -5,7 +5,7 @@ Repository for the implementation of an object detection application based on th
 # Software Tests
 ## Utility Software
 - **bootloader:** firmware to use as BOOT - waits to receive another firmware via UART
-- **ld-sw:** program that runs on the machine and sends the firmware received by the bootloarder
+- **console:** program that runs on the machine, sends the firmware received by the bootloader and handles UART communication
 
 ## Test Software
 - **ddr_test:** writes N positions of DDR and reads them. Goal: verify correct functioning of the DDR.

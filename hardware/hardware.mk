@@ -44,6 +44,18 @@ periphs:
 	$(eval include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk)
 	$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/hardware/hardware.mk))
 
+$(SRC_DIR)/system.v:
+	cp $(SRC_DIR)/system_core.v $@
+#UART peripheral
+	sed -i '/endmodule/e cat $(SOC_SUBMODULES_DIR)/UART/hardware/include/inst.v' $(SRC_DIR)/system.v
+	sed -i '/PIO/r $(SOC_SUBMODULES_DIR)/UART/hardware/include/pio.v' $(SRC_DIR)/system.v
+	sed -i '/PHEADER/a `include \"$(shell echo `ls $(SOC_SUBMODULES_DIR)/UART/hardware/include/*.vh`)\"' $(SRC_DIR)/system.v
+#Yolo peripherals
+	$(foreach p, $(PERIPHERALS), sed -i '/endmodule/e cat $(SUBMODULES_DIR)/$p/hardware/include/inst.v' $(SRC_DIR)/system.v;)
+	$(foreach p, $(PERIPHERALS), sed -i '/PIO/r $(SUBMODULES_DIR)/$p/hardware/include/pio.v' $(SRC_DIR)/system.v;)
+	$(foreach p, $(PERIPHERALS), sed -i '/PHEADER/a `include \"$(shell echo `ls $(SUBMODULES_DIR)/$p/hardware/include/*.vh`)\"' $(SRC_DIR)/system.v;)\
+
+
 # data files
 firmware.hex: $(FIRM_DIR)/firmware.bin
 ifeq ($(INIT_MEM),1)
@@ -56,4 +68,7 @@ endif
 boot.hex: $(BOOT_DIR)/boot.bin
 	$(PYTHON_DIR)/makehex.py $(BOOT_DIR)/boot.bin $(BOOTROM_ADDR_W) > boot.hex
 
-.PHONY: periphs
+hw-clean:
+	@rm -f *# *~ *.vcd *.dat *.hex *.bin $(SRC_DIR)/system.v
+
+.PHONY: periphs hw-clean
