@@ -5,7 +5,7 @@ FIRM_ADDR_W:=13
 SRAM_ADDR_W:=14
 
 #DDR
-USE_DDR:=0
+USE_DDR:=1
 RUN_DDR:=0
 DDR_ADDR_W:=30
 
@@ -16,7 +16,7 @@ BOOTROM_ADDR_W:=12
 INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
-TEST:=eth_weights
+TEST:=eth_ddr
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba

@@ -57,7 +57,7 @@ for j in range(num_frames+1):
     s.send(dst_addr + src_addr + eth_type + payload + padding)
 
     #Wait some time
-    sleep(0.0025)
+    sleep(0.05)
     
 #Close and open file again
 fp.close()
@@ -92,7 +92,7 @@ for j in range(num_frames+1):
         if s2 != r:
             count_errors += 1
 
-print("Data sent and received with %d errors\n", count_errors)
+print("Data sent and received with %d errors\n" % count_errors)
 
 #Close file
 fp.close()
