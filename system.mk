@@ -16,7 +16,7 @@ BOOTROM_ADDR_W:=12
 INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
-TEST:=eth_repeat
+TEST:=eth_weights
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
