@@ -2,10 +2,10 @@
 FIRM_ADDR_W:=13
 
 #SRAM
-SRAM_ADDR_W=14
+SRAM_ADDR_W:=14
 
 #DDR
-USE_DDR:=1
+USE_DDR:=0
 RUN_DDR:=0
 DDR_ADDR_W:=30
 
@@ -17,6 +17,10 @@ INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
 TEST:=eth_repeat
+
+#Ethernet
+RMAC_ADDR:=00e04c690ba0 #Baba
+#RMAC_ADDR:=309c231e624b #Pudim
 
 #Versat
 USE_VERSAT:=0

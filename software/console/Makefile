@@ -7,7 +7,7 @@ CC := gcc
 CFLAGS := -g -Wall
 
 INCLUDE+=-I$(UART_DIR)/software -I$(CONSOLE_SRC_DIR)
-SRC:=$(CONSOLE_SRC_DIR)/console.c
+SRC:=console.c
 
 CONSOLE:=./console -s $(SERIAL)
 

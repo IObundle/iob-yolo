@@ -16,6 +16,7 @@ software/bootloader/*
 
 software/*/*
 !software/bootloader/*
+!software/console/console.c
 !software/*/firmware.c
 !software/*/firmware.S
 !software/*/Makefile
