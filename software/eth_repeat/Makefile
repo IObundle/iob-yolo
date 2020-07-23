@@ -24,6 +24,6 @@ pcsim: $(HDR) $(SRC)
 	./pcsim
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim tmpLocalSocket
 
 .PHONY: run clean

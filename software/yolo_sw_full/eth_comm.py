@@ -1,5 +1,5 @@
 #Import libraries
-from socket import socket, AF_PACKET, SOCK_RAW, htons
+from socket import socket, AF_PACKET, SOCK_RAW, htons, AF_UNIX, SOCK_SEQPACKET
 from os.path import getsize
 import sys
 import definitions
@@ -10,12 +10,26 @@ if len(sys.argv) < 4:
     print("<usage>: python eth_comm.py <interface> <RMAC> <filename_path>")
     sys.exit()
 
+#Check for PC simulation
+if len(sys.argv) > 4:
+    PCSIM = (sys.argv[4] == "PCsim")
+else:
+    PCSIM = 0
+
 #Ethernet parameters
-interface = sys.argv[1]
-src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
+#Common parameters
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
 eth_type = "\x08\x00"                       # ethernet frame type
 ETH_P_ALL = 0x0800  
+
+if PCSIM: #PC simulation
+    print(sys.argv[3])
+    SOCKET_NAME = sys.argv[3] + "/tmpLocalSocket"
+    src_addr = dst_addr
+    print("**** PC simulation ***")
+else: # embedded
+    interface = sys.argv[1]
+    src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
 
 #Frame parameters
 if(fixed_flag):
@@ -23,9 +37,16 @@ if(fixed_flag):
 else:
     eth_nbytes = 1022-18
     
-#Open socket and bind
-s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
-s.bind((interface, 0))
+#Connect with Firmware
+if PCSIM: # PC Simulation: open local socket
+    #Open socket and bind
+    s = socket(AF_UNIX, SOCK_SEQPACKET, 0)
+    #Connect to Peer
+    s.connect(SOCKET_NAME)
+else: # Embedded: open raw ethernet socket
+    #Open socket and bind
+    s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
+    s.bind((interface, 0))
 
 ################################# SEND IMAGE ##############################################
 
