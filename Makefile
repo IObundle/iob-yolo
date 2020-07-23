@@ -47,16 +47,15 @@ bootloader: firmware
 	make -C $(BOOT_DIR) BAUD=$(BAUD)
 
 pcsim:
+	make -C $(FIRM_DIR) clean
 	make -C $(FIRM_DIR) pcsim BAUD=$(BAUD) PCSIM=1
 
 setsim:
 	$(eval SIM=1)
 
-
+#Run on FPGA_BOARD_SERVER
+# for PCSIM: make ld-eth SIM=1
 ld-eth:
-	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make eth-comm"
-
-eth-comm:
 	$(eval RMAC := $(shell ethtool -P $(RMAC_INTERFACE) | awk '{print $$3}' | sed 's/://g'))
 ifneq ($(SIM),1)
 	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
