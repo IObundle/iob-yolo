@@ -28,7 +28,7 @@ ifeq ($(PCSIM),1)
 else #Compile for riscv
   #compiler settings
   TOOLCHAIN_PREFIX:=riscv64-unknown-elf-
-  CFLAGS:=-Os -ffreestanding -nostdlib -march=rv32im -mabi=ilp32 --std=gnu99
+  CFLAGS:=-O3 -nostdlib -march=rv32im -mabi=ilp32
 
   #include peripherals
   # UART special case

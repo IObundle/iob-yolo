@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<simPackage>
- <file path="pll25_multi_out_sim/pll25_multi_out.vo" type="VERILOG" />
- <topLevel name="pll25_multi_out" />
- <deviceFamily name="cyclonev" />
-</simPackage>

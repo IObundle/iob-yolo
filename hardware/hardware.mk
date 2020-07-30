@@ -12,7 +12,11 @@ endif
 INC_DIR:=$(ROOT_DIR)/hardware/include
 SOC_INC_DIR:=$(SOC_DIR)/hardware/include
 
-INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR)
+INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR) $(incdir)$(INC_DIR)/versat
+#Check for versat.json
+ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
+	INCLUDE+=$(incdir)$(FIRM_DIR)
+endif
 
 #headers
 VHDR+=$(SOC_INC_DIR)/system.vh
@@ -39,6 +43,11 @@ endif
 #system
 VSRC+=$(SRC_DIR)/system.v
 
+ifneq ($(VERSAT),)
+#Versat yolo
+VSRC+=$(wildcard $(SRC_DIR)/versat/*.v)
+endif
+
 # peripherals
 periphs:
 	$(eval include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk)
@@ -53,7 +62,7 @@ $(SRC_DIR)/system.v:
 #Yolo peripherals
 	$(foreach p, $(PERIPHERALS), sed -i '/endmodule/e cat $(SUBMODULES_DIR)/$p/hardware/include/inst.v' $(SRC_DIR)/system.v;)
 	$(foreach p, $(PERIPHERALS), sed -i '/PIO/r $(SUBMODULES_DIR)/$p/hardware/include/pio.v' $(SRC_DIR)/system.v;)
-	$(foreach p, $(PERIPHERALS), sed -i '/PHEADER/a `include \"$(shell echo `ls $(SUBMODULES_DIR)/$p/hardware/include/*.vh`)\"' $(SRC_DIR)/system.v;)\
+	$(foreach p, $(PERIPHERALS), $(foreach f, $(shell echo `ls $(SUBMODULES_DIR)/$p/hardware/include/*.vh`), sed -i '/PHEADER/a `include \"$f\"' $(SRC_DIR)/system.v;))\
 
 
 # data files

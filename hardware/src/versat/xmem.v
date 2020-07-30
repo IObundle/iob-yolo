@@ -115,7 +115,7 @@ module xmem #(
       we_reg <= wr;
    end
 
-   iob_1p_mem #(
+   iob_sp_ram #(
                    .FILE(MEM_INIT_FILE),
 		   .DATA_W(DATA_W),
 		   .ADDR_W(MEM_ADDR_W))

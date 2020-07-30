@@ -1,10 +1,11 @@
 //import custom libraries
 #include "system.h"
+#include "periphs.h"
 #include "iob-uart.h"
 #include "iob-eth.h"
 #include "iob_timer.h"
 #include "firmware.h"
-#include "iob-cache.h"
+/* #include "iob-cache.h" */
 #include "versat.hpp"
 
 //import c libraries
@@ -55,11 +56,21 @@
 #endif
 
 //define peripheral base addresses
-#define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
-#define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
-#define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
-#define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
-#define VERSAT (VERSAT_BASE<<(ADDR_W-N_SLAVES_W))
+/* #define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W)) */
+// set pointer to DDR base
+#ifndef PCSIM
+  //USE_DDR==1 to run yolo anyways
+  #if (RUN_DDR==0) // running firmware from SRAM 
+    #define DDR_MEM ((uint8_t*) EXTRA_BASE)
+  #else //running firmware from DDR
+    #define DDR_MEM ((uint8_t*) (1<<(FIRM_ADDR_W)))
+  #endif
+#else
+  uint8_t ddr_mem_vect[1<<(DDR_ADDR_W-2)]; //DDR addressable space, up to 2**30
+  #define DDR_MEM (&ddr_mem_vect[0])
+#endif //ifndef PCSIM
+
+
 
 //Constants for image resize
 #define w_scale ((float)(IMG_W-1)/(NEW_W-1))
@@ -79,7 +90,7 @@
 #define dy_size (NEW_H*2)
 
 //define DDR mapping
-#define ix_BASE_ADDRESS (DDR_MEM + (int)pow(2,MAINRAM_ADDR_W)) //after main mem
+#define ix_BASE_ADDRESS (DDR_MEM + (int)pow(2,FIRM_ADDR_W)) //after main mem
 #define iy_BASE_ADDRESS (ix_BASE_ADDRESS + ix_size*2) //16 bits
 #define dx_BASE_ADDRESS (iy_BASE_ADDRESS + iy_size*2) //16 bits
 #define dy_BASE_ADDRESS (dx_BASE_ADDRESS + dx_size*2) //16 bits
@@ -144,7 +155,7 @@ void reset_DDR() {
 
   //measure initial time
   uart_printf("\nSetting DDR positions to zero\n");
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
 
   //resized image
   for(i = 0; i < IMAGE_INPUT; i++) fp_image[i] = 0;
@@ -190,7 +201,7 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_20 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
@@ -207,7 +218,7 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      // start timer
-     if(j == 0) start = timer_get_count_us(TIMER);   
+     if(j == 0) start = timer_time_us(TIMER_BASE);   
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_DATA_FRAMES) bytes_to_receive = DATA_SIZE - count_bytes;
@@ -235,13 +246,13 @@ void receive_data() {
   uart_printf("\nReady to receive input image and weights...\n");
   char * fp_image_char = (char *) DATA_BASE_ADDRESS;
   rcv_frame(NUM_INPUT_FRAMES, INPUT_FILE_SIZE, fp_image_char);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Image received in %d ms\n", (end-start)/1000);
 
   //Receive weights
   char * fp_weights_char = (char *) WEIGHTS_BASE_ADDRESS;
   rcv_frame(NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, fp_weights_char);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("weights transferred in %d ms\n", (end-start)/1000);
 }
 
@@ -303,14 +314,14 @@ void resize_image() {
   ///////////////////////////////////////////////////////////////////////////////
   
   //load ix and dx to versat mem0 and mem2
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   for(i = 0; i < ix_size; i++) stage[0].memA[0].write(i, ix[i]);
   for(i = 0; i < dx_size; i++) stage[0].memA[2].write(i, dx[i]);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   data_time = end - start;
 
   //configure mem0 to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -355,7 +366,7 @@ void resize_image() {
   stage[0].memA[3].setIter(2*NEW_W);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   config_time = end - start;
 
   //loops for performing resizing 1st step
@@ -369,28 +380,28 @@ void resize_image() {
 
       //Store 2 lines of pixels in mem1
       //Extra pixel is necessary to be multiplied by zero
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       for(i = 0; i < IMG_W*2+1; i++)
         stage[0].memA[1].write(i, fp_image[k*IMG_W*IMG_H + iy[j]*IMG_W + i]);
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       data_time += (end - start);
 
       //Wait until done
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       run();
       while(done() == 0);
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       run_time += (end - start);
 
       //store result in DDR
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       for(i = 0; i < NEW_W*2; i++)
       #ifdef SIM
         if(fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i] != stage[0].memA[3].read(i)) num_err++;
       #else
         fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i] = stage[0].memA[3].read(i);
       #endif
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       data_time += (end - start);
     }
   }
@@ -407,13 +418,13 @@ void resize_image() {
   globalClearConf();
 
   //load dy to versat mem1
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   for(i = 0; i < dy_size; i++) stage[0].memA[1].write(i, dy[i]);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   data_time += end - start;
 
   //configure mem0 to read res0
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -442,7 +453,7 @@ void resize_image() {
   stage[0].memA[3].setIter(NEW_W);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   config_time += end - start;
 
   //loops for performing resizing 2nd step
@@ -455,14 +466,14 @@ void resize_image() {
 #endif
 
       //Store res1 in mem0
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       for(i = 0; i < 2*NEW_W; i++)
         stage[0].memA[0].write(i, fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i]);
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       data_time += (end - start);
 
       //run
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       run();
 
       //configure mem1 start
@@ -477,18 +488,18 @@ void resize_image() {
 
       //Wait until done
       while(done() == 0);
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       run_time += (end - start);
 
       //store result in DDR
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       for(i = 0; i < NEW_W; i++)
       #ifdef SIM
         if(fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H) + NETWORK_INPUT_AUX] != stage[0].memA[3].read(i)) num_err++;
       #else
         fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H) + NETWORK_INPUT_AUX] = stage[0].memA[3].read(i);
       #endif
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       data_time += (end - start);
     }
   }
@@ -529,7 +540,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read ker_size*ker_size*c blocks from tiled FM
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[0].setDuty(ker_size*c);
   stage[0].memA[0].setPer(ker_size*c);
   stage[0].memA[0].setIncr(1);
@@ -581,7 +592,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   stage[0].memA[3].setIter(til_w*til_h/(1+3*maxpool));
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   config_time = end - start;
 
   //loops for performing convolution
@@ -594,40 +605,40 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
 #endif
 
       //Send input FM tile (z-x-y format)
-      start = timer_get_count_us(TIMER);
+      start = timer_time_us(TIMER_BASE);
       for(i = 0; i < c; i++)
 	for(j = 0; j < til_h+2*inpadd; j++)
           for(k = 0; k < til_w+2*inpadd; k++)
 	    stage[0].memA[0].write((j*(til_w+2*inpadd)+k)*c + i, input[i*(w+2*inpadd+2*ignorepadd)*(w+2*inpadd+2*ignorepadd) + (l*til_h+j+ignorepadd)*(w+2*inpadd+2*ignorepadd) + (k+m*til_w+ignorepadd)]);
-      end = timer_get_count_us(TIMER);
+      end = timer_time_us(TIMER_BASE);
       data_time += (end - start);
 
-    #ifdef SIM
+#ifdef SIM
       for(k = 0; k < 1; k++) {
     #else
       for(k = 0; k < num_ker; k++) {
     #endif
 
         //load weights (z-x-y format)
-        start = timer_get_count_us(TIMER);
+        start = timer_time_us(TIMER_BASE);
         for(j = 0; j < c; j++)
           for(i = 0; i < ker_size*ker_size; i++)
             stage[0].memA[1].write(i*c + j, weights[k*c*ker_size*ker_size + j*ker_size*ker_size + i]);
         stage[0].memA[2].write(0, bias[k]);
-        end = timer_get_count_us(TIMER);
+        end = timer_time_us(TIMER_BASE);
         data_time += end - start;
 
         //run
-        start = timer_get_count_us(TIMER);
+        start = timer_time_us(TIMER_BASE);
         run();
 
         //Wait until done
         while(done() == 0);
-        end = timer_get_count_us(TIMER);
+        end = timer_time_us(TIMER_BASE);
         run_time += (end - start);
 
         //store result in DDR
-        start = timer_get_count_us(TIMER);
+        start = timer_time_us(TIMER_BASE);
 	for(i = 0; i < til_h/(1+maxpool); i++)
           for(j = 0; j < til_w/(1+maxpool); j++)
           #ifdef SIM
@@ -637,7 +648,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
           #endif
 
         //end measuring data load/store time
-        end = timer_get_count_us(TIMER);
+        end = timer_time_us(TIMER_BASE);
         data_time += (end - start);
       }
     }
@@ -676,7 +687,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read input FMs
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -703,7 +714,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   config_time = end - start;
 
 #ifdef SIM
@@ -713,24 +724,24 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
 #endif
 
     //Send input FM tile (x-y-z format)
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     for(j = 0; j < w+stride; j++)
       for(i = 0; i < w+stride; i++)
         stage[0].memA[0].write(j*(w+stride) + i, input[k*(w+2*inpadd+stride)*(w+2*inpadd+stride) + (j+inpadd)*(w+2*inpadd+stride) + i+inpadd]);
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     data_time += (end - start);
 
     //run
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     run();
 
     //Wait until done
     while(done() == 0);
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     run_time += (end - start);
 
     //store result in DDR
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     for(j = 0; j < w/(1+inpadd); j++)
       for(i = 0; i < w/(1+inpadd); i++)
       #ifdef SIM
@@ -738,7 +749,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
       #else
         output[k*(w/(1+inpadd)+2)*(w/(1+inpadd)+2) + (j+1)*(w/(1+inpadd)+2) + i+1] = stage[0].memA[3].read(j*(w/(1+inpadd)) + i);
       #endif
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     data_time += (end - start);
   }
 #ifdef SIM
@@ -773,7 +784,7 @@ void upsample() {
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read same pixel 4 times
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[0].setDuty(4);
   stage[0].memA[0].setPer(4);
   stage[0].memA[0].setIter(1);
@@ -799,7 +810,7 @@ void upsample() {
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   config_time = end - start;
 
 #ifdef SIM
@@ -809,24 +820,24 @@ void upsample() {
 #endif
 
     //Send input FM tile (x-y-z format)
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     for(j = 0; j < 13; j++)
       for(i = 0; i < 13; i++)
         stage[0].memA[0].write(j*13 + i, input[k*13*13 + j*13 + i]);
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     data_time += (end - start);
 
     //run
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     run();
 
     //Wait until done
     while(done() == 0);
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     run_time += (end - start);
 
     //store result in DDR
-    start = timer_get_count_us(TIMER);
+    start = timer_time_us(TIMER_BASE);
     for(j = 0; j < 26; j++)
       for(i = 0; i < 26; i++)
       #ifdef SIM
@@ -834,7 +845,7 @@ void upsample() {
       #else
         output[k*28*28 + (j+1)*28 + i+1] = stage[0].memA[3].read(j*26 + i);
       #endif
-    end = timer_get_count_us(TIMER);
+    end = timer_time_us(TIMER_BASE);
     data_time += (end - start);
   }
 #ifdef SIM
@@ -981,7 +992,7 @@ void send_data(unsigned int pos) {
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
-     if(j == 0) start = timer_get_count_us(TIMER);
+     if(j == 0) start = timer_time_us(TIMER_BASE);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
@@ -1001,27 +1012,26 @@ void send_data(unsigned int pos) {
   }
 
   //measure transference time
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
 int main(int argc, char **argv) {
 
   //init UART
-  uart_init(UART,UART_CLK_FREQ/UART_BAUD_RATE);
+  uart_init(UART_BASE,FREQ/BAUD);
 
   //send init message
   uart_printf("\nYOLO HW FULL\n\n");
-  uart_txwait();
 
 #ifndef SIM
   //init ETHERNET
-  eth_init(ETHERNET);
+  eth_init(ETHERNET_BASE);
   eth_set_rx_payload_size(ETH_NBYTES);
 #endif
 
   //init VERSAT
-  versat_init(VERSAT);
+  versat_init(VERSAT_BASE);
 
   //define memory regions
   define_memory_regions();
@@ -1096,10 +1106,10 @@ int main(int argc, char **argv) {
   conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD, LAYER_16_IGNOREPAD, 0);
 
   //layer17 (yolo)
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   uart_printf("\nRunning layer 17...\n");
   yolo_layer(LAYER_16_W, yolo1_div, 1, data_pos, box_pos);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Total time = %d us\n", end-start);
 
   //layer19 (conv)
@@ -1120,10 +1130,10 @@ int main(int argc, char **argv) {
   conv_layer(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_TILING_W, LAYER_23_TILING_H, LAYER_23_MAXPOOL, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_22_OUTPADD, LAYER_23_IGNOREPAD, 0);
 
   //layer24 (yolo)
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   uart_printf("\nRunning layer 24...\n");
   yolo_layer(LAYER_23_W, yolo2_div, 0, data_pos, box_pos);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Total time = %d us\n", end-start);
 
   //return data
@@ -1188,9 +1198,9 @@ int main(int argc, char **argv) {
 
   //check result
   if(stage[0].memA[3].read(0) == exp_res) uart_printf("xyolo acc feature tested successfully!\n");
-  else uart_printf("xyolo acc feature failed!\n");
+  else uart_printf("xyolo acc feature failed!\nExpected: %d, got %d\n", exp_res, stage[0].memA[3].read(0));
 
   //finish
-  uart_putc(4);
+  uart_putc(ETX);
   return 0;
 }

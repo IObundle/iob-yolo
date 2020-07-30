@@ -1,8 +1,8 @@
 #FIRMWARE
-FIRM_ADDR_W:=13
+FIRM_ADDR_W:=16
 
 #SRAM
-SRAM_ADDR_W:=14
+SRAM_ADDR_W:=16
 
 #DDR
 USE_DDR:=1
@@ -16,7 +16,7 @@ BOOTROM_ADDR_W:=12
 INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
-TEST:=yolo_sw_full
+TEST:=yolo_hw_full
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
@@ -29,12 +29,11 @@ USE_VERSAT:=0
 VCD:=0
 
 #Peripheral list (must match respective submodule name)
-PERIPHERALS:=TIMER ETHERNET #UART is implicit
+PERIPHERALS:=TIMER ETHERNET VERSAT #UART is implicit
 
-#RTL simulator
-SIMULATOR:=icarus
+#SIMULATOR:=icarus
 #SIMULATOR:=modelsim
-#SIMULATOR:=ncsim
+SIMULATOR:=ncsim
 
 #FPGA board (associated with server below)
 FPGA_BOARD:=AES-KU040-DB-G
@@ -141,7 +140,7 @@ endif
 #server list
 PUDIM:=pudim-flan.iobundle.com
 BABA:=baba-de-camelo.iobundle.com
-MICRO:=micro5.lx.it.pt
+MICRO:=micro7.lx.it.pt
 
 #user list
 MICRO_USER=user14

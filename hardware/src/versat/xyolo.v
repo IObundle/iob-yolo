@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 `include "xversat.vh"
+`include "xdefs.vh"
+
 
 module xyolo # (
 		parameter		      DATA_W = 32

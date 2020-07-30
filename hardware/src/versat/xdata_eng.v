@@ -144,7 +144,9 @@ module xdata_eng # (
 
    // generate iterator
    genvar                                      i;
-   parameter integer MEM_ADDR_W[0 : `nMEM-1] = `MEM_ADDR_W_ARR;
+   // parameter integer 			       MEM_ADDR_W = `MEM_ADDR_W;
+   
+   parameter integer 			       MEM_ADDR_W[0 : `nMEM-1] = `MEM_ADDR_W_ARR;
    generate for (i=0; i < `nMEM; i=i+1) begin : mem_array
       xmem # (
               .DATA_W(`DATAPATH_W),
