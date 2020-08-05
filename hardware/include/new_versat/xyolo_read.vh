@@ -1,5 +1,5 @@
 // Latency
-`define XYOLO_READ_LAT              1
+`define XYOLO_READ_LAT              3
 
 // Configuration offsets
 `define XYOLO_READ_CONF_EXT_ADDR    0

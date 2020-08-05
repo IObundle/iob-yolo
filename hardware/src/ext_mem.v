@@ -232,12 +232,12 @@ module ext_mem
    genvar 					  k;
    generate
       for(k=0; k< (`nYOLOvect+`nSTAGES);k=k+1) begin : databus_to_vcache_fe
-	 assign m_versat_req[`valid_VERSAT(k)] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
-	 assign m_versat_req[`address_VERSAT(k, `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
-	 assign m_versat_req[`wdata_VERSAT(k)] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
-	 assign m_versat_req[`wstrb_VERSAT(k)] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
-	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = m_versat_resp[`rdata_VERSAT(k)];
-	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = m_versat_resp[`ready_VERSAT(k)]; 
+	 assign m_versat_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
+	 assign m_versat_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
+	 assign m_versat_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
+	 assign m_versat_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
+	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = m_versat_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
+	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = m_versat_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
       end
    endgenerate
    

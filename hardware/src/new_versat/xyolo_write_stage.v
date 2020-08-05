@@ -40,6 +40,7 @@ module xyolo_write_stage #(
         input [`PERIOD_W-1:0]           vwrite_perA,
         input [`MEM_ADDR_W-1:0]         vwrite_shiftA,
         input [`MEM_ADDR_W-1:0]         vwrite_incrA,
+        input                           vwrite_bypass,
 
         // xyolo config params
 	input                           xyolo_bias,
@@ -64,11 +65,14 @@ module xyolo_write_stage #(
    // local parameter for merge
    localparam				ADDR_W = `IO_ADDR_W;
 
-   // external addrgen wires
+   // external addrgen wires and regs
    wire					vread_enA, vread_we, vwrite_enA;
+   reg					vread_enA_reg, vread_we_reg;
    wire [`MEM_ADDR_W-1:0]		vread_addrA;
+   reg [`MEM_ADDR_W-1:0]		vread_addrA_reg;
    wire [`VWRITE_ADDR_W-1:0]            vwrite_addrA;
    wire [DATA_W-1:0]      		vread_inA;
+   reg [DATA_W-1:0]      		vread_inA_reg;
    wire [`nYOLOvect*DATA_W-1:0]		vwrite_inA, vwrite_inB;
 
    // done output
@@ -76,7 +80,8 @@ module xyolo_write_stage #(
    assign                               done = &{vread_doneA, vwrite_doneA};
 
    // vread output
-   wire	[DATA_W-1:0]			pixel;
+   wire	[DATA_W-1:0]			pixel, vread_out;
+   reg	[DATA_W-1:0]			vread_out_reg;
 
    // vwrite counter and mux
    reg [$clog2(`nYOLOvect)-1:0]         vwrite_cnt;
@@ -133,6 +138,14 @@ module xyolo_write_stage #(
       .data_in({DATA_W{1'b0}})
    );
 
+   //register vread mem write inputs
+   always @ (posedge clk) begin
+      vread_enA_reg <= vread_enA;
+      vread_we_reg <= vread_we;
+      vread_addrA_reg <= vread_addrA;
+      vread_inA_reg <= vread_inA;
+   end
+
    //internal memory
    iob_2p_mem #(
       .DATA_W(DATA_W),
@@ -141,14 +154,19 @@ module xyolo_write_stage #(
    ) vread_mem (
        .clk(clk),
        // Writting port
-       .w_en(vread_enA & vread_we),
-       .w_addr(vread_addrA),
-       .data_in(vread_inA),
+       .w_en(vread_enA_reg & vread_we_reg),
+       .w_addr(vread_addrA_reg),
+       .data_in(vread_inA_reg),
        // Reading port
        .r_en(vread_enB),
        .r_addr(vread_addrB),
-       .data_out(pixel)
+       .data_out(vread_out)
    );
+
+   //register vread mem read output
+   always @ (posedge clk)
+      vread_out_reg <= vread_out;
+   assign pixel = vread_out_reg;
 
    //
    // vwrite/xyolo vector
@@ -159,7 +177,9 @@ module xyolo_write_stage #(
       if (global_run) begin
          vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
          vwrite_cnt_en <= 1'b0;
-      end else if(m_resp[`ready(1)]) begin
+      end else if(vwrite_bypass)
+         vwrite_cnt_en <= 1'b1;
+      else if(m_resp[`ready(1)]) begin
          if(vwrite_cnt == `nYOLOvect-1) begin
             vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
             vwrite_cnt_en <= 1'b0;

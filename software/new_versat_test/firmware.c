@@ -102,8 +102,8 @@ void conv() {
   //local variables
   int j, k, l;
 #ifdef SIM
-  /* int k_delta = 1; */
-  int k_delta = NTW_IN_W/2;
+  int k_delta = 10;
+  /* int k_delta = NTW_IN_W/2; */
 #endif
 
   /////////////////////////////////////////////////////////////////////////
@@ -257,6 +257,58 @@ void send_data() {
   uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
+//simulate layer 1 READ data
+void mem_test() {
+
+  uart_printf("\nmem_test...\n");
+  start = timer_time_us(TIMER_BASE);
+  int til_w, l, k, j;
+
+  // configure xyolo_read vreads to read bias and kernel from DDR
+  versat.yread.setOffset(2*(1 +3*3*3));
+  versat.yread.setExtPer(1 + 3*3*3);
+  versat.yread.setExtIncr(1);
+
+  // configure xyolo_write vread to read tile from input fm
+  versat.ywrite.read.setOffset(2*(4*418*3));
+  versat.ywrite.read.setExtIncr(1);
+  versat.ywrite.read.setExtIter(4);
+
+  // perform convolution reading
+  for(l = 0; l < 16/nYOLOvect; l++) {
+
+     // read filter
+     versat.yread.setExtIter(1);
+     versat.yread.setExtAddr(2*l*nYOLOvect*(1 + 3*3*3));
+
+     for(k = 0; k < 416/(4*nSTAGES); k++) {
+
+       //update tiling (first time has padding)
+       til_w = 34;
+
+       for(j = 0; j < 416/32; j++) {
+
+	 // configure xyolo_write vread to read tile from input fm
+	 versat.ywrite.read.setExtPer(3*til_w);
+	 versat.ywrite.read.setExtShift(418*3 - 3*til_w);
+	 versat.ywrite.read.setExtAddr(2*(k*4*418*3*nSTAGES + 34*3 + (j-1)*til_w*3));
+
+	 // wait until done
+	 while(versat.done()==0);
+		 
+	 // run configuration
+	 versat.run();
+
+	 // stop xyolo_read vread reading from DDR
+	 versat.yread.setExtIter(0);
+	 til_w = 32; //without padding
+       }
+     }
+  }
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("mem_test done in %d ms\n\n", (end-start)/1000);
+}
+
 int main(int argc, char **argv) {
 
   //init UART
@@ -353,7 +405,8 @@ int main(int argc, char **argv) {
   //first layer conv
   uart_printf("Running convolution...\n");
   start = timer_time_us(TIMER_BASE);
-  conv();
+  /* conv(); */
+  mem_test();
   end = timer_time_us(TIMER_BASE);
   uart_printf("\nConvolution done in %d ms\n\n", (end-start)/1000);
 

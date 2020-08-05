@@ -67,14 +67,23 @@ module xyolo_read #(
 
    // mem enables output by addr gen
    wire [`nYOLOvect-1:0]                enA, we;
+   reg [`nYOLOvect-1:0]                 enA_reg, we_reg;
    wire                                 enB;
+   reg                                  enB_reg;
 
    // port addresses and enables
    wire [`nYOLOvect*`MEM_ADDR_W-1:0]    addrA;
+   reg [`nYOLOvect*`MEM_ADDR_W-1:0]     addrA_reg;
    wire [`MEM_ADDR_W-1:0]               addrB;
+   reg [`MEM_ADDR_W-1:0]                addrB_reg;
 
    // data inputs
    wire [`nYOLOvect*DATA_W-1:0]         inA;
+   reg [`nYOLOvect*DATA_W-1:0]          inA_reg;
+
+   // data output
+   wire [`nYOLOvect*DATA_W-1:0]         weights;
+   reg [`nYOLOvect*DATA_W-1:0]          weights_reg;
 
    // done output
    wire [`nYOLOvect-1:0]                vread_done;
@@ -236,6 +245,18 @@ module xyolo_read #(
 	       bias0[`nYOLOvect*DATA_W-DATA_W*j-1 -: DATA_W] = inA[`nYOLOvect*DATA_W-DATA_W*j-1 -: DATA_W];
    end
 
+   // register mem inputs
+   always @ (posedge clk) begin
+      // read port
+      enA_reg <= enA;
+      we_reg <= we;
+      addrA_reg <= addrA;
+      inA_reg <= inA;
+      // write port
+      enB_reg <= enB;
+      addrB_reg <= addrB;
+   end
+
    // instantiate external address generators and internal memories
    generate
       for (i=0; i < `nYOLOvect; i=i+1) begin : vread_array
@@ -289,19 +310,25 @@ module xyolo_read #(
            .clk(clk),
 
            // Writting port
-           .w_en(enA[i] & we[i]),
-           .w_addr(addrA[`nYOLOvect*`MEM_ADDR_W-`MEM_ADDR_W*i-1 -: `MEM_ADDR_W]),
-           .data_in(inA[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W]),
+           .w_en(enA_reg[i] & we_reg[i]),
+           .w_addr(addrA_reg[`nYOLOvect*`MEM_ADDR_W-`MEM_ADDR_W*i-1 -: `MEM_ADDR_W]),
+           .data_in(inA_reg[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W]),
 
            // Reading port
-           .r_en(enB),
-           .r_addr(addrB),
-           .data_out(flow_out_weight[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W])
+           .r_en(enB_reg),
+           .r_addr(addrB_reg),
+           .data_out(weights[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W])
            );
 
       end
    endgenerate
 
+   // register mem outputs
+   always @ (posedge clk)
+      weights_reg <= weights;
+   assign flow_out_weight = weights_reg;
+
+   // common internal addrgen
    xaddrgen addrgenB (
       .clk(clk),
       .rst(rst),

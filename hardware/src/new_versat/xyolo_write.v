@@ -2,6 +2,7 @@
 
 `include "xversat.vh"
 `include "xyolo_write.vh"
+`include "xyolo_read.vh"
 
 module xyolo_write #(
     	parameter                       DATA_W = 32
@@ -32,6 +33,9 @@ module xyolo_write #(
     	input [`nYOLOvect*DATA_W-1:0]   flow_in_bias,
     	input [`nYOLOvect*DATA_W-1:0]	flow_in_weight
     );
+
+   // vread latency
+   localparam [`PERIOD_W-1:0]           vread_lat = `XYOLO_READ_LAT;
 
    // vwrite configuration enables
    reg                                  vwrite_ext_addr_en;
@@ -96,6 +100,7 @@ module xyolo_write #(
    reg [`PERIOD_W-1:0]                  vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
    reg [`MEM_ADDR_W-1:0]                vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
    reg [`MEM_ADDR_W-1:0]                vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
+   reg                                  vwrite_bypass_shadow; //used for maxpool and upsample
 
    // vread configuration parameters
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
@@ -132,9 +137,11 @@ module xyolo_write #(
    // external address buses
    wire [`nSTAGES*`IO_ADDR_W-1:0]       vwrite_ext_addr_bus, vread_ext_addr_bus;
 
-   // internal addrgen wires
+   // internal addrgen wires and regs
    wire                                 vread_enB, vwrite_enB;
+   reg                                  vread_enB_reg;
    wire [`MEM_ADDR_W-1:0]               vread_addrB, vwrite_addrB;
+   reg [`MEM_ADDR_W-1:0]                vread_addrB_reg;
    wire                                 vread_doneB, vwrite_doneB;
 
    // done output
@@ -384,6 +391,7 @@ module xyolo_write #(
          vwrite_shiftB_pip <= `MEM_ADDR_W'b0;
          vwrite_incrB_shadow <= `MEM_ADDR_W'b0;
          vwrite_incrB_pip <= `MEM_ADDR_W'b0;
+         vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
          vread_int_addr_shadow <= `MEM_ADDR_W'b0;
@@ -467,6 +475,7 @@ module xyolo_write #(
 	 vwrite_shiftB_shadow <= vwrite_shiftB_pip;
 	 vwrite_incrB_pip <= vwrite_incrB;
 	 vwrite_incrB_shadow <= vwrite_incrB_pip;
+         vwrite_bypass_shadow <= xyolo_bypass_shadow;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 //XOR ensures ping-pong happens when acessing external mem
@@ -598,7 +607,7 @@ module xyolo_write #(
       .start(`MEM_ADDR_W'b0),
       .shift(-xyolo_per_shadow[`MEM_ADDR_W-1:0]),
       .incr(`MEM_ADDR_W'b1),
-      .delay(`PERIOD_W'b1), //vread latency
+      .delay(vread_lat),
       .addr(xyolo_addr),
       .mem_en(),
       .done()
@@ -610,11 +619,18 @@ module xyolo_write #(
    assign ld_res = ld_acc1 || xyolo_bypass_shadow;
 
    //update xyolo registers
-   always @ (posedge clk, posedge run_reg)
-      if (run_reg) begin
+   always @ (posedge clk, posedge rst)
+      if(rst) begin
+	 ld_acc0 <= 1'b0;
+         ld_acc1 <= 1'b0;
+	 mp_cnt <= 2'b0;
+      end else if(run_reg) begin
          ld_acc0 <= 1'b0;
          ld_acc1 <= 1'b0;
-	 mp_cnt <= 2'd2;
+         if(xyolo_bypass_shadow)
+	   mp_cnt <= 2'd1;
+         else
+           mp_cnt <= 2'd0;
       end else begin
 	 ld_acc0 <= ld_acc;
          ld_acc1 <= ld_acc0;
@@ -644,6 +660,12 @@ module xyolo_write #(
    // stages
    //
 
+   // register vread mem read inputs
+   always @ (posedge clk) begin
+      vread_enB_reg <= vread_enB;
+      vread_addrB_reg <= vread_addrB;
+   end
+
    //instantiate stages
    generate
      for(i = 0; i < `nSTAGES; i=i+1)  begin : stages
@@ -658,9 +680,9 @@ module xyolo_write #(
            .global_run(run_reg),
            .done(stages_done[i]),
            //internal addrgen
-           .vread_enB(vread_enB),
+           .vread_enB(vread_enB_reg),
            .vwrite_enB(vwrite_enB),
-           .vread_addrB(vread_addrB),
+           .vread_addrB(vread_addrB_reg),
            .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
            //load control
            .ld_acc(ld_acc0),
@@ -680,6 +702,7 @@ module xyolo_write #(
            .vwrite_perA(vwrite_perA_shadow),
            .vwrite_shiftA(vwrite_shiftA_shadow),
            .vwrite_incrA(vwrite_incrA_shadow),
+           .vwrite_bypass(vwrite_bypass_shadow),
            //xyolo config params
            .xyolo_bias(xyolo_bias_shadow),
            .xyolo_leaky(xyolo_leaky_shadow),
