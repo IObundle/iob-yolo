@@ -16,14 +16,14 @@ BOOTROM_ADDR_W:=12
 INIT_MEM:=0
 
 #Choose Firmware (in SW_DIR)
-TEST:=yolo_hw_full
+TEST:=new_versat_test
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
 #RMAC_ADDR:=309c231e624b #Pudim
 
 #Versat
-USE_VERSAT:=0
+USE_NEW_VERSAT:=1
 
 #VCD
 VCD:=0
@@ -93,6 +93,9 @@ endif
 endif
 ifeq ($(INIT_MEM),1)
 DEFINE+=$(define)INIT_MEM 
+endif
+ifeq ($(USE_NEW_VERSAT),1)
+DEFINE+=$(define)USE_NEW_VERSAT
 endif
 DEFINE+=$(define)N_SLAVES=$(N_SLAVES) 
 #address select bits: Extra memory (E), Peripherals (P), Boot controller (B)

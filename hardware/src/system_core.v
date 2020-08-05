@@ -5,12 +5,15 @@
 //do not remove line below
 //PHEADER
 
+`ifdef USE_NEW_VERSAT
+`include "xversat.vh"
+`endif   
+
 module system 
   (
    //do not remove line below
    //PIO
 
-   
 `ifdef USE_DDR //AXI MASTER INTERFACE
 
    //address write
@@ -233,6 +236,16 @@ module system
       );
 
 `ifdef USE_DDR
+
+ `ifdef USE_NEW_VERSAT
+   // Connect Versat to L1 Caches in ext_mem
+   wire [`nYOLOvect+`nSTAGES-1:0]                 dbus_ready, dbus_valid;
+   wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W-1:0]   dbus_wdata, dbus_rdata;
+   wire [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0]    dbus_addr;
+   wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W/8-1:0] dbus_wstrb;
+
+ `endif
+
    //
    // EXTERNAL DDR MEMORY
    //
@@ -251,6 +264,16 @@ module system
         .d_req                (ext_mem_d_req),
         .d_resp               (ext_mem_d_resp),
 
+`ifdef USE_NEW_VERSAT
+	//Versat bus
+	.databus_valid        (dbus_valid),
+	.databus_addr         (dbus_addr),
+	.databus_wdata        (dbus_wdata),
+	.databus_wstrb        (dbus_wstrb),
+	.databus_rdata        (dbus_rdata),
+	.databus_ready        (dbus_ready),
+`endif
+	
         //AXI INTERFACE 
         //address write
         .axi_awid(m_axi_awid), 

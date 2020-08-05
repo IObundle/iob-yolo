@@ -12,7 +12,13 @@ endif
 INC_DIR:=$(ROOT_DIR)/hardware/include
 SOC_INC_DIR:=$(SOC_DIR)/hardware/include
 
-INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR) $(incdir)$(INC_DIR)/versat
+INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR)
+# Versat yolo includes
+ifeq ($(USE_NEW_VERSAT),1)
+INCLUDE+=$(incdir)$(INC_DIR)/new_versat
+endif
+INCLUDE+=$(incdir)$(INC_DIR)/versat
+
 #Check for versat.json
 ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
 	INCLUDE+=$(incdir)$(FIRM_DIR)
@@ -45,13 +51,20 @@ VSRC+=$(SRC_DIR)/system.v
 
 ifneq ($(VERSAT),)
 #Versat yolo
+ifeq ($(USE_NEW_VERSAT),1)
+VSRC+=$(wildcard $(SRC_DIR)/new_versat/*.v)
+else
 VSRC+=$(wildcard $(SRC_DIR)/versat/*.v)
+endif
 endif
 
 # peripherals
 periphs:
 	$(eval include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk)
 	$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/hardware/hardware.mk))
+#Remove duplicated files
+	$(eval VSRC_AUX = $(VSRC))
+	$(eval VSRC = $(foreach file,$(notdir $(VSRC_AUX)),$(word 1,$(filter %$(file),$(VSRC_AUX))))) 
 
 $(SRC_DIR)/system.v:
 	cp $(SRC_DIR)/system_core.v $@
