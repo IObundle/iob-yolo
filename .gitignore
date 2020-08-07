@@ -21,4 +21,5 @@ software/*/*
 !software/*/firmware.S
 !software/*/Makefile
 !software/*/*.json
+!software/*/*.py
 software/periphs.h
