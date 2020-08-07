@@ -222,44 +222,80 @@ module ext_mem
    //Front-end bus
    wire [`REQ_VERSAT_W-1:0] 	  vcache_fe_req;
    wire [`RESP_VERSAT_W-1:0] 	  vcache_fe_resp;
-
+   // wire [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] 	  vcache_fe_req;
+   // wire [(`nYOLOvect+`nSTAGES)*`RESP_VERSAT_W-1:0] 	  vcache_fe_resp;
+   
    //connect Versat databus to vcache front-end
 
    wire [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] m_versat_req;
    wire [(`nYOLOvect+`nSTAGES)*`RESP_VERSAT_W-1:0] m_versat_resp;
 
+   //register merge entries
+   reg [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] m_versat_req_r;
+   // reg [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0] 	  databus_addr_r;
+   
+   always @(posedge clk, posedge rst)
+      if(rst) begin
+   	 m_versat_req_r <= {(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W{1'b0}};
+      end else begin
+	 if(vcache_fe_resp[0]) begin // || vcache_fe_ready_0) begin
+   	    m_versat_req_r <= {(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W{1'b0}};
+	 end else begin
+   	    m_versat_req_r <= m_versat_req;
+	 end
+      end
+   
    //concatenate databus interface to merge master interface
    genvar 					  k;
    generate
       for(k=0; k< (`nYOLOvect+`nSTAGES);k=k+1) begin : databus_to_vcache_fe
-	 assign m_versat_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
-	 assign m_versat_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
-	 assign m_versat_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
-	 assign m_versat_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
-	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = m_versat_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
-	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = m_versat_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
+   	 assign m_versat_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
+   	 assign m_versat_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
+   	 assign m_versat_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
+   	 assign m_versat_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
+   	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = m_versat_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
+   	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = m_versat_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
       end
    endgenerate
+    
+   
+   // //concatenate databus interface to merge master interface
+   // genvar 					  k;
+   // generate
+   //    for(k=0; k< (`nYOLOvect+`nSTAGES);k=k+1) begin : databus_to_vcache_fe
+   // 	 assign vcache_fe_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
+   // 	 assign vcache_fe_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
+   // 	 assign vcache_fe_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
+   // 	 assign vcache_fe_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
+   // 	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = vcache_fe_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
+   // 	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = vcache_fe_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
+   //    end
+   // endgenerate
+
    
    //merge
    merge #(
-	   .N_MASTERS(`nYOLOvect+`nSTAGES),
-	   .DATA_W(`DATAPATH_W),
-	   .ADDR_W(`IO_ADDR_W)
-	   ) vcache_merge (
-			   //masters interface
-			   .m_req(m_versat_req),
-			   .m_resp(m_versat_resp),
-			   //slave interface
-			   .s_req(vcache_fe_req),
-			   .s_resp(vcache_fe_resp)
-			   );
-     
+   	   .N_MASTERS(`nYOLOvect+`nSTAGES),
+   	   .DATA_W(`DATAPATH_W),
+   	   .ADDR_W(`IO_ADDR_W)
+   	   ) vcache_merge (
+   			   //masters interface
+   			   .m_req(m_versat_req_r),
+   			   .m_resp(m_versat_resp),
+   			   //slave interface
+   			   .s_req(vcache_fe_req),
+   			   .s_resp(vcache_fe_resp)
+   			   );
+      
    //Back-end bus
 
    wire [`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
    wire [`RESP_MIG_BUS_W-1:0] 	  vcache_be_resp;
 
+   // wire [(`nYOLOvect+`nSTAGES)*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
+   // wire [(`nYOLOvect+`nSTAGES)*`RESP_MIG_BUS_W-1:0] 	  vcache_be_resp;
+
+   
    // Versat cache instance
    iob_cache # 
      (
@@ -293,6 +329,47 @@ module ext_mem
            .mem_ready (vcache_be_resp[`ready_MIG_BUS(0)])
            );
 
+   // genvar 						  l;
+   // generate
+   //    for(l=0;l<(`nYOLOvect+`nSTAGES);l=l+1) begin : vcaches_l1
+   // 	 // Versat cache instance
+   // 	 iob_cache # 
+   // 	    (
+   // 	     .FE_ADDR_W(`DDR_ADDR_W),
+   // 	     .N_WAYS(1),        //Number of ways
+   // 	     .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
+   // 	     .WORD_OFF_W(5),    //Word Offset (number of words per line)
+   // 	     .WTBUF_DEPTH_W(4), //FIFO's depth
+   // 	     .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
+   // 	     .FE_DATA_W(`DATAPATH_W), //DATAPATH_W = 16 front-end
+   // 	     .BE_DATA_W(`MIG_BUS_W)
+   // 	     )
+   // 	 vcache (
+   // 		 .clk   (clk),
+   // 		 .reset (rst),
+
+   // 		 // Front-end interface
+   // 		 .valid (vcache_fe_req[`valid_VERSAT(l)]),
+   // 		 .addr  (vcache_fe_req[`address_VERSAT(l,`DDR_ADDR_W+1)-1]),
+   // 		 .wdata (vcache_fe_req[`wdata_VERSAT(l)]),
+   // 		 .wstrb (vcache_fe_req[`wstrb_VERSAT(l)]),
+   // 		 .rdata (vcache_fe_resp[`rdata_VERSAT(l)]),
+   // 		 .ready (vcache_fe_resp[`ready_VERSAT(l)]),
+		 
+   // 		 // Back-end interface
+   // 		 .mem_valid (vcache_be_req[`valid_MIG_BUS(l)]),
+   // 		 .mem_addr  (vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)]),
+   // 		 .mem_wdata (vcache_be_req[`wdata_MIG_BUS(l)]),
+   // 		 .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS(l)]),
+   // 		 .mem_rdata (vcache_be_resp[`rdata_MIG_BUS(l)]),
+   // 		 .mem_ready (vcache_be_resp[`ready_MIG_BUS(l)])
+   // 		 );
+
+   // 	 //assign MSBs of address fields
+   // 	 assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
+	 	 
+   //    end
+   // endgenerate
 `endif
    
    
@@ -317,7 +394,7 @@ module ext_mem
      .N_MASTERS(2),
 `else
  `ifdef USE_NEW_VERSAT
-       .N_MASTERS(2),
+       .N_MASTERS(2), //1+(`nYOLOvect+`nSTAGES)),
  `else
        .N_MASTERS(1),
  `endif

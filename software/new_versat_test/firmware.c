@@ -102,7 +102,7 @@ void conv() {
   //local variables
   int j, k, l;
 #ifdef SIM
-  int k_delta = 10;
+  int k_delta = 1;
   /* int k_delta = NTW_IN_W/2; */
 #endif
 
@@ -405,8 +405,8 @@ int main(int argc, char **argv) {
   //first layer conv
   uart_printf("Running convolution...\n");
   start = timer_time_us(TIMER_BASE);
-  /* conv(); */
-  mem_test();
+  conv();
+  /* mem_test(); */
   end = timer_time_us(TIMER_BASE);
   uart_printf("\nConvolution done in %d ms\n\n", (end-start)/1000);
 
