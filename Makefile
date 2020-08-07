@@ -3,11 +3,20 @@ include ./system.mk
 
 run: sim
 
+sim-loc:
+	make -C hardware/simulation/ncsim
+
+ld-sw:
+	make -C software/console run
+
+ld-hw:
+	make -C $(FPGA_DIR) load
+
 sim: setsim firmware bootloader
 ifeq ($(SIMULATOR),ncsim)
 	ssh $(MICRO_USER)@$(SIM_SERVER) "if [ ! -d $(MICRO_ROOT_DIR) ]; then mkdir -p $(MICRO_ROOT_DIR); fi"
 	rsync -avz --exclude .git . $(MICRO_USER)@$(SIM_SERVER):$(MICRO_ROOT_DIR) 
-	ssh $(MICRO_USER)@$(SIM_SERVER) "cd $(MICRO_ROOT_DIR); make -C $(SIM_DIR)"
+	#ssh $(MICRO_USER)@$(SIM_SERVER) "cd $(MICRO_ROOT_DIR); make -C $(SIM_DIR)"
 else
 	make -C $(SIM_DIR)
 endif
@@ -18,7 +27,7 @@ fpga: firmware bootloader
 	ssh $(USER)@$(FPGA_COMPILE_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) compile"
 
 
-fpga-load: fpga
+fpga-load: firmware bootloader
 ifeq ($(FPGA_BOARD_SERVER),$(FPGA_COMPILE_SERVER))
 	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) load"
 else
@@ -77,6 +86,7 @@ else
 endif
 	make -C $(FIRM_DIR) clean
 	make -C $(BOOT_DIR) clean
+	make -C $(CONSOLE_DIR) clean
 
 
 .PHONY: sim fpga fpga-clean fpga-clean-ip fpga-load firmware bootloader clean run-firmware

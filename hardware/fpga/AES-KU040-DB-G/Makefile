@@ -20,10 +20,10 @@ synth_system.bit: $(wildcard *.xdc) $(VSRC) boot.hex
 	-grep -B1 -A9 ^Slack vivado.log && echo
 
 clean: hw-clean
-	rm -rf .Xil/ *.map *. *~ synth_*.mmi synth_*.bit synth_system*.v *.vcd *_tb table.txt tab_*/ *webtalk* *.jou xelab.* xsim[._]* xvlog.* uart_loader *.ltx fsm_encoding.os
+	rm -rf .Xil/ *.map *. *~ synth_*.mmi synth_*.bit synth_system*.v *.vcd *_tb table.txt tab_*/ *webtalk* *.jou xelab.* xsim[._]* xvlog.* uart_loader *.ltx fsm_encoding.os *.log .log
 
 clean-ip:
-	rm -rf ip *.log
+	rm -rf ip
 
 .PRECIOUS: synth_system.bit
 
