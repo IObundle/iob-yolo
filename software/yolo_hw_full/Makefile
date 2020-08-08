@@ -28,6 +28,6 @@ versat:
 	python $(VERSAT_PYTHON_DIR)/mkhdr.py . $(HW_DIR)/include/versat $(VERSAT_INC_DIR) .
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim *.vh *.pyc *.bin
 
 .PHONY: run clean

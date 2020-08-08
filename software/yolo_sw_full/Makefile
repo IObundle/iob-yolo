@@ -54,7 +54,7 @@ endif
 
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim tmpLocalSocket
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex *.pyc *.bin ../periphs.h *~ pcsim tmpLocalSocket
 	@sed -i "/interm_data_flag =/d" eth_comm.py
 	@sed -i "/fixed_flag =/d" eth_comm.py
 
