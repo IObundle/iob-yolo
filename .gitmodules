@@ -1,12 +1,12 @@
-[submodule "submodules/iob-eth"]
-	path = submodules/iob-eth
-	url = git@bitbucket.org:jjts/iob-eth.git
 [submodule "submodules/iob-soc"]
 	path = submodules/iob-soc
-	url = git@bitbucket.org:jjts/iob-soc.git
-[submodule "submodules/iob-timer"]
-	path = submodules/iob-timer
-	url = git@bitbucket.org:jjts/iob-timer.git
-[submodule "submodules/iob-versat"]
-	path = submodules/iob-versat
-	url = https://github.com/jjts/versat.git
+	url = git@github.com:IObundle/iob-soc
+[submodule "submodules/TIMER"]
+	path = submodules/TIMER
+	url = git@github.com:IObundle/iob-timer
+[submodule "submodules/ETHERNET"]
+	path = submodules/ETHERNET
+	url = git@github.com:IObundle/iob-eth
+[submodule "submodules/VERSAT"]
+	path = submodules/VERSAT
+	url = git@github.com:IObundle/iob-versat

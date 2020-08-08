@@ -1,31 +1,22 @@
-TOOLCHAIN_PREFIX := riscv32-unknown-elf-
+ROOT_DIR:=../..
+include $(ROOT_DIR)/software/software.mk
+include $(CACHE_DIR)/software/software.mk
 
-PYTHON_DIR := ../../submodules/iob-soc/software/python
-CONSOLE_DIR = ../../submodules/iob-soc/software/ld-sw
-UART_DIR := ../../submodules/iob-soc/submodules/iob-uart/c-driver
-CACHE_DIR := ../../submodules/iob-soc/submodules/iob-cache/c-driver
-BOOT_DIR := ../../submodules/iob-soc/software/bootloader
+#specific compiler flags
+CFLAGS+=-Wl,-Bstatic,-T,../template.lds,-Map,boot.map,--strip-debug
 
+#specific sources
+BOOT_SRC+=$(BOOT_SRC_DIR)/boot.S boot.c $(CACHE_SW_DIR)/iob-cache.c
+#specific includes
+BOOT_INCLUDE+=$(incdir)$(CACHE_SW_DIR) 
 
-INCLUDE =  -I. -I$(UART_DIR) -I$(CACHE_DIR) -I$(CONSOLE_DIR)
+run: boot.elf
 
-DEFINE = -DUART_BAUD_RATE=$(BAUD) -DUART_CLK_FREQ=$(FREQ)
-DEFINE += -DPROG_SIZE=`wc -c   ../../software/$(TEST)/firmware.bin | head -n1 | cut -d " " -f1`
-
-SRC = $(BOOT_DIR)/boot.S boot.c $(UART_DIR)/iob-uart.c
-
-all: boot.hex
-
-boot.hex: $(SRC) system.h $(UART_DIR)/iob-uart.h $(CONSOLE_DIR)/console.h $(BOOT_DIR)/boot.lds
-	$(TOOLCHAIN_PREFIX)gcc -Os -ffreestanding -nostdlib -march=rv32im -mabi=ilp32 -o boot.elf $(INCLUDE) $(DEFINE) $(SRC) --std=gnu99 -Wl,-Bstatic,-T,$(BOOT_DIR)/boot.lds,-Map,boot.map,--strip-debug -lgcc -lc
+boot.elf: ../template.lds  $(HDR) $(BOOT_SRC)
+	$(TOOLCHAIN_PREFIX)gcc -o $@ $(CFLAGS) $(DEFINE) $(BOOT_INCLUDE) $(BOOT_SRC) -lgcc -lc
 	$(TOOLCHAIN_PREFIX)objcopy -O binary boot.elf boot.bin
-	$(eval MEM_SIZE=`$(PYTHON_DIR)/get_memsize.py BOOTROM_ADDR_W`)
-	$(PYTHON_DIR)/makehex.py boot.bin $(MEM_SIZE) > boot.hex
-
-system.h: ../../rtl/include/system.vh
-	sed s/\`/\#/g ../../rtl/include/system.vh > system.h
 
 clean:
-	@rm -rf boot.bin boot.elf boot.map *.hex *.dat
-	@rm -rf uart_loader *~
-	@rm -rf ../uart_loader system.h
+	@rm -rf boot.bin boot.elf boot.map *.hex ../periphs.h *~
+
+.PHONY: clean

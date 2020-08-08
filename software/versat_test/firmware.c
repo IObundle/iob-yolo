@@ -1,5 +1,7 @@
 //import custom libraries
 #include "system.h"
+#include "periphs.h"
+
 #include "iob-uart.h"
 #include "iob_timer.h"
 #include "versat.hpp"
@@ -10,11 +12,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-//define peripheral base addresses
-#define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
-#define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
-#define VERSAT (VERSAT_BASE<<(ADDR_W-N_SLAVES_W))
-
 int main(int argc, char **argv) {
 
   //local variables
@@ -23,20 +20,19 @@ int main(int argc, char **argv) {
   unsigned int start, end;
 
   //init UART
-  uart_init(UART,UART_CLK_FREQ/UART_BAUD_RATE);
+  uart_init(UART_BASE,FREQ/BAUD);
 
   //send init message
   uart_printf("\nVERSAT TEST \n\n");
-  uart_txwait();
 
   //init VERSAT
-  start = timer_get_count_us(TIMER);
-  versat_init(VERSAT);
-  end = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
+  versat_init(VERSAT_BASE);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Deep versat initialized in %d us\n", (end-start));
 
   //write data in versat mems
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   for(j = 0; j < nSTAGE; j++) {
 
     //write 5x5 feature map in mem0
@@ -57,7 +53,7 @@ int main(int argc, char **argv) {
       stage[j].memA[2].write(0, bias);
     }
   }
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\nData stored in versat mems in %d us\n", (end-start));
 
   //expected result of 3D convolution
@@ -85,7 +81,7 @@ int main(int argc, char **argv) {
 
   //configure mem2A to read bias
   int delay = 0, in_1_alulite = sMEMA[2];
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   stage[0].memA[2].setIter(1);
   stage[0].memA[2].setPer(9);
   stage[0].memA[2].setDuty(9);
@@ -134,11 +130,11 @@ int main(int argc, char **argv) {
   stage[nSTAGE-1].memA[2].setDuty(1);
   stage[nSTAGE-1].memA[2].setSel(sALULITE[0]);
   stage[nSTAGE-1].memA[2].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
   
   //perform convolution
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   for(i = 0; i < 3; i++) {
     for(j = 0; j < 3; j++) {
 
@@ -153,13 +149,13 @@ int main(int argc, char **argv) {
       while(done() == 0);
     }
   }  
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\n3D convolution done in %d us\n", (end-start));
 
   //display results
   uart_printf("\nActual convolution result\n");
   for(i = 0; i < 3; i++) {
-    for(j = 0; j < 3; j++) uart_printf("%d\t", (int16_t) stage[nSTAGE-1].memA[2].read(i*3+j));
+    for(j = 0; j < 3; j++) uart_printf("%d\t", stage[nSTAGE-1].memA[2].read(i*3+j));
     uart_printf("\n");
   }
 
@@ -171,7 +167,7 @@ int main(int argc, char **argv) {
 
   //loop to configure versat stages
   delay = 0, in_1_alulite = sMEMA[2];
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
 
   //configure mem2A of versat0 to read bias
   stage[0].memA[2].setIter(9);
@@ -214,14 +210,14 @@ int main(int argc, char **argv) {
   stage[nSTAGE-1].memA[2].setDuty(1);
   stage[nSTAGE-1].memA[2].setSel(sALULITE[0]);
   stage[nSTAGE-1].memA[2].setInWr(1);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\nConfigurations (except start) made in %d us\n", (end-start));
   
   //perform convolution
-  start = timer_get_count_us(TIMER);
+  start = timer_time_us(TIMER_BASE);
   run();
   while(done() == 0);
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\n3D convolution done in %d us\n", (end-start));
 
   //display results
@@ -249,6 +245,6 @@ int main(int argc, char **argv) {
 
   //return data
   uart_printf("\n");
-  uart_putc(4);
+  uart_putc(ETX);
   return 0;
 }

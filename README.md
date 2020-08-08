@@ -5,7 +5,7 @@ Repository for the implementation of an object detection application based on th
 # Software Tests
 ## Utility Software
 - **bootloader:** firmware to use as BOOT - waits to receive another firmware via UART
-- **ld-sw:** program that runs on the machine and sends the firmware received by the bootloarder
+- **console:** program that runs on the machine, sends the firmware received by the bootloader and handles UART communication
 
 ## Test Software
 - **ddr_test:** writes N positions of DDR and reads them. Goal: verify correct functioning of the DDR.
@@ -16,3 +16,4 @@ Repository for the implementation of an object detection application based on th
 - **yolo_sw_full:** Full execution of the YOLO pipeline (image resize, tiny-yolo CNN and detections). Goal: baseline for hardware acceleration of full YOLO pipeline.
 - **versat_test:** performs one 3D convolution with 5 input FMs of 5x5 and kernels of 3x3. Goal: verify deep_versat pipeline is working.
 - **yolo_hw_full:** Full execution of YOLO pipeline using versat. Goal: adapt yolo-sw code to be easily accelerated by versat.
+- **new_versat_test:** Computing yolov3-tiny layer 1 output with nSTAGES of nYOLOvect each. Goal: verify new versat is working.

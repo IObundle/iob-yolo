@@ -1,5 +1,5 @@
 #Import libraries
-from socket import socket, AF_PACKET, SOCK_RAW, htons
+from socket import socket, AF_PACKET, SOCK_RAW, htons, AF_UNIX, SOCK_SEQPACKET
 from os.path import getsize
 from time import sleep
 import sys
@@ -9,12 +9,26 @@ if len(sys.argv) < 3:
     print("<usage>: python eth_comm.py <interface> <RMAC> ")
     sys.exit()
 
+#Check for PC simulation
+if len(sys.argv) > 4:
+    PCSIM = (sys.argv[4] == "PCsim")
+else:
+    PCSIM = 0
+
 #Ethernet parameters
-interface = sys.argv[1]
-src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
+#Common parameters
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
 eth_type = "\x08\x00"                       # ethernet frame type
 ETH_P_ALL = 0x0800   
+
+if PCSIM: #PC simulation
+    print(sys.argv[3])
+    SOCKET_NAME = sys.argv[3] + "/tmpLocalSocket"
+    src_addr = dst_addr
+    print("**** PC simulation ***")
+else: # embedded
+    interface = sys.argv[1]
+    src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
 
 #Open output.network
 filename = "../output_fixed.network"
@@ -27,9 +41,17 @@ num_frames = int(file_size/eth_nbytes)
 print("file_size: %d" % file_size)     
 print("num_frames: %d" % (num_frames+1))
     
-#Open socket and bind
-s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
-s.bind((interface, 0))
+#Connect with Firmware
+if PCSIM: # PC Simulation: open local socket
+    #Open socket and bind
+    s = socket(AF_UNIX, SOCK_SEQPACKET, 0)
+    #Connect to Peer
+    s.connect(SOCKET_NAME)
+else: # Embedded: open raw ethernet socket
+    #Open socket and bind
+    s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
+    s.bind((interface, 0))
+
 print("Starting data transmission...")
 
 #Counters
@@ -57,7 +79,7 @@ for j in range(num_frames+1):
     s.send(dst_addr + src_addr + eth_type + payload + padding)
 
     #Wait some time
-    sleep(0.0025)
+    sleep(0.05)
     
 #Close and open file again
 fp.close()
@@ -92,7 +114,7 @@ for j in range(num_frames+1):
         if s2 != r:
             count_errors += 1
 
-print("Data sent and received with %d errors\n", count_errors)
+print("Data sent and received with %d errors\n" % count_errors)
 
 #Close file
 fp.close()

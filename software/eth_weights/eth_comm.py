@@ -1,5 +1,5 @@
 #Import libraries
-from socket import socket, AF_PACKET, SOCK_RAW, htons, timeout
+from socket import socket, AF_PACKET, SOCK_RAW, htons, timeout, AF_UNIX, SOCK_SEQPACKET
 import sys
 import os
 import struct
@@ -27,8 +27,14 @@ def print_MAC_ADDR(rcv, i):
     return
 
 def main(argv):
-    
-    # Path to files - suposed to be on sandbox/
+
+    #Check for PC simulation
+    if len(sys.argv) > 4:
+        PCSIM = (sys.argv[4] == "PCsim")
+    else:
+        PCSIM = 0
+
+    # Path to files - supposed to be on sandbox/
     weights_path = "../yolov3-tiny_batch-fixed.weights"
     data_path = "../input_fixed.network"
 
@@ -48,12 +54,20 @@ def main(argv):
         sys.exit(1)
 
     #Ethernet parameters
-    interface = sys.argv[1]
-    src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
+    #Common parameters
     dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
     eth_type = "\x08\x00"                       # ethernet frame type
     ETH_P_ALL = 0x0800                          # ethernet frame type
-        
+
+    if PCSIM: #PC simulation
+        print(sys.argv[3])
+        SOCKET_NAME = sys.argv[3] + "/tmpLocalSocket"
+        src_addr = dst_addr
+        print("**** PC simulation ***")
+    else: # embedded
+        interface = sys.argv[1]
+        src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
+       
     #Frame parameter
     eth_nbytes = 1024-18
 
@@ -66,9 +80,16 @@ def main(argv):
     print("num_data_frames: %d\n" % num_data_frames)
     print("num_weight_frames: %d\n" % num_weight_frames)
 
-    #Open socket and bind
-    s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
-    s.bind((interface, 0))
+    #Connect with Firmware
+    if PCSIM: # PC Simulation: open local socket
+        #Open socket and bind
+        s = socket(AF_UNIX, SOCK_SEQPACKET, 0)
+        #Connect to Peer
+        s.connect(SOCKET_NAME)
+    else: # Embedded: open raw ethernet socket
+        #Open socket and bind
+        s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
+        s.bind((interface, 0))
 
     print("Starting input data transmission...\n")
 

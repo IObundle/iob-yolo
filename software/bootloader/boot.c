@@ -1,111 +1,54 @@
 #include "system.h"
+#include "interconnect.h"
 #include "iob-uart.h"
 #include "iob-cache.h"
-#include "console.h"
 
-//memory access macros
-#define RAM_PUTCHAR(location, value) (*((char*) (location)) = value)
-#define RAM_PUTINT(location, value) (*((int*) (location)) = value)
+#define UART_BASE (1<<P) |(UART<<(ADDR_W-2-N_SLAVES_W))
 
-
-//peripheral addresses 
-//memory
-#ifdef USE_MAINRAM
-  #define MAIN_MEM (MAINRAM_BASE<<(ADDR_W-N_SLAVES_W))
+// address to copy firmware to
+#if (USE_DDR==0 || (USE_DDR==1 && RUN_DDR==0))
+char *prog_start_addr = (char *) (1<<BOOTROM_ADDR_W);
 #else
-  #ifdef USE_DDR
-    #define MAIN_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
-  #else
-    #define MAIN_MEM (MAINRAM_BASE<<(ADDR_W-N_SLAVES_W))
-  #endif
+char *prog_start_addr = (char *) EXTRA_BASE;
 #endif
 
-//uart
-#define UART (UART_BASE<<(ADDR_W-N_SLAVES_W))
-//soft reset
-#define SOFT_RESET (SOFT_RESET_BASE<<(ADDR_W-N_SLAVES_W))
-//cache controller
-#define CACHE_CTRL (CACHE_CTRL_BASE<<(ADDR_W-N_SLAVES_W))
-
-//#define DEBUG  // Uncomment this line for debug printfs
-
-unsigned int receiveFile(void) {
-  
-  // Send Start to PC
-  uart_putc(STR);
-  
-  // Get file size
-  unsigned int file_size = (unsigned int) uart_getc();
-  file_size |= ((unsigned int) uart_getc()) << 8;
-  file_size |= ((unsigned int) uart_getc()) << 16;
-  file_size |= ((unsigned int) uart_getc()) << 24;
-  
-  // Write file to main memory
-  volatile char *mem = (volatile char *) MAIN_MEM;
-  for (unsigned int i = 0; i < file_size; i++) {
-    mem[i] = uart_getc();
-  }
-  
-  return file_size;
-}
-
-void sendFile(unsigned int file_size, unsigned int offset) {
-  
-  // Wait for PC
-  while (uart_getc() != STR);
-  
-  // Write file size
-  uart_putc((char)(file_size & 0x0ff));
-  uart_putc((char)((file_size & 0x0ff00) >> 8));
-  uart_putc((char)((file_size & 0x0ff0000) >> 16));
-  uart_putc((char)((file_size & 0x0ff000000) >> 24));
-  
-  // Read file from main memory
-  volatile char *mem = (volatile char *) (MAIN_MEM + offset);
-  for (unsigned int i = 0; i < file_size; i++) {
-    uart_putc(mem[i]);
-  }
-  
-  return;
-}
+#define LOAD STX
+#define SEND ETX
+#define RUN  EOT
 
 int main() {
-  
-  // Start Communication
-  uart_init(UART, UART_CLK_FREQ/UART_BAUD_RATE);
-  
-  // Request File
-  uart_puts ("Loading program from UART...\n");
-  uart_putc(STX);
-  
-  unsigned int prog_size = receiveFile();
-  
-  uart_printf("load_address=%x, prog_size=%d \n", MAIN_MEM, prog_size);
-  
-#ifdef DEBUG
-  uart_puts("Printing program from Main Memory:\n");
-  
-  volatile int *memInt = (volatile int *) MAIN_MEM;
-  for (unsigned int i = 0; i < prog_size/4; i++){
-    uart_printf("%x\n", memInt[i]);
+
+  //init uart 
+  uart_init(UART_BASE, FREQ/BAUD);
+
+  //connect with host, comment to disable handshaking
+  uart_connect();
+
+  //welcome message
+  uart_puts ("\n\n\nIOb-SoC Bootloader:\n\n");
+
+  unsigned int file_size;
+  //enter command loop
+  while (1) {
+    char host_cmd = uart_getcmd(); //receive command
+    switch(host_cmd) {
+    case LOAD: //load firmware
+      file_size = uart_getfile(prog_start_addr);
+      break;
+    case SEND: //return firmware to host
+      uart_sendfile(file_size, prog_start_addr);
+      break;
+    default: break;
+    case RUN: //run firmware
+      uart_puts ("Reboot CPU and run program...\n");
+#if USE_DDR
+      //wait for cache write buffer to empty  
+      cache_init(DDR_ADDR_W);
+      while(!cache_buffer_empty());
+#endif
+      //reboot and run firmware
+      MEM_SET(int, BOOTCTR_BASE, 2);//{cpu_rst_req=1, boot=0}
+      break;
+    }
   }
-  uart_puts("Finished printing the Main Memory program\n");
-#endif
-  
-#ifdef USE_DDR
-  while(!ctrl_buffer_empty(CACHE_CTRL));
-#endif
-  
-  uart_puts("Program loaded\n");
-  
-  // Send File
-  uart_puts ("Sending program to UART...\n");
-  uart_putc(SRX);
-  
-  sendFile(prog_size, 0);
-  
-  uart_puts("Program sent\n");
-  uart_txwait();
-  
-  RAM_PUTINT(SOFT_RESET, 0);
 }

@@ -1,54 +1,76 @@
-#configurable parameters
-TEST = yolo_hw_full
-LOOPBACK = 0
-XILINX = 1
-VCD = 0
-ICARUS = 1
+ROOT_DIR:=.
+include ./system.mk
 
-#directories
-ifeq ($(ICARUS),1)
-   SIM_DIR = simulation/icarus
-else
-   SIM_DIR = simulation/ncsim
-endif
-LD_SW_DIR = software/ld-sw
-ifeq ($(XILINX),1)
-   FPGA_DIR = fpga/xilinx/AES-KU040-DB-G
-else
-   FPGA_DIR = fpga/intel/CYCLONEV-GT-DK
-endif
-FIRM_DIR = software/$(TEST)
-ETH_DIR = submodules/iob-eth
+run: sim
 
-#Run source inside Makefile
-SHELL := /bin/bash
+sim-loc:
+	make -C hardware/simulation/ncsim
 
-all:
-	@echo "options: make [sim | fpga | ld-sw | ld-hw | ld-eth | clean]"
-	@echo "sim    -> run simulation"
-	@echo "fpga   -> generate bitstream"
-	@echo "ld-sw  -> read from serial port and, if case, send program through uart"
-	@echo "ld-hw  -> send bitstream to FPGA"
-	@echo "ld-eth -> communicate through FPGA via Ethernet"
-	@echo "clean  -> clean repo"
-
-
-sim: 
-	make -C $(SIM_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX) VCD=$(VCD)
-
-fpga: rmac
-	make -C $(FPGA_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
-
-ld-sw: rmac
-	make -C $(LD_SW_DIR) TEST=$(TEST) LOOPBACK=$(LOOPBACK) XILINX=$(XILINX)
+ld-sw:
+	make -C software/console run
 
 ld-hw:
-	make -C $(FPGA_DIR) ld-hw
+	make -C $(FPGA_DIR) load
 
+sim: setsim firmware bootloader
+ifeq ($(SIMULATOR),ncsim)
+	ssh $(MICRO_USER)@$(SIM_SERVER) "if [ ! -d $(MICRO_ROOT_DIR) ]; then mkdir -p $(MICRO_ROOT_DIR); fi"
+	rsync -avz --exclude .git . $(MICRO_USER)@$(SIM_SERVER):$(MICRO_ROOT_DIR) 
+	#ssh $(MICRO_USER)@$(SIM_SERVER) "cd $(MICRO_ROOT_DIR); make -C $(SIM_DIR)"
+else
+	make -C $(SIM_DIR)
+endif
+
+fpga: firmware bootloader
+	ssh $(USER)@$(FPGA_COMPILE_SERVER) "if [ ! -d $(REMOTE_ROOT_DIR) ]; then mkdir -p $(REMOTE_ROOT_DIR); fi"
+	rsync -avz --exclude .git . $(USER)@$(FPGA_COMPILE_SERVER):$(REMOTE_ROOT_DIR) 
+	ssh $(USER)@$(FPGA_COMPILE_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) compile"
+
+
+fpga-load: firmware bootloader
+ifeq ($(FPGA_BOARD_SERVER),$(FPGA_COMPILE_SERVER))
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) load"
+else
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "if [ ! -d $(REMOTE_ROOT_DIR) ]; then mkdir -p $(REMOTE_ROOT_DIR); fi"
+	ssh $(USER)@$(FPGA_COMPILE_SERVER) "cd $(REMOTE_ROOT_DIR); rsync -avz --exclude .git . $(USER)@$(FPGA_BOARD_SERVER):$(REMOTE_ROOT_DIR)"
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) load"
+endif
+
+fpga-clean: clean
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "if [ -d $(REMOTE_ROOT_DIR) ]; then cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) clean; fi"
+	ssh $(USER)@$(FPGA_COMPILE_SERVER) "if [ -d $(REMOTE_ROOT_DIR) ]; then cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) clean; fi"
+
+fpga-clean-ip: fpga-clean
+	ssh $(USER)@$(FPGA_COMPILE_SERVER) "if [ -d $(REMOTE_ROOT_DIR) ]; then cd $(REMOTE_ROOT_DIR); make -C $(FPGA_DIR) clean-ip; fi"
+
+
+run-firmware: firmware
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "if [ ! -d $(REMOTE_ROOT_DIR) ]; then mkdir -p $(REMOTE_ROOT_DIR); fi"
+	rsync -avz --exclude .git . $(USER)@$(FPGA_BOARD_SERVER):$(REMOTE_ROOT_DIR) 
+	ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(CONSOLE_DIR) run"
+
+firmware:
+	make -C $(FIRM_DIR) BAUD=$(BAUD) SIM=$(SIM)
+
+bootloader: firmware
+	make -C $(BOOT_DIR) BAUD=$(BAUD)
+
+pcsim:
+	make -C $(FIRM_DIR) clean
+	make -C $(FIRM_DIR) pcsim BAUD=$(BAUD) PCSIM=1
+
+setsim:
+	$(eval SIM=1)
+
+#Run on FPGA_BOARD_SERVER
+# for PCSIM: make ld-eth SIM=1
 ld-eth:
-	$(eval INTERFACE := $(shell ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep ^"en" | awk '{print $$1}' | sed 's/://g'))
-	$(eval RMAC := $(shell ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g'))
-	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
+	$(eval RMAC := $(shell ethtool -P $(RMAC_INTERFACE) | awk '{print $$3}' | sed 's/://g'))
+ifneq ($(SIM),1)
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
+else
+	python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR) PCsim
+endif
 ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
 	@echo "Creating image file with detections...\n"
 	@python $(FIRM_DIR)/write_image.py $(FIRM_DIR)/detections.bin
@@ -56,16 +78,15 @@ ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
 	@display $(FIRM_DIR)/detections.png
 endif
 
-rmac:
-	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
-	ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g' | sed "s/^/#define ETH_RMAC_ADDR 0x/" >> $(ETH_DIR)/c-driver/iob-eth.h
-	ifconfig -a | grep -B 1 "ether" | sed '/inet/,+2d' | grep -A 1 ^"en" | grep "ether" | awk '{print $$2}' | sed 's/://g' | sed "s/^/\`define ETH_RMAC_ADDR 48'h/" >> $(ETH_DIR)/rtl/include/iob_eth_defs.vh
+clean: 
+ifeq ($(SIMULATOR),ncsim)
+	ssh $(MICRO_USER)@$(SIM_SERVER) "cd $(MICRO_ROOT_DIR); make -C $(SIM_DIR) clean"
+else
+	make -C $(SIM_DIR) clean
+endif
+	make -C $(FIRM_DIR) clean
+	make -C $(BOOT_DIR) clean
+	make -C $(CONSOLE_DIR) clean
 
 
-clean:
-	make -C $(SIM_DIR) clean TEST=$(TEST)
-	make -C $(FPGA_DIR) clean TEST=$(TEST)
-	make -C $(LD_SW_DIR) clean TEST=$(TEST)
-	sed -i "/ETH_RMAC_ADDR/d" $(ETH_DIR)/c-driver/iob-eth.h $(ETH_DIR)/rtl/include/iob_eth_defs.vh
-
-.PHONY: sim fpga clean
+.PHONY: sim fpga fpga-clean fpga-clean-ip fpga-load firmware bootloader clean run-firmware

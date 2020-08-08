@@ -1,28 +1,23 @@
 #include "system.h"
+#include "periphs.h"
+
 #include "iob-uart.h"
 #include "iob-eth.h"
 
-#include <stdint.h>
-#include <stdio.h>
 #include <string.h>
-
-#define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
-#define SOFT_RESET (SOFT_RESET_BASE<<(ADDR_W-N_SLAVES_W))
-#define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
 
 #define ETH_NBYTES (256-18) //minimum ethernet payload excluding FCS
 
 int main() {
 
   //init UART
-  uart_init(UART,UART_CLK_FREQ/UART_BAUD_RATE);
+  uart_init(UART_BASE,FREQ/BAUD);
 
   //send init message
   uart_printf("\nETHERNET TEST\n");
-  uart_txwait();
 
   //init ETHERNET
-  eth_init(ETHERNET);
+  eth_init(ETHERNET_BASE);
   eth_set_rx_payload_size(ETH_NBYTES);
 
   //ETHERNET variables
@@ -42,6 +37,6 @@ int main() {
   uart_puts("Data Sent\n");
 
   //end program
-  uart_putc(4);
+  uart_putc(ETX);
   return 0;
 }

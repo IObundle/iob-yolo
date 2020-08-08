@@ -1,4 +1,6 @@
 #include "system.h"
+#include "periphs.h"
+
 #include "iob-uart.h"
 #include "iob-eth.h"
 #include "iob_timer.h"
@@ -6,11 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
-#define UART (UART_BASE<<(DATA_W-N_SLAVES_W))
-#define SOFT_RESET (SOFT_RESET_BASE<<(ADDR_W-N_SLAVES_W))
-#define ETHERNET (ETHERNET_BASE<<(ADDR_W-N_SLAVES_W))
-#define TIMER (TIMER_BASE<<(ADDR_W-N_SLAVES_W))
 
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define DATA_FILE_SIZE (418*418*3*2) //16 bits per input
@@ -21,14 +18,14 @@
 int main() {
 
   //init UART
-  uart_init(UART,UART_CLK_FREQ/UART_BAUD_RATE);
+  uart_init(UART_BASE,FREQ/BAUD);
 
   //send init message
   uart_printf("\nETHERNET TEST\n");
   uart_txwait();
 
   //init ETHERNET
-  eth_init(ETHERNET);
+  eth_init(ETHERNET_BASE);
   eth_set_rx_payload_size(ETH_NBYTES);
 
   //ETHERNET variables
@@ -51,8 +48,8 @@ int main() {
 
      // start timer
      if(j == 0){
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
+       timer_reset(TIMER_BASE);
+       start = timer_time_us(TIMER_BASE);
      }
 
      //save in local mem
@@ -66,7 +63,7 @@ int main() {
   }
 
   //measure final time for data transmission
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Data transmission done in %d ms\n", (end-start)/1000);
 
   //Loop to receive and send back weight frames
@@ -77,8 +74,8 @@ int main() {
      
      // start timer
      if(j == 0){
-       timer_reset(TIMER);
-       start = timer_get_count_us(TIMER);
+       timer_reset(TIMER_BASE);
+       start = timer_time_us(TIMER_BASE);
      }
 
      //save in local mem
@@ -93,10 +90,10 @@ int main() {
   }
 
   //measure final time for weight transmission
-  end = timer_get_count_us(TIMER);
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Weight transmission done in %d ms\n", (end-start)/1000);
 
   //end program
-  uart_putc(4);
+  uart_putc(ETX);
   return 0;
 }
