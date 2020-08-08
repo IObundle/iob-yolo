@@ -124,12 +124,12 @@ module xyolo_write_stage #(
       .incr(vread_incrA),
       .delay(`EXT_PERIOD_W'd0),
       // Databus interface
-      .databus_ready(m_resp[`ready(0)]),
-      .databus_valid(m_req[`valid(0)]),
-      .databus_addr(m_req[`address(0, `IO_ADDR_W)]),
-      .databus_rdata(m_resp[`rdata(0)]),
-      .databus_wdata(m_req[`wdata(0)]),
-      .databus_wstrb(m_req[`wstrb(0)]),
+      .databus_ready(m_resp[`ready(1)]),
+      .databus_valid(m_req[`valid(1)]),
+      .databus_addr(m_req[`address(1, `IO_ADDR_W)]),
+      .databus_rdata(m_resp[`rdata(1)]),
+      .databus_wdata(m_req[`wdata(1)]),
+      .databus_wstrb(m_req[`wstrb(1)]),
       // internal memory interface
       .valid(vread_enA),
       .we(vread_we),
@@ -179,7 +179,7 @@ module xyolo_write_stage #(
          vwrite_cnt_en <= 1'b0;
       end else if(vwrite_bypass)
          vwrite_cnt_en <= 1'b1;
-      else if(m_resp[`ready(1)]) begin
+      else if(m_resp[`ready(0)]) begin
          if(vwrite_cnt == `nYOLOvect-1) begin
             vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
             vwrite_cnt_en <= 1'b0;
@@ -224,12 +224,12 @@ module xyolo_write_stage #(
       .incr(vwrite_incrA),
       .delay(`PERIOD_W'd0),
       // Databus interface
-      .databus_ready(m_resp[`ready(1)]),
-      .databus_valid(m_req[`valid(1)]),
-      .databus_addr(m_req[`address(1, `IO_ADDR_W)]),
-      .databus_rdata(m_resp[`rdata(1)]),
-      .databus_wdata(m_req[`wdata(1)]),
-      .databus_wstrb(m_req[`wstrb(1)]),
+      .databus_ready(m_resp[`ready(0)]),
+      .databus_valid(m_req[`valid(0)]),
+      .databus_addr(m_req[`address(0, `IO_ADDR_W)]),
+      .databus_rdata(m_resp[`rdata(0)]),
+      .databus_wdata(m_req[`wdata(0)]),
+      .databus_wstrb(m_req[`wstrb(0)]),
       // internal memory interface
       .valid(vwrite_enA),
       .we(),

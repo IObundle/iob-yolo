@@ -666,9 +666,65 @@ module xyolo_write #(
       vread_addrB_reg <= vread_addrB;
    end
 
+   // first stage
+   xyolo_write_stage # (
+      .DATA_W(DATA_W)
+   ) stage0 (
+      .clk(clk),
+      .rst(rst),
+       //control
+      .global_run(run_reg),
+      .done(stages_done[0]),
+      //internal addrgen
+      .vread_enB(vread_enB_reg),
+      .vwrite_enB(vwrite_enB),
+      .vread_addrB(vread_addrB_reg),
+      .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
+      //load control
+      .ld_acc(ld_acc0),
+      .ld_mp(ld_mp),
+      .ld_res(ld_res),
+      //vread config params
+      .vread_ext_addr(vread_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-1 -: `IO_ADDR_W]),
+      .vread_int_addr(vread_int_addr_shadow),
+      .vread_iterA(vread_iterA_shadow),
+      .vread_perA(vread_perA_shadow),
+      .vread_shiftA(vread_shiftA_shadow),
+      .vread_incrA(vread_incrA_shadow),
+      //vwrite config params
+      .vwrite_ext_addr(vwrite_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-1 -: `IO_ADDR_W]),
+      .vwrite_int_addr(vwrite_int_addr_shadow),
+      .vwrite_iterA(vwrite_iterA_shadow),
+      .vwrite_perA(vwrite_perA_shadow),
+      .vwrite_shiftA(vwrite_shiftA_shadow),
+      .vwrite_incrA(vwrite_incrA_shadow),
+      .vwrite_bypass(vwrite_bypass_shadow),
+      //xyolo config params
+      .xyolo_bias(xyolo_bias_shadow),
+      .xyolo_leaky(xyolo_leaky_shadow),
+      .xyolo_maxpool(xyolo_maxpool_shadow),
+      .xyolo_bypass(xyolo_bypass_shadow),
+      .xyolo_shift(xyolo_shift_shadow),
+      //Databus interface
+      .databus_ready(databus_ready[`nSTAGES-1 -: 1]),
+      .databus_valid(databus_valid[`nSTAGES-1 -: 1]),
+      .databus_addr(databus_addr[`nSTAGES*`IO_ADDR_W-1 -: `IO_ADDR_W]),
+      .databus_rdata(databus_rdata[`nSTAGES*DATA_W-1 -: DATA_W]),
+      .databus_wdata(databus_wdata[`nSTAGES*DATA_W-1 -: DATA_W]),
+      .databus_wstrb(databus_wstrb[`nSTAGES*DATA_W/8-1 -: DATA_W/8]),
+      //input data
+      .flow_in_bias(flow_in_bias),
+      .flow_in_weight(flow_in_weight)
+   );
+
    //instantiate stages
    generate
-     for(i = 0; i < `nSTAGES; i=i+1)  begin : stages
+     for(i = 1; i < `nSTAGES; i=i+1)  begin : stages
+
+        //check if asking for the same data as previous vread
+        wire cond = databus_addr[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*(i-1)-1 -: `IO_ADDR_W] == databus_addr[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W] & databus_valid[`nSTAGES-(i-1)-1 -: 1] & databus_valid[`nSTAGES-i-1 -: 1];
+        wire databus_ready_w = cond ? databus_ready[`nSTAGES-(i-1)-1 -: 1] : databus_ready[`nSTAGES-i-1 -: 1];
+        wire [DATA_W-1:0] databus_rdata_w = cond ? databus_rdata[`nSTAGES*DATA_W-DATA_W*(i-1)-1 -: DATA_W] : databus_rdata[`nSTAGES*DATA_W-DATA_W*i-1 -: DATA_W];
 
         //instantiate xyolo_write_stage
         xyolo_write_stage # (
@@ -710,10 +766,10 @@ module xyolo_write #(
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_shift(xyolo_shift_shadow),
            //Databus interface
-           .databus_ready(databus_ready[`nSTAGES-i-1 -: 1]),
+           .databus_ready(databus_ready_w),
            .databus_valid(databus_valid[`nSTAGES-i-1 -: 1]),
            .databus_addr(databus_addr[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
-           .databus_rdata(databus_rdata[`nSTAGES*DATA_W-DATA_W*i-1 -: DATA_W]),
+           .databus_rdata(databus_rdata_w),
            .databus_wdata(databus_wdata[`nSTAGES*DATA_W-DATA_W*i-1 -: DATA_W]),
            .databus_wstrb(databus_wstrb[`nSTAGES*DATA_W/8-DATA_W/8*i-1 -: DATA_W/8]),
            //input data

@@ -36,7 +36,7 @@
 #define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C))
 #define DATA_LAYER_1 ((NTW_IN_W+2)*(NTW_IN_W+2)*NTW_IN_C)
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
-#define TILE_W 4
+#define TILE_W 32
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
@@ -102,8 +102,7 @@ void conv() {
   //local variables
   int j, k, l;
 #ifdef SIM
-  int k_delta = 1;
-  /* int k_delta = NTW_IN_W/2; */
+  int k_delta = 1; //NTW_IN_W/(2*nSTAGES);
 #endif
 
   /////////////////////////////////////////////////////////////////////////
@@ -116,8 +115,8 @@ void conv() {
   versat.yread.setExtIncr(1);
 
   // configure xyolo_write vread to read tile from input fm
-  versat.ywrite.read.setOffset(2*TILE_W*NTW_IN_C); // 24
-  versat.ywrite.read.setExtPer(NTW_IN_C*(TILE_W+2)); //+2 due to padding // 18
+  versat.ywrite.read.setOffset(2*(2*(NTW_IN_W+2)*NTW_IN_C));
+  versat.ywrite.read.setExtPer(NTW_IN_C*(TILE_W+2));
   versat.ywrite.read.setExtIncr(1);
   versat.ywrite.read.setExtIter(NTW_IN_KER_SIZE+1); //+1 due to maxpool // 4
   versat.ywrite.read.setExtShift((NTW_IN_W+2)*NTW_IN_C - NTW_IN_C*(TILE_W+2)); //+2 due to padding // 1236
@@ -158,7 +157,7 @@ void conv() {
   versat.ywrite.write.setIntIter(TILE_W/2); // 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setOffset(2*(NTW_IN_NUM_KER*TILE_W/2)); // 64
+  versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(nYOLOvect); // 16
   versat.ywrite.write.setExtIncr(1);
   versat.ywrite.write.setExtIter(TILE_W/2); // 2
@@ -173,17 +172,17 @@ void conv() {
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {
-       uart_printf("%d\n", k);
+       //uart_printf("%d\n", k);
   #else
-    for(k = 0; k < NTW_IN_W/2; k++) { //2 due to maxpool
+    for(k = 0; k < NTW_IN_W/(2*nSTAGES); k++) { //2 due to maxpool
   #endif
-      for(j = 0; j < NTW_IN_W/(TILE_W*nSTAGES); j++) {
+      for(j = 0; j < NTW_IN_W/TILE_W; j++) {
 
         // configure xyolo_write vread to read tile from input fm
-        versat.ywrite.read.setExtAddr(DATA_BASE_ADDRESS + 2*(k*2*(NTW_IN_W+2)*NTW_IN_C + j*TILE_W*NTW_IN_C*nSTAGES));
+        versat.ywrite.read.setExtAddr(DATA_BASE_ADDRESS + 2*(k*2*(NTW_IN_W+2)*NTW_IN_C*nSTAGES + j*TILE_W*NTW_IN_C));
 
         // configure xyolo_write vwrite to write result back to DDR
-        versat.ywrite.write.setExtAddr(DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + (NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*(TILE_W/2)*NTW_IN_NUM_KER*nSTAGES + l*nYOLOvect));
+        versat.ywrite.write.setExtAddr(DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + (NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
 
         // wait until done
         while(versat.done()==0);
@@ -203,18 +202,15 @@ void conv() {
   // wait until done
   while(versat.done()==0);
 
-  // last 2 runs
-  versat.run();
-  while(versat.done()==0);
-  versat.run();
-  while(versat.done()==0);
+  // end versat
+  versat_end();
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += DATA_LAYER_1;
   int i;
   uart_printf("Verifying...\n\n");
-  for(i = 0; i < k_delta+1; i++) {
+  for(i = 0; i < k_delta*nSTAGES+1; i++) {
     uart_printf("%d\n", i);
     for(j = 0; j < NTW_IN_W/2+2; j++)
       for(k = 0; k < NTW_IN_NUM_KER; k++)
