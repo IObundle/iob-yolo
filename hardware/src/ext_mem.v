@@ -379,6 +379,11 @@ module ext_mem
    wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
    wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
 
+   wire 			  l2cache_read_valid, l2cache_read_ready;
+   wire 			  l2cache_write_valid, l2cache_write_ready;
+   
+   
+
 `ifdef RUN_DDR_USE_SRAM
    assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
 `endif
@@ -421,6 +426,14 @@ module ext_mem
         .s_resp (l2cache_resp)
         );
 
+   // Connect Buses for L2 caches
+
+   assign l2cache_read_valid = l2cache_req[`valid_MIG_BUS(0)] & (~(|l2cache_req[`wstrb_MIG_BUS(0)]));
+   assign l2cache_write_valid = l2cache_req[`valid_MIG_BUS(0)] & (|l2cache_req[`wstrb_MIG_BUS(0)]);
+   
+   assign l2cache_resp[`ready_MIG_BUS(0)] = l2cache_read_ready | l2cache_write_ready;
+   
+
    // L2 cache instance
    iob_cache_axi # 
      (
@@ -435,17 +448,90 @@ module ext_mem
       .FE_DATA_W(`MIG_BUS_W),
       .BE_DATA_W(`MIG_BUS_W)
       )
-   l2cache (
+   l2cache_read (
             .clk   (clk),
             .reset (rst),
       
             // Native interface
-            .valid    (l2cache_req[`valid_MIG_BUS(0)]),
+            .valid    (l2cache_read_valid),
             .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
             .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
-	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
+   	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
             .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
-            .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
+            .ready    (l2cache_read_ready),
+
+	    
+            // AXI interface
+            // Address write
+            .axi_awid(), 
+            .axi_awaddr(), 
+            .axi_awlen(), 
+            .axi_awsize(), 
+            .axi_awburst(), 
+            .axi_awlock(), 
+            .axi_awcache(), 
+            .axi_awprot(),
+            .axi_awqos(), 
+            .axi_awvalid(), 
+            .axi_awready(1'b0), 
+            //write
+            .axi_wdata(), 
+            .axi_wstrb(), 
+            .axi_wlast(), 
+            .axi_wvalid(), 
+            .axi_wready(1'b0), 
+            //write response
+            //.axi_bid(axi_bid), 
+            .axi_bresp(2'b0), 
+            .axi_bvalid(1'b0), 
+            .axi_bready(), 
+            //address read
+            .axi_arid(axi_arid), 
+            .axi_araddr(axi_araddr), 
+            .axi_arlen(axi_arlen), 
+            .axi_arsize(axi_arsize), 
+            .axi_arburst(axi_arburst), 
+            .axi_arlock(axi_arlock), 
+            .axi_arcache(axi_arcache), 
+            .axi_arprot(axi_arprot), 
+            .axi_arqos(axi_arqos), 
+            .axi_arvalid(axi_arvalid), 
+            .axi_arready(axi_arready), 
+            //read 
+            //.axi_rid(axi_rid), 
+            .axi_rdata(axi_rdata), 
+            .axi_rresp(axi_rresp), 
+            .axi_rlast(axi_rlast), 
+            .axi_rvalid(axi_rvalid),  
+            .axi_rready(axi_rready)
+            );
+
+
+      // L2 cache instance
+   iob_cache_axi # 
+     (
+      .FE_ADDR_W(`DDR_ADDR_W),
+      .N_WAYS(4),        //Number of Ways
+      .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
+      .WORD_OFF_W(4),    //Word Offset (number of words per line)
+      .WTBUF_DEPTH_W(4), //FIFO's depth
+      .BE_ADDR_W (`DDR_ADDR_W),
+      .CTRL_CACHE (0),
+      .CTRL_CNT(0),       //Remove counters
+      .FE_DATA_W(`MIG_BUS_W),
+      .BE_DATA_W(`MIG_BUS_W)
+      )
+   l2cache_write (
+            .clk   (clk),
+            .reset (rst),
+      
+            // Native interface
+            .valid    (l2cache_write_valid),
+            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
+            .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
+   	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
+            .rdata    (),
+            .ready    (l2cache_write_ready),
 
 	    
             // AXI interface
@@ -473,25 +559,102 @@ module ext_mem
             .axi_bvalid(axi_bvalid), 
             .axi_bready(axi_bready), 
             //address read
-            .axi_arid(axi_arid), 
-            .axi_araddr(axi_araddr), 
-            .axi_arlen(axi_arlen), 
-            .axi_arsize(axi_arsize), 
-            .axi_arburst(axi_arburst), 
-            .axi_arlock(axi_arlock), 
-            .axi_arcache(axi_arcache), 
-            .axi_arprot(axi_arprot), 
-            .axi_arqos(axi_arqos), 
-            .axi_arvalid(axi_arvalid), 
-            .axi_arready(axi_arready), 
+            .axi_arid(), 
+            .axi_araddr(), 
+            .axi_arlen(), 
+            .axi_arsize(), 
+            .axi_arburst(), 
+            .axi_arlock(), 
+            .axi_arcache(), 
+            .axi_arprot(), 
+            .axi_arqos(), 
+            .axi_arvalid(), 
+            .axi_arready(1'b0), 
             //read 
             //.axi_rid(axi_rid), 
-            .axi_rdata(axi_rdata), 
-            .axi_rresp(axi_rresp), 
-            .axi_rlast(axi_rlast), 
-            .axi_rvalid(axi_rvalid),  
-            .axi_rready(axi_rready)
+            .axi_rdata({`MIG_BUS_W{1'b0}}), 
+            .axi_rresp(2'b0), 
+            .axi_rlast(1'b0), 
+            .axi_rvalid(1'b0),  
+            .axi_rready()
             );
+
+
+
+
+
+   
+   // // L2 cache instance
+   // iob_cache_axi # 
+   //   (
+   //    .FE_ADDR_W(`DDR_ADDR_W),
+   //    .N_WAYS(4),        //Number of Ways
+   //    .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
+   //    .WORD_OFF_W(4),    //Word Offset (number of words per line)
+   //    .WTBUF_DEPTH_W(4), //FIFO's depth
+   //    .BE_ADDR_W (`DDR_ADDR_W),
+   //    .CTRL_CACHE (0),
+   //    .CTRL_CNT(0),       //Remove counters
+   //    .FE_DATA_W(`MIG_BUS_W),
+   //    .BE_DATA_W(`MIG_BUS_W)
+   //    )
+   // l2cache (
+   //          .clk   (clk),
+   //          .reset (rst),
+      
+   //          // Native interface
+   //          .valid    (l2cache_req[`valid_MIG_BUS(0)]),
+   //          .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
+   //          .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
+   // 	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
+   //          .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
+   //          .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
+
+	    
+   //          // AXI interface
+   //          // Address write
+   //          .axi_awid(axi_awid), 
+   //          .axi_awaddr(axi_awaddr), 
+   //          .axi_awlen(axi_awlen), 
+   //          .axi_awsize(axi_awsize), 
+   //          .axi_awburst(axi_awburst), 
+   //          .axi_awlock(axi_awlock), 
+   //          .axi_awcache(axi_awcache), 
+   //          .axi_awprot(axi_awprot),
+   //          .axi_awqos(axi_awqos), 
+   //          .axi_awvalid(axi_awvalid), 
+   //          .axi_awready(axi_awready), 
+   //          //write
+   //          .axi_wdata(axi_wdata), 
+   //          .axi_wstrb(axi_wstrb), 
+   //          .axi_wlast(axi_wlast), 
+   //          .axi_wvalid(axi_wvalid), 
+   //          .axi_wready(axi_wready), 
+   //          //write response
+   //          //.axi_bid(axi_bid), 
+   //          .axi_bresp(axi_bresp), 
+   //          .axi_bvalid(axi_bvalid), 
+   //          .axi_bready(axi_bready), 
+   //          //address read
+   //          .axi_arid(axi_arid), 
+   //          .axi_araddr(axi_araddr), 
+   //          .axi_arlen(axi_arlen), 
+   //          .axi_arsize(axi_arsize), 
+   //          .axi_arburst(axi_arburst), 
+   //          .axi_arlock(axi_arlock), 
+   //          .axi_arcache(axi_arcache), 
+   //          .axi_arprot(axi_arprot), 
+   //          .axi_arqos(axi_arqos), 
+   //          .axi_arvalid(axi_arvalid), 
+   //          .axi_arready(axi_arready), 
+   //          //read 
+   //          //.axi_rid(axi_rid), 
+   //          .axi_rdata(axi_rdata), 
+   //          .axi_rresp(axi_rresp), 
+   //          .axi_rlast(axi_rlast), 
+   //          .axi_rvalid(axi_rvalid),  
+   //          .axi_rready(axi_rready)
+   //          );
 
 endmodule
 
