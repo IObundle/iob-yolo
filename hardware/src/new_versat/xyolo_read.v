@@ -4,34 +4,37 @@
 `include "xyolo_read.vh"
 
 module xyolo_read #(
-    	parameter                           DATA_W = 32
+    	parameter                      	DATA_W = 32
    ) (
-    	input                               clk,
-    	input                               rst,
+    	input                           clk,
+    	input                           rst,
 
 	// control
-	input				    clear,
-    	input                               run,
-    	output                              done,
+	input				clear,
+    	input                           run,
+    	output                          done,
 
 	// cpu interface (only request)
-	input				    valid,
-	input [`XYOLO_READ_ADDR_W-1:0]	    addr,
-	input [`IO_ADDR_W-1:0]		    wdata,
-	input 			    	    wstrb,
+	input				valid,
+	input [`XYOLO_READ_ADDR_W-1:0]	addr,
+	input [`IO_ADDR_W-1:0]		wdata,
+	input 			    	wstrb,
 
     	// databus interface
-    	input  [`nYOLOvect-1:0]             databus_ready,
-    	output [`nYOLOvect-1:0]             databus_valid,
-    	output [`nYOLOvect*`IO_ADDR_W-1:0]  databus_addr,
-    	input  [`nYOLOvect*DATA_W-1:0]      databus_rdata,
-    	output [`nYOLOvect*DATA_W-1:0]      databus_wdata,
-    	output [`nYOLOvect*DATA_W/8-1:0]    databus_wstrb,
+    	input               		databus_ready,
+    	output 			        databus_valid,
+    	output [`IO_ADDR_W-1:0]  	databus_addr,
+    	input  [DATA_W-1:0]      	databus_rdata,
+    	output [DATA_W-1:0]      	databus_wdata,
+    	output [DATA_W/8-1:0]    	databus_wstrb,
 
     	// output data
-    	output [`nYOLOvect*DATA_W-1:0]      flow_out_bias,
-    	output [`nYOLOvect*DATA_W-1:0]      flow_out_weight
+    	output [`nYOLOvect*DATA_W-1:0]  flow_out_bias,
+    	output [`nYOLOvect*DATA_W-1:0]  flow_out_weight
    );
+
+   // local parameter for merge
+   localparam                           ADDR_W = `IO_ADDR_W;
 
    // configuration enables
    reg  		                ext_addr_en;
@@ -95,6 +98,14 @@ module xyolo_read #(
    reg [`nYOLOvect*DATA_W-1:0]		bias0, bias1;
    reg [`nYOLOvect*DATA_W-1:0]          bias0_reg, bias1_reg;
    assign 				flow_out_bias = addrB[`MEM_ADDR_W-1] ? bias1_reg : bias0_reg;
+
+   // merge master interface
+   wire [`nYOLOvect*`REQ_W-1:0]         m_req;
+   wire [`nYOLOvect*`RESP_W-1:0]        m_resp;
+
+   //merge slave interface
+   wire [`REQ_W-1:0]                    s_req;
+   wire [`RESP_W-1:0]                   s_resp;
 
    // register run and bias
    always @ (posedge clk, posedge rst)
@@ -286,12 +297,12 @@ module xyolo_read #(
 	    .delay(`PERIOD_W'd0),
 
             // Databus interface
- 	    .databus_ready(databus_ready[`nYOLOvect-i-1 -: 1'b1]),
- 	    .databus_valid(databus_valid[`nYOLOvect-i-1 -: 1'b1]),
- 	    .databus_addr(databus_addr[`nYOLOvect*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
-	    .databus_rdata(databus_rdata[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W]),
-	    .databus_wdata(databus_wdata[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W]),
-	    .databus_wstrb(databus_wstrb[`nYOLOvect*DATA_W/8-DATA_W/8*i-1 -: DATA_W/8]),
+ 	    .databus_ready(m_resp[`ready((`nYOLOvect-i-1))]),
+ 	    .databus_valid(m_req[`valid((`nYOLOvect-i-1))]),
+	    .databus_addr(m_req[`address((`nYOLOvect-i-1), `IO_ADDR_W)]),
+	    .databus_rdata(m_resp[`rdata((`nYOLOvect-i-1))]),
+	    .databus_wdata(m_req[`wdata((`nYOLOvect-i-1))]),
+	    .databus_wstrb(m_req[`wstrb((`nYOLOvect-i-1))]),
 
             // internal memory interface
             .valid(enA[i]),
@@ -346,5 +357,31 @@ module xyolo_read #(
       .mem_en(enB),
       .done(doneB)
    );
+
+   //
+   // Merge
+   //
+
+   //instantiate merge
+   merge # (
+      .N_MASTERS(`nYOLOvect),
+      .DATA_W(DATA_W),
+      .ADDR_W(ADDR_W)
+   ) xyolo_read_merge (
+      //masters interface
+      .m_req(m_req),
+      .m_resp(m_resp),
+      //slave interface
+      .s_req(s_req),
+      .s_resp(s_resp)
+   );
+
+   //unconcatenate merge slave interface back to native interface
+   assign databus_addr = s_req[`address(0, `IO_ADDR_W)];
+   assign databus_wdata = s_req[`wdata(0)];
+   assign databus_wstrb = s_req[`wstrb(0)];
+   assign databus_valid = s_req[`valid(0)];
+   assign s_resp[`rdata(0)] = databus_rdata;
+   assign s_resp[`ready(0)] = databus_ready;
 
 endmodule
