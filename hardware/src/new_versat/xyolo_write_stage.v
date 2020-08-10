@@ -50,20 +50,17 @@ module xyolo_write_stage #(
 	input [`SHIFT_W-1:0]            xyolo_shift,
 
     	// Databus interface
-    	input                           databus_ready,
-    	output                      	databus_valid,
-    	output [`IO_ADDR_W-1:0]       	databus_addr,
-    	input [DATA_W-1:0]              databus_rdata,
-    	output [DATA_W-1:0]             databus_wdata,
-    	output [DATA_W/8-1:0]           databus_wstrb,
+    	input [1:0]                     databus_ready,
+    	output [1:0]                    databus_valid,
+    	output [2*`IO_ADDR_W-1:0]       databus_addr,
+    	input [2*DATA_W-1:0]            databus_rdata,
+    	output [2*DATA_W-1:0]           databus_wdata,
+    	output [2*DATA_W/8-1:0]         databus_wstrb,
 
     	// input data
     	input [`nYOLOvect*DATA_W-1:0]   flow_in_bias,
     	input [`nYOLOvect*DATA_W-1:0]	flow_in_weight
     );
-
-   // local parameter for merge
-   localparam				ADDR_W = `IO_ADDR_W;
 
    // external addrgen wires and regs
    wire					vread_enA, vread_we, vwrite_enA;
@@ -87,14 +84,6 @@ module xyolo_write_stage #(
    reg [$clog2(`nYOLOvect)-1:0]         vwrite_cnt;
    reg                                  vwrite_cnt_en;
    reg [DATA_W-1:0]                     vwrite_mux;
-
-   // merge master interface
-   wire [2*`REQ_W-1:0]   	        m_req;
-   wire [2*`RESP_W-1:0]                 m_resp;
-
-   //merge slave interface
-   wire [`REQ_W-1:0]                    s_req;
-   wire [`RESP_W-1:0]                   s_resp;
 
    //
    // global vread
@@ -124,12 +113,12 @@ module xyolo_write_stage #(
       .incr(vread_incrA),
       .delay(`EXT_PERIOD_W'd0),
       // Databus interface
-      .databus_ready(m_resp[`ready(1)]),
-      .databus_valid(m_req[`valid(1)]),
-      .databus_addr(m_req[`address(1, `IO_ADDR_W)]),
-      .databus_rdata(m_resp[`rdata(1)]),
-      .databus_wdata(m_req[`wdata(1)]),
-      .databus_wstrb(m_req[`wstrb(1)]),
+      .databus_ready(databus_ready[1]),
+      .databus_valid(databus_valid[1]),
+      .databus_addr(databus_addr[2*`IO_ADDR_W-1:`IO_ADDR_W]),
+      .databus_rdata(databus_rdata[2*DATA_W-1:DATA_W]),
+      .databus_wdata(databus_wdata[2*DATA_W-1:DATA_W]),
+      .databus_wstrb(databus_wstrb[2*DATA_W/8-1:DATA_W/8]),
       // internal memory interface
       .valid(vread_enA),
       .we(vread_we),
@@ -179,7 +168,7 @@ module xyolo_write_stage #(
          vwrite_cnt_en <= 1'b0;
       end else if(vwrite_bypass)
          vwrite_cnt_en <= 1'b1;
-      else if(m_resp[`ready(0)]) begin
+      else if(databus_ready[0]) begin
          if(vwrite_cnt == `nYOLOvect-1) begin
             vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
             vwrite_cnt_en <= 1'b0;
@@ -224,12 +213,12 @@ module xyolo_write_stage #(
       .incr(vwrite_incrA),
       .delay(`PERIOD_W'd0),
       // Databus interface
-      .databus_ready(m_resp[`ready(0)]),
-      .databus_valid(m_req[`valid(0)]),
-      .databus_addr(m_req[`address(0, `IO_ADDR_W)]),
-      .databus_rdata(m_resp[`rdata(0)]),
-      .databus_wdata(m_req[`wdata(0)]),
-      .databus_wstrb(m_req[`wstrb(0)]),
+      .databus_ready(databus_ready[0]),
+      .databus_valid(databus_valid[0]),
+      .databus_addr(databus_addr[`IO_ADDR_W-1:0]),
+      .databus_rdata(databus_rdata[DATA_W-1:0]),
+      .databus_wdata(databus_wdata[DATA_W-1:0]),
+      .databus_wstrb(databus_wstrb[DATA_W/8-1:0]),
       // internal memory interface
       .valid(vwrite_enA),
       .we(),
@@ -285,31 +274,5 @@ module xyolo_write_stage #(
 
       end
    endgenerate
-
-   //
-   // merge
-   //
-
-   //instantiate merge
-   merge #(
-      .N_MASTERS(2),
-      .DATA_W(DATA_W),
-      .ADDR_W(ADDR_W)
-   ) xyolo_write_merge (
-      //masters interface
-      .m_req(m_req),
-      .m_resp(m_resp),
-      //slave interface
-      .s_req(s_req),
-      .s_resp(s_resp)
-   );
-
-   //unconcatenate merge slave interface back to native interface
-   assign databus_addr = s_req[`address(0, `IO_ADDR_W)];
-   assign databus_wdata = s_req[`wdata(0)];
-   assign databus_wstrb = s_req[`wstrb(0)];
-   assign databus_valid = s_req[`valid(0)];
-   assign s_resp[`rdata(0)] = databus_rdata;
-   assign s_resp[`ready(0)] = databus_ready;
 
 endmodule

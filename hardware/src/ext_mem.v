@@ -3,19 +3,15 @@
 
 `include "system.vh"
 `include "interconnect.vh"
-
 `ifdef USE_NEW_VERSAT
-`include "xversat.vh"
+  `include "xversat.vh"
 `endif
-
 
 // REQ/RESP MIG BUS DEFINES
 `define REQ_MIG_BUS_W (`VALID_W+ADDR_W+`MIG_BUS_W+(`MIG_BUS_W/8))
 `define RESP_MIG_BUS_W (`MIG_BUS_W+`READY_W)
-
 `define WDATA_MIG_BUS_P (`MIG_BUS_W/8)
 `define ADDR_MIG_BUS_P (`WDATA_MIG_BUS_P + `MIG_BUS_W)
-
 `define valid_MIG_BUS(I) (I+1)*`REQ_MIG_BUS_W-1
 `define address_MIG_BUS(I,W) I*`REQ_MIG_BUS_W+`ADDR_MIG_BUS_P+W-1 -: W
 `define wdata_MIG_BUS(I) I*`REQ_MIG_BUS_W+`WDATA_MIG_BUS_P +: `MIG_BUS_W
@@ -23,23 +19,18 @@
 `define rdata_MIG_BUS(I) I*`RESP_MIG_BUS_W+`RDATA_P +: `MIG_BUS_W
 `define ready_MIG_BUS(I) I*`RESP_MIG_BUS_W
 
-`ifdef USE_NEW_VERSAT
 // REQ/RESP VERSAT BUS DEFINES
-// ADDR_W = IO_ADDR_W
-// DATA_W = DATAPATH_W
-`define REQ_VERSAT_W (`VALID_W+`IO_ADDR_W+`DATAPATH_W+(`DATAPATH_W/8))
-`define RESP_VERSAT_W (`DATAPATH_W+`READY_W)
-
-`define WDATA_VERSAT_P (`DATAPATH_W/8)
-`define ADDR_VERSAT_P (`WDATA_VERSAT_P + `DATAPATH_W)
-
-`define valid_VERSAT(I) (I+1)*`REQ_VERSAT_W-1
-`define address_VERSAT(I,W) I*`REQ_VERSAT_W+`ADDR_VERSAT_P+W-1 -: W
-`define wdata_VERSAT(I) I*`REQ_VERSAT_W+`WDATA_VERSAT_P +: `DATAPATH_W
-`define wstrb_VERSAT(I) I*`REQ_VERSAT_W +: (`DATAPATH_W/8)
-`define rdata_VERSAT(I) I*`RESP_VERSAT_W+`RDATA_P +: `DATAPATH_W
-`define ready_VERSAT(I) I*`RESP_VERSAT_W
-
+`ifdef USE_NEW_VERSAT
+  `define REQ_VERSAT_W (`VALID_W+`IO_ADDR_W+`DATAPATH_W+(`DATAPATH_W/8))
+  `define RESP_VERSAT_W (`DATAPATH_W+`READY_W)
+  `define WDATA_VERSAT_P (`DATAPATH_W/8)
+  `define ADDR_VERSAT_P (`WDATA_VERSAT_P + `DATAPATH_W)
+  `define valid_VERSAT(I) (I+1)*`REQ_VERSAT_W-1
+  `define address_VERSAT(I,W) I*`REQ_VERSAT_W+`ADDR_VERSAT_P+W-1 -: W
+  `define wdata_VERSAT(I) I*`REQ_VERSAT_W+`WDATA_VERSAT_P +: `DATAPATH_W
+  `define wstrb_VERSAT(I) I*`REQ_VERSAT_W +: (`DATAPATH_W/8)
+  `define rdata_VERSAT(I) I*`RESP_VERSAT_W+`RDATA_P +: `DATAPATH_W
+  `define ready_VERSAT(I) I*`RESP_VERSAT_W
 `endif
 
 module ext_mem
@@ -48,73 +39,71 @@ module ext_mem
     parameter DATA_W=32
     )
   (
-   input 					   clk,
-   input 					   rst,
+   input 			clk,
+   input 			rst,
 
 `ifdef RUN_DDR_USE_SRAM
    // Instruction bus
-   input [`REQ_W-1:0] 				   i_req,
-   output [`RESP_W-1:0] 			   i_resp,
+   input [`REQ_W-1:0] 		i_req,
+   output [`RESP_W-1:0] 	i_resp,
 `endif
 
    // Data bus
-   input [`REQ_W-1:0] 				   d_req,
-   output [`RESP_W-1:0] 			   d_resp,
-
+   input [`REQ_W-1:0] 		d_req,
+   output [`RESP_W-1:0] 	d_resp,
 
 `ifdef USE_NEW_VERSAT
    //Versat bus
-   output [`nYOLOvect+`nSTAGES-1:0] 		   databus_ready,
-   output [(`nYOLOvect+`nSTAGES)*`DATAPATH_W-1:0]  databus_rdata,
-   input [`nYOLOvect+`nSTAGES-1:0] 		   databus_valid,
-   input [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0]    databus_addr,
-   input [(`nYOLOvect+`nSTAGES)*`DATAPATH_W-1:0]   databus_wdata,
-   input [(`nYOLOvect+`nSTAGES)*`DATAPATH_W/8-1:0] databus_wstrb,
+   output [2:0] 		databus_ready,
+   output [3*`DATAPATH_W-1:0]  	databus_rdata,
+   input [2:0] 		   	databus_valid,
+   input [3*`IO_ADDR_W-1:0]    	databus_addr,
+   input [3*`DATAPATH_W-1:0]   	databus_wdata,
+   input [3*`DATAPATH_W/8-1:0] 	databus_wstrb,
 `endif
-
    
    // AXI interface 
    // Address write
-   output [0:0] 				   axi_awid, 
-   output [`DDR_ADDR_W-1:0] 			   axi_awaddr,
-   output [7:0] 				   axi_awlen,
-   output [2:0] 				   axi_awsize,
-   output [1:0] 				   axi_awburst,
-   output [0:0] 				   axi_awlock,
-   output [3:0] 				   axi_awcache,
-   output [2:0] 				   axi_awprot,
-   output [3:0] 				   axi_awqos,
-   output 					   axi_awvalid,
-   input 					   axi_awready,
+   output [0:0] 	 	axi_awid, 
+   output [`DDR_ADDR_W-1:0] 	axi_awaddr,
+   output [7:0] 		axi_awlen,
+   output [2:0] 		axi_awsize,
+   output [1:0] 		axi_awburst,
+   output [0:0] 		axi_awlock,
+   output [3:0] 		axi_awcache,
+   output [2:0] 		axi_awprot,
+   output [3:0] 		axi_awqos,
+   output 			axi_awvalid,
+   input 			axi_awready,
    //Write
-   output [`MIG_BUS_W-1:0] 			   axi_wdata,
-   output [`MIG_BUS_W/8-1:0] 			   axi_wstrb,
-   output 					   axi_wlast,
-   output 					   axi_wvalid, 
-   input 					   axi_wready,
-   input [0:0] 					   axi_bid,
-   input [1:0] 					   axi_bresp,
-   input 					   axi_bvalid,
-   output 					   axi_bready,
+   output [`MIG_BUS_W-1:0] 	axi_wdata,
+   output [`MIG_BUS_W/8-1:0] 	axi_wstrb,
+   output 			axi_wlast,
+   output 			axi_wvalid, 
+   input 			axi_wready,
+   input [0:0] 			axi_bid,
+   input [1:0] 			axi_bresp,
+   input 			axi_bvalid,
+   output 			axi_bready,
    //Address Read
-   output [0:0] 				   axi_arid,
-   output [`DDR_ADDR_W-1:0] 			   axi_araddr, 
-   output [7:0] 				   axi_arlen,
-   output [2:0] 				   axi_arsize,
-   output [1:0] 				   axi_arburst,
-   output [0:0] 				   axi_arlock,
-   output [3:0] 				   axi_arcache,
-   output [2:0] 				   axi_arprot,
-   output [3:0] 				   axi_arqos,
-   output 					   axi_arvalid, 
-   input 					   axi_arready,
+   output [0:0] 		axi_arid,
+   output [`DDR_ADDR_W-1:0] 	axi_araddr, 
+   output [7:0] 		axi_arlen,
+   output [2:0] 		axi_arsize,
+   output [1:0] 		axi_arburst,
+   output [0:0] 		axi_arlock,
+   output [3:0] 		axi_arcache,
+   output [2:0] 		axi_arprot,
+   output [3:0] 		axi_arqos,
+   output 			axi_arvalid, 
+   input 			axi_arready,
    //Read
-   input [0:0] 					   axi_rid,
-   input [`MIG_BUS_W-1:0] 			   axi_rdata,
-   input [1:0] 					   axi_rresp,
-   input 					   axi_rlast, 
-   input 					   axi_rvalid, 
-   output 					   axi_rready
+   input [0:0] 			axi_rid,
+   input [`MIG_BUS_W-1:0] 	axi_rdata,
+   input [1:0] 			axi_rresp,
+   input 			axi_rlast, 
+   input 			axi_rvalid, 
+   output 			axi_rready
    );
 
    
@@ -124,10 +113,8 @@ module ext_mem
    //
 
    // Front-end bus
-
    wire [`REQ_W-1:0]      icache_fe_req;
    wire [`RESP_W-1:0]     icache_fe_resp;
-
    assign icache_fe_req = i_req;
    assign i_resp = icache_fe_resp;
 
@@ -167,6 +154,7 @@ module ext_mem
            .mem_ready (icache_be_resp[`ready_MIG_BUS(0)])
            );
 `endif
+
    //
    // DATA CACHE
    //
@@ -215,165 +203,58 @@ module ext_mem
            );
 
 `ifdef USE_NEW_VERSAT
+
    //
    // VERSAT L1 Caches
    //
 
-   //Front-end bus
-   wire [`REQ_VERSAT_W-1:0] 	  vcache_fe_req;
-   wire [`RESP_VERSAT_W-1:0] 	  vcache_fe_resp;
-   // wire [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] 	  vcache_fe_req;
-   // wire [(`nYOLOvect+`nSTAGES)*`RESP_VERSAT_W-1:0] 	  vcache_fe_resp;
+   //Back-end bus
+   wire [3*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
+   wire [3*`RESP_MIG_BUS_W-1:0]	  vcache_be_resp;
    
-   //connect Versat databus to vcache front-end
-
-   wire [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] m_versat_req;
-   wire [(`nYOLOvect+`nSTAGES)*`RESP_VERSAT_W-1:0] m_versat_resp;
-
-   //register merge entries
-   reg [(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W-1:0] m_versat_req_r;
-   // reg [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0] 	  databus_addr_r;
-   
-   always @(posedge clk, posedge rst)
-      if(rst) begin
-   	 m_versat_req_r <= {(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W{1'b0}};
-      end else begin
-	 if(vcache_fe_resp[0]) begin // || vcache_fe_ready_0) begin
-   	    m_versat_req_r <= {(`nYOLOvect+`nSTAGES)*`REQ_VERSAT_W{1'b0}};
-	 end else begin
-   	    m_versat_req_r <= m_versat_req;
-	 end
-      end
-   
-   //concatenate databus interface to merge master interface
-   genvar 					  k;
+   genvar			  l;
    generate
-      for(k=0; k< (`nYOLOvect+`nSTAGES);k=k+1) begin : databus_to_vcache_fe
-   	 assign m_versat_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
-   	 assign m_versat_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
-   	 assign m_versat_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
-   	 assign m_versat_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
-   	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = m_versat_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
-   	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = m_versat_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
+      for(l = 0; l < 3; l++) begin : vcaches_l1
+
+	 wire [`IO_ADDR_W-1:0] vcache_addr = databus_addr[3*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
+
+         // Versat cache instance
+    	 iob_cache # (
+           .FE_ADDR_W(`DDR_ADDR_W),
+           .N_WAYS(1),        //Number of ways
+           .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
+           .WORD_OFF_W(5),    //Word Offset (number of words per line)
+           .WTBUF_DEPTH_W(4), //FIFO's depth
+           .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
+           .FE_DATA_W(`DATAPATH_W), //DATAPATH_W = 16 front-end
+           .BE_DATA_W(`MIG_BUS_W)
+        ) vcache (
+     	   .clk   (clk),
+    	   .reset (rst),
+
+    	   // Front-end interface
+   	   .valid (databus_valid[2-l -: 1]),
+   	   .addr  (vcache_addr[`DDR_ADDR_W:1]),
+   	   .wdata (databus_wdata[3*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
+  	   .wstrb (databus_wstrb[3*`DATAPATH_W/8-l*`DATAPATH_W/8-1 -: `DATAPATH_W/8]),
+   	   .rdata (databus_rdata[3*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
+   	   .ready (databus_ready[2-l -: 1]),
+		 
+    	    // Back-end interface
+    	   .mem_valid (vcache_be_req[`valid_MIG_BUS(l)]),
+    	   .mem_addr  (vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)]),
+    	   .mem_wdata (vcache_be_req[`wdata_MIG_BUS(l)]),
+    	   .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS(l)]),
+    	   .mem_rdata (vcache_be_resp[`rdata_MIG_BUS(l)]),
+    	   .mem_ready (vcache_be_resp[`ready_MIG_BUS(l)])
+        );
+
+        //assign MSBs of address fields
+   	assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
+	 	 
       end
    endgenerate
-    
-   
-   // //concatenate databus interface to merge master interface
-   // genvar 					  k;
-   // generate
-   //    for(k=0; k< (`nYOLOvect+`nSTAGES);k=k+1) begin : databus_to_vcache_fe
-   // 	 assign vcache_fe_req[`valid_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_valid[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1];
-   // 	 assign vcache_fe_req[`address_VERSAT((`nYOLOvect+`nSTAGES-1-k), `IO_ADDR_W)] = databus_addr[(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-`IO_ADDR_W*k-1 -: `IO_ADDR_W];
-   // 	 assign vcache_fe_req[`wdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W];
-   // 	 assign vcache_fe_req[`wstrb_VERSAT((`nYOLOvect+`nSTAGES-1-k))] = databus_wstrb[(`nYOLOvect+`nSTAGES)*(`DATAPATH_W/8)-(`DATAPATH_W/8)*k-1 -: (`DATAPATH_W/8)];
-   // 	 assign databus_rdata[(`nYOLOvect+`nSTAGES)*`DATAPATH_W-`DATAPATH_W*k-1 -: `DATAPATH_W] = vcache_fe_resp[`rdata_VERSAT((`nYOLOvect+`nSTAGES-1-k))];
-   // 	 assign databus_ready[(`nYOLOvect+`nSTAGES)-k-1 -: 1'b1] = vcache_fe_resp[`ready_VERSAT((`nYOLOvect+`nSTAGES-1-k))]; 
-   //    end
-   // endgenerate
-
-   
-   //merge
-   merge #(
-   	   .N_MASTERS(`nYOLOvect+`nSTAGES),
-   	   .DATA_W(`DATAPATH_W),
-   	   .ADDR_W(`IO_ADDR_W)
-   	   ) vcache_merge (
-   			   //masters interface
-   			   .m_req(m_versat_req_r),
-   			   .m_resp(m_versat_resp),
-   			   //slave interface
-   			   .s_req(vcache_fe_req),
-   			   .s_resp(vcache_fe_resp)
-   			   );
-      
-   //Back-end bus
-
-   wire [`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
-   wire [`RESP_MIG_BUS_W-1:0] 	  vcache_be_resp;
-
-   // wire [(`nYOLOvect+`nSTAGES)*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
-   // wire [(`nYOLOvect+`nSTAGES)*`RESP_MIG_BUS_W-1:0] 	  vcache_be_resp;
-
-   
-   // Versat cache instance
-   iob_cache # 
-     (
-      .FE_ADDR_W(`DDR_ADDR_W),
-      .N_WAYS(1),        //Number of ways
-      .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
-      .WORD_OFF_W(5),    //Word Offset (number of words per line)
-      .WTBUF_DEPTH_W(4), //FIFO's depth
-      .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
-      .FE_DATA_W(`DATAPATH_W), //DATAPATH_W = 16 front-end
-      .BE_DATA_W(`MIG_BUS_W)
-      )
-   vcache (
-           .clk   (clk),
-           .reset (rst),
-
-           // Front-end interface
-           .valid (vcache_fe_req[`valid_VERSAT(0)]),
-           .addr  (vcache_fe_req[`address_VERSAT(0,`DDR_ADDR_W+1)-1]),
-           .wdata (vcache_fe_req[`wdata_VERSAT(0)]),
-           .wstrb (vcache_fe_req[`wstrb_VERSAT(0)]),
-           .rdata (vcache_fe_resp[`rdata_VERSAT(0)]),
-           .ready (vcache_fe_resp[`ready_VERSAT(0)]),
-	   
-           // Back-end interface
-           .mem_valid (vcache_be_req[`valid_MIG_BUS(0)]),
-           .mem_addr  (vcache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W)]),
-           .mem_wdata (vcache_be_req[`wdata_MIG_BUS(0)]),
-           .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS(0)]),
-           .mem_rdata (vcache_be_resp[`rdata_MIG_BUS(0)]),
-           .mem_ready (vcache_be_resp[`ready_MIG_BUS(0)])
-           );
-
-   // genvar 						  l;
-   // generate
-   //    for(l=0;l<(`nYOLOvect+`nSTAGES);l=l+1) begin : vcaches_l1
-   // 	 // Versat cache instance
-   // 	 iob_cache # 
-   // 	    (
-   // 	     .FE_ADDR_W(`DDR_ADDR_W),
-   // 	     .N_WAYS(1),        //Number of ways
-   // 	     .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
-   // 	     .WORD_OFF_W(5),    //Word Offset (number of words per line)
-   // 	     .WTBUF_DEPTH_W(4), //FIFO's depth
-   // 	     .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
-   // 	     .FE_DATA_W(`DATAPATH_W), //DATAPATH_W = 16 front-end
-   // 	     .BE_DATA_W(`MIG_BUS_W)
-   // 	     )
-   // 	 vcache (
-   // 		 .clk   (clk),
-   // 		 .reset (rst),
-
-   // 		 // Front-end interface
-   // 		 .valid (vcache_fe_req[`valid_VERSAT(l)]),
-   // 		 .addr  (vcache_fe_req[`address_VERSAT(l,`DDR_ADDR_W+1)-1]),
-   // 		 .wdata (vcache_fe_req[`wdata_VERSAT(l)]),
-   // 		 .wstrb (vcache_fe_req[`wstrb_VERSAT(l)]),
-   // 		 .rdata (vcache_fe_resp[`rdata_VERSAT(l)]),
-   // 		 .ready (vcache_fe_resp[`ready_VERSAT(l)]),
-		 
-   // 		 // Back-end interface
-   // 		 .mem_valid (vcache_be_req[`valid_MIG_BUS(l)]),
-   // 		 .mem_addr  (vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)]),
-   // 		 .mem_wdata (vcache_be_req[`wdata_MIG_BUS(l)]),
-   // 		 .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS(l)]),
-   // 		 .mem_rdata (vcache_be_resp[`rdata_MIG_BUS(l)]),
-   // 		 .mem_ready (vcache_be_resp[`ready_MIG_BUS(l)])
-   // 		 );
-
-   // 	 //assign MSBs of address fields
-   // 	 assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
-	 	 
-   //    end
-   // endgenerate
 `endif
-   
-   
-
    
    // Merge caches back-ends
    wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
@@ -383,10 +264,6 @@ module ext_mem
    assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
 `endif
    assign dcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
-`ifdef USE_NEW_VERSAT //TODO: later this needs to be for generate
-   assign vcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
-`endif   
-   
    
    merge
      #(
@@ -394,7 +271,7 @@ module ext_mem
      .N_MASTERS(2),
 `else
  `ifdef USE_NEW_VERSAT
-       .N_MASTERS(2), //1+(`nYOLOvect+`nSTAGES)),
+       .N_MASTERS(1+3),
  `else
        .N_MASTERS(1),
  `endif
