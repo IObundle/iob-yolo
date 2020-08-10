@@ -174,7 +174,7 @@ module ext_mem
    iob_cache # 
      (
       .FE_ADDR_W(`DDR_ADDR_W),
-      .N_WAYS(2),        //Number of ways
+      .N_WAYS(1),        //Number of ways
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
       .WTBUF_DEPTH_W(4), //FIFO's depth
@@ -265,7 +265,7 @@ module ext_mem
 `endif
    assign dcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
    
-   merge
+   sync_merge
      #(
 `ifdef RUN_DDR_USE_SRAM
      .N_MASTERS(2),
@@ -280,6 +280,9 @@ module ext_mem
        )
      merge_i_d_buses_into_l2
        (
+	//inputs
+	.clk(clk),
+	.rst(rst),
         // masters
 `ifdef RUN_DDR_USE_SRAM
         .m_req  ({icache_be_req, dcache_be_req}),
@@ -302,7 +305,7 @@ module ext_mem
    iob_cache_axi # 
      (
       .FE_ADDR_W(`DDR_ADDR_W),
-      .N_WAYS(4),        //Number of Ways
+      .N_WAYS(1),        //Number of Ways
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
       .WTBUF_DEPTH_W(4), //FIFO's depth
