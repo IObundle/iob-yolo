@@ -49,13 +49,21 @@ module xyolo_write_stage #(
 	input                           xyolo_bypass,
 	input [`SHIFT_W-1:0]            xyolo_shift,
 
-    	// Databus interface
-    	input [1:0]                     databus_ready,
-    	output [1:0]                    databus_valid,
-    	output [2*`IO_ADDR_W-1:0]       databus_addr,
-    	input [2*DATA_W-1:0]            databus_rdata,
-    	output [2*DATA_W-1:0]           databus_wdata,
-    	output [2*DATA_W/8-1:0]         databus_wstrb,
+    	// vread databus interface
+    	input                      	vread_databus_ready,
+    	output                     	vread_databus_valid,
+    	output [`IO_ADDR_W-1:0]       	vread_databus_addr,
+    	input [DATA_W-1:0]            	vread_databus_rdata,
+    	output [DATA_W-1:0]           	vread_databus_wdata,
+    	output [DATA_W/8-1:0]         	vread_databus_wstrb,
+
+    	// vwrite databus interface
+    	input                      	vwrite_databus_ready,
+    	output                     	vwrite_databus_valid,
+    	output [`IO_ADDR_W-1:0]       	vwrite_databus_addr,
+    	input [256-1:0]            	vwrite_databus_rdata,
+    	output [256-1:0]           	vwrite_databus_wdata,
+    	output [256/8-1:0]         	vwrite_databus_wstrb,
 
     	// input data
     	input [`nYOLOvect*DATA_W-1:0]   flow_in_bias,
@@ -79,11 +87,6 @@ module xyolo_write_stage #(
    // vread output
    wire	[DATA_W-1:0]			pixel, vread_out;
    reg	[DATA_W-1:0]			vread_out_reg;
-
-   // vwrite counter and mux
-   reg [$clog2(`nYOLOvect)-1:0]         vwrite_cnt;
-   reg                                  vwrite_cnt_en;
-   reg [DATA_W-1:0]                     vwrite_mux;
 
    //
    // global vread
@@ -113,12 +116,12 @@ module xyolo_write_stage #(
       .incr(vread_incrA),
       .delay(`EXT_PERIOD_W'd0),
       // Databus interface
-      .databus_ready(databus_ready[1]),
-      .databus_valid(databus_valid[1]),
-      .databus_addr(databus_addr[2*`IO_ADDR_W-1:`IO_ADDR_W]),
-      .databus_rdata(databus_rdata[2*DATA_W-1:DATA_W]),
-      .databus_wdata(databus_wdata[2*DATA_W-1:DATA_W]),
-      .databus_wstrb(databus_wstrb[2*DATA_W/8-1:DATA_W/8]),
+      .databus_ready(vread_databus_ready),
+      .databus_valid(vread_databus_valid),
+      .databus_addr(vread_databus_addr),
+      .databus_rdata(vread_databus_rdata),
+      .databus_wdata(vread_databus_wdata),
+      .databus_wstrb(vread_databus_wstrb),
       // internal memory interface
       .valid(vread_enA),
       .we(vread_we),
@@ -161,45 +164,16 @@ module xyolo_write_stage #(
    // vwrite/xyolo vector
    //
 
-   //vwrite counter - to address each vwrite mem sequentially
-   always @ (posedge clk, posedge global_run)
-      if (global_run) begin
-         vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
-         vwrite_cnt_en <= 1'b0;
-      end else if(vwrite_bypass)
-         vwrite_cnt_en <= 1'b1;
-      else if(databus_ready[0]) begin
-         if(vwrite_cnt == `nYOLOvect-1) begin
-            vwrite_cnt <= {$clog2(`nYOLOvect){1'b0}};
-            vwrite_cnt_en <= 1'b0;
-         end else begin
-            vwrite_cnt <= vwrite_cnt + 1;
-            if(vwrite_cnt == `nYOLOvect-2)
-               vwrite_cnt_en <= 1'b1;
-            else
-               vwrite_cnt_en <= 1'b0;
-         end
-      end
-
-   //vwrite mux - select which memory to address
-   always @ * begin
-      integer j;
-      vwrite_mux = {DATA_W{1'b0}};
-      for(j = 0; j < `nYOLOvect; j++)
-         if(vwrite_cnt == j)
-            vwrite_mux = vwrite_inA[`nYOLOvect*DATA_W-DATA_W*j-1 -: DATA_W];
-   end
-
    //external address generator
    ext_addrgen #(
-      .DATA_W(DATA_W),
+      .DATA_W(256),
       .MEM_ADDR_W(`VWRITE_ADDR_W)
    ) vwrite_addrgenA (
       .clk(clk),
       .rst(rst),
       // Control
       .run(global_run),
-      .int_cnt_en(vwrite_cnt_en),
+      .int_cnt_en(1'b1),
       .done(vwrite_doneA),
       // Configuration
       .ext_addr(vwrite_ext_addr),
@@ -213,18 +187,18 @@ module xyolo_write_stage #(
       .incr(vwrite_incrA),
       .delay(`PERIOD_W'd0),
       // Databus interface
-      .databus_ready(databus_ready[0]),
-      .databus_valid(databus_valid[0]),
-      .databus_addr(databus_addr[`IO_ADDR_W-1:0]),
-      .databus_rdata(databus_rdata[DATA_W-1:0]),
-      .databus_wdata(databus_wdata[DATA_W-1:0]),
-      .databus_wstrb(databus_wstrb[DATA_W/8-1:0]),
+      .databus_ready(vwrite_databus_ready),
+      .databus_valid(vwrite_databus_valid),
+      .databus_addr(vwrite_databus_addr),
+      .databus_rdata(vwrite_databus_rdata),
+      .databus_wdata(vwrite_databus_wdata),
+      .databus_wstrb(vwrite_databus_wstrb),
       // internal memory interface
       .valid(vwrite_enA),
       .we(),
       .addr(vwrite_addrA),
       .data_out(),
-      .data_in(vwrite_mux)
+      .data_in(vwrite_inA)
    );
 
    // instantiate vwrite internal memories and xyolo units
@@ -242,7 +216,7 @@ module xyolo_write_stage #(
             // Reading port
             .r_en(vwrite_enA),
             .r_addr(vwrite_addrA),
-            .data_out(vwrite_inA[`nYOLOvect*DATA_W-DATA_W*i-1 -: DATA_W]),
+            .data_out(vwrite_inA[DATA_W*i +: DATA_W]),
             // Writting port
             .w_en(vwrite_enB),
             .w_addr(vwrite_addrB),

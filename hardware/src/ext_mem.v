@@ -54,12 +54,19 @@ module ext_mem
 
 `ifdef USE_NEW_VERSAT
    //Versat bus
-   output [2:0] 		databus_ready,
-   output [3*`DATAPATH_W-1:0]  	databus_rdata,
-   input [2:0] 		   	databus_valid,
-   input [3*`IO_ADDR_W-1:0]    	databus_addr,
-   input [3*`DATAPATH_W-1:0]   	databus_wdata,
-   input [3*`DATAPATH_W/8-1:0] 	databus_wstrb,
+   output [1:0] 		databus_ready,
+   output [2*`DATAPATH_W-1:0]  	databus_rdata,
+   input [1:0] 		   	databus_valid,
+   input [2*`IO_ADDR_W-1:0]    	databus_addr,
+   input [2*`DATAPATH_W-1:0]   	databus_wdata,
+   input [2*`DATAPATH_W/8-1:0] 	databus_wstrb,
+   //vwrite versat bus
+   output  			vwrite_databus_ready,
+   output [256-1:0]  		vwrite_databus_rdata,
+   input  		   	vwrite_databus_valid,
+   input [`IO_ADDR_W-1:0]    	vwrite_databus_addr,
+   input [256-1:0]   		vwrite_databus_wdata,
+   input [256/8-1:0] 		vwrite_databus_wstrb,
 `endif
    
    // AXI interface 
@@ -211,12 +218,22 @@ module ext_mem
    //Back-end bus
    wire [3*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
    wire [3*`RESP_MIG_BUS_W-1:0]	  vcache_be_resp;
+
+   //Connect vwrite to backend
+   assign vcache_be_req[`valid_MIG_BUS(0)] = vwrite_databus_valid;
+   assign vcache_be_req[`address_MIG_BUS(0, `DDR_ADDR_W)] = vwrite_databus_addr;
+   assign vcache_be_req[`wdata_MIG_BUS(0)] = vwrite_databus_wdata;
+   assign vcache_be_req[`wstrb_MIG_BUS(0)] = vwrite_databus_wstrb;
+   assign vwrite_databus_rdata = vcache_be_resp[`rdata_MIG_BUS(0)];
+   assign vwrite_databus_ready = vcache_be_resp[`ready_MIG_BUS(0)];
+   assign vcache_be_req[`address_MIG_BUS(0, `ADDR_W)-`DDR_ADDR_W] = 0;
    
+   //Connect vreads to cache
    genvar			  l;
    generate
-      for(l = 0; l < 3; l++) begin : vcaches_l1
+      for(l = 0; l < 2; l++) begin : vcaches_l1
 
-	 wire [`IO_ADDR_W-1:0] vcache_addr = databus_addr[3*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
+	 wire [`IO_ADDR_W-1:0] vcache_addr = databus_addr[2*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
 
          // Versat cache instance
     	 iob_cache # (
@@ -233,24 +250,24 @@ module ext_mem
     	   .reset (rst),
 
     	   // Front-end interface
-   	   .valid (databus_valid[2-l -: 1]),
+   	   .valid (databus_valid[1-l -: 1]),
    	   .addr  (vcache_addr[`DDR_ADDR_W:1]),
-   	   .wdata (databus_wdata[3*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
-  	   .wstrb (databus_wstrb[3*`DATAPATH_W/8-l*`DATAPATH_W/8-1 -: `DATAPATH_W/8]),
-   	   .rdata (databus_rdata[3*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
-   	   .ready (databus_ready[2-l -: 1]),
+   	   .wdata (databus_wdata[2*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
+  	   .wstrb (databus_wstrb[2*`DATAPATH_W/8-l*`DATAPATH_W/8-1 -: `DATAPATH_W/8]),
+   	   .rdata (databus_rdata[2*`DATAPATH_W-l*`DATAPATH_W-1 -: `DATAPATH_W]),
+   	   .ready (databus_ready[1-l -: 1]),
 		 
     	    // Back-end interface
-    	   .mem_valid (vcache_be_req[`valid_MIG_BUS(l)]),
-    	   .mem_addr  (vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)]),
-    	   .mem_wdata (vcache_be_req[`wdata_MIG_BUS(l)]),
-    	   .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS(l)]),
-    	   .mem_rdata (vcache_be_resp[`rdata_MIG_BUS(l)]),
-    	   .mem_ready (vcache_be_resp[`ready_MIG_BUS(l)])
+    	   .mem_valid (vcache_be_req[`valid_MIG_BUS((l+1))]),
+    	   .mem_addr  (vcache_be_req[`address_MIG_BUS((l+1), `DDR_ADDR_W)]),
+    	   .mem_wdata (vcache_be_req[`wdata_MIG_BUS((l+1))]),
+    	   .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS((l+1))]),
+    	   .mem_rdata (vcache_be_resp[`rdata_MIG_BUS((l+1))]),
+    	   .mem_ready (vcache_be_resp[`ready_MIG_BUS((l+1))])
         );
 
         //assign MSBs of address fields
-   	assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
+   	assign vcache_be_req[`address_MIG_BUS((l+1), `ADDR_W)-`DDR_ADDR_W] = 0;
 	 	 
       end
    endgenerate

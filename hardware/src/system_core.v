@@ -239,10 +239,15 @@ module system
 
  `ifdef USE_NEW_VERSAT
    // Connect Versat to L1 Caches in ext_mem
-   wire [2:0]                 dbus_ready, dbus_valid;
-   wire [3*`DATAPATH_W-1:0]   dbus_wdata, dbus_rdata;
-   wire [3*`IO_ADDR_W-1:0]    dbus_addr;
-   wire [3*`DATAPATH_W/8-1:0] dbus_wstrb;
+   wire [1:0]                 dbus_ready, dbus_valid;
+   wire [2*`DATAPATH_W-1:0]   dbus_wdata, dbus_rdata;
+   wire [2*`IO_ADDR_W-1:0]    dbus_addr;
+   wire [2*`DATAPATH_W/8-1:0] dbus_wstrb;
+   // Connect Versat to L1 Caches in ext_mem
+   wire                       vwrite_dbus_ready, vwrite_dbus_valid;
+   wire [256-1:0]     	      vwrite_dbus_wdata, vwrite_dbus_rdata;
+   wire [`IO_ADDR_W-1:0]      vwrite_dbus_addr;
+   wire [256/8-1:0]   	      vwrite_dbus_wstrb;
 
  `endif
 
@@ -272,6 +277,13 @@ module system
 	.databus_wstrb        (dbus_wstrb),
 	.databus_rdata        (dbus_rdata),
 	.databus_ready        (dbus_ready),
+	//vwrite Versat bus
+	.vwrite_databus_valid (vwrite_dbus_valid),
+	.vwrite_databus_addr  (vwrite_dbus_addr),
+	.vwrite_databus_wdata (vwrite_dbus_wdata),
+	.vwrite_databus_wstrb (vwrite_dbus_wstrb),
+	.vwrite_databus_rdata (vwrite_dbus_rdata),
+	.vwrite_databus_ready (vwrite_dbus_ready),
 `endif
 	
         //AXI INTERFACE 

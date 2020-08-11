@@ -11,7 +11,7 @@
 `define NTW_IN_KER_SIZE 3
 `define NTW_IN_NUM_KER 16
 `define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C)) //16 bits
-`define DATA_LAYER_1 ((`NTW_IN_W+2)*(`NTW_IN_W+2)*`NTW_IN_C) //16 bits
+`define DATA_LAYER_1 ((`NTW_IN_W+2)*(`NTW_IN_W+2)*`NTW_IN_C + 4) //16 bits
 `define DATA_LAYER_3 ((`NTW_IN_W/2+2)*(`NTW_IN_W/2+2)*`NTW_IN_NUM_KER)
 `define FILE_SIZE ((`OFFSET + 2*(`WEIGHT_SIZE + `DATA_LAYER_1 + 2*`DATA_LAYER_3))/(`MIG_BUS_W/8))
 
@@ -64,7 +64,7 @@ module new_versat_test_tb;
    integer                i;
 
    //define parameters
-   parameter file_ddr = "../../../../new_versat_256.hex";
+   parameter file_ddr = {"../../../../new_versat_", `STRINGIFY(`MIG_BUS_W), ".hex"};
    parameter file_size = `FILE_SIZE;
    
 

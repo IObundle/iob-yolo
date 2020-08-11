@@ -47,7 +47,8 @@
 
 //define DDR mapping
 #define WEIGHTS_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
-#define DATA_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + 2*WEIGHT_SIZE) //16 bits
+#define LAYER_1_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + 2*WEIGHT_SIZE) //16 bits
+#define LAYER_3_BASE_ADDRESS (LAYER_1_BASE_ADDRESS + 2*DATA_LAYER_1 + 8) //aligned layer 3 input
 
 //ETHERNET variables
 int rcv_timeout = 5000;
@@ -102,7 +103,7 @@ void conv() {
   //local variables
   int j, k, l;
 #ifdef SIM
-  int k_delta = 1; //NTW_IN_W/(2*nSTAGES);
+  int k_delta = NTW_IN_W/(2*nSTAGES);
 #endif
 
   /////////////////////////////////////////////////////////////////////////
@@ -158,8 +159,8 @@ void conv() {
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
-  versat.ywrite.write.setExtPer(nYOLOvect); // 16
-  versat.ywrite.write.setExtIncr(1);
+  versat.ywrite.write.setExtPer(1);
+  versat.ywrite.write.setExtIncr(nYOLOvect);
   versat.ywrite.write.setExtIter(TILE_W/2); // 2
   versat.ywrite.write.setExtShift(NTW_IN_NUM_KER-nYOLOvect); // 16-16 = 0
 
@@ -179,10 +180,10 @@ void conv() {
       for(j = 0; j < NTW_IN_W/TILE_W; j++) {
 
         // configure xyolo_write vread to read tile from input fm
-        versat.ywrite.read.setExtAddr(DATA_BASE_ADDRESS + 2*(k*2*(NTW_IN_W+2)*NTW_IN_C*nSTAGES + j*TILE_W*NTW_IN_C));
+        versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*(NTW_IN_W+2)*NTW_IN_C*nSTAGES + j*TILE_W*NTW_IN_C));
 
         // configure xyolo_write vwrite to write result back to DDR
-        versat.ywrite.write.setExtAddr(DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + (NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
+        versat.ywrite.write.setExtAddr(LAYER_3_BASE_ADDRESS + 2*((NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
 
         // wait until done
         while(versat.done()==0);
@@ -206,8 +207,7 @@ void conv() {
   versat_end();
 
 #ifdef SIM
-  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1;
+  int16_t * fp_data = (int16_t *) LAYER_3_BASE_ADDRESS;
   int i;
   uart_printf("Verifying...\n\n");
   for(i = 0; i < k_delta*nSTAGES+1; i++) {
@@ -215,7 +215,7 @@ void conv() {
     for(j = 0; j < NTW_IN_W/2+2; j++)
       for(k = 0; k < NTW_IN_NUM_KER; k++)
         if(fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] != fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k), fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF);  }
+          uart_printf("(%x) res = %x, act = %x\n", LAYER_3_BASE_ADDRESS + 2*(i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k), fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF);  }
 #endif
 }
 
@@ -225,7 +225,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + DATA_LAYER_1*2;
+  char * fp_data_char = (char *) LAYER_3_BASE_ADDRESS;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -326,8 +326,8 @@ int main(int argc, char **argv) {
   eth_set_rx_payload_size(ETH_NBYTES);
 
   //set positions to zero due to output padding
-  int16_t * fp_image = (int16_t *) DATA_BASE_ADDRESS;
-  for(i = 0; i < DATA_LAYER_3; i++) fp_image[DATA_LAYER_1 + i] = 0;
+  int16_t * fp_image = (int16_t *) LAYER_3_BASE_ADDRESS;
+  for(i = 0; i < DATA_LAYER_3; i++) fp_image[i] = 0;
 
   //receive data via ethernet
   rcv_data();
@@ -404,7 +404,7 @@ int main(int argc, char **argv) {
   conv();
   /* mem_test(); */
   end = timer_time_us(TIMER_BASE);
-  uart_printf("\nConvolution done in %d ms\n\n", (end-start)/1000);
+  uart_printf("\nConvolution done in %d us\n\n", (end-start));
 
   //send results back
 #ifndef SIM

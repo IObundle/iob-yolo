@@ -22,13 +22,21 @@ module xversat # (
     	output reg                      ready,
     	output [`IO_ADDR_W-1:0]         rdata,
 
-    	// databus interface (2 vreads + 1 vwrite)
-    	input [2:0]                	databus_ready,
-    	input [3*`DATAPATH_W-1:0]	databus_rdata,
-    	output [2:0]          		databus_valid,
-    	output [3*`IO_ADDR_W-1:0]   	databus_addr,
-    	output [3*`DATAPATH_W-1:0]  	databus_wdata,
-    	output [3*`DATAPATH_W/8-1:0] 	databus_wstrb
+    	// vread databus interface
+    	input [1:0]                	databus_ready,
+    	input [2*`DATAPATH_W-1:0]	databus_rdata,
+    	output [1:0]          		databus_valid,
+    	output [2*`IO_ADDR_W-1:0]   	databus_addr,
+    	output [2*`DATAPATH_W-1:0]  	databus_wdata,
+    	output [2*`DATAPATH_W/8-1:0] 	databus_wstrb,
+
+    	// vwrite databus interface
+    	input                 		vwrite_databus_ready,
+    	input [256-1:0]			vwrite_databus_rdata,
+    	output           		vwrite_databus_valid,
+    	output [`IO_ADDR_W-1:0]   	vwrite_databus_addr,
+    	output [256-1:0]  		vwrite_databus_wdata,
+    	output [256/8-1:0] 		vwrite_databus_wstrb
     );
 
    // local parameters
@@ -131,13 +139,20 @@ module xversat # (
       .addr(s_req[`address(1, `XYOLO_WRITE_ADDR_W)]),
       .wdata(s_req[`wdata(1)]),
       .wstrb(|s_req[`wstrb(1)]),
-      // databus interface
-      .databus_ready(databus_ready[2:1]),
-      .databus_valid(databus_valid[2:1]),
-      .databus_addr(databus_addr[3*`IO_ADDR_W-1:`IO_ADDR_W]),
-      .databus_rdata(databus_rdata[3*`DATAPATH_W-1:`DATAPATH_W]),
-      .databus_wdata(databus_wdata[3*`DATAPATH_W-1:`DATAPATH_W]),
-      .databus_wstrb(databus_wstrb[3*`DATAPATH_W/8-1:`DATAPATH_W/8]),
+      // vread databus interface
+      .vread_databus_ready(databus_ready[1]),
+      .vread_databus_valid(databus_valid[1]),
+      .vread_databus_addr(databus_addr[2*`IO_ADDR_W-1:`IO_ADDR_W]),
+      .vread_databus_rdata(databus_rdata[2*`DATAPATH_W-1:`DATAPATH_W]),
+      .vread_databus_wdata(databus_wdata[2*`DATAPATH_W-1:`DATAPATH_W]),
+      .vread_databus_wstrb(databus_wstrb[2*`DATAPATH_W/8-1:`DATAPATH_W/8]),
+      // vread databus interface
+      .vwrite_databus_ready(vwrite_databus_ready),
+      .vwrite_databus_valid(vwrite_databus_valid),
+      .vwrite_databus_addr(vwrite_databus_addr),
+      .vwrite_databus_rdata(vwrite_databus_rdata),
+      .vwrite_databus_wdata(vwrite_databus_wdata),
+      .vwrite_databus_wstrb(vwrite_databus_wstrb),
       // output data
       .flow_in_bias(flow_bias),
       .flow_in_weight(flow_weight)
