@@ -273,8 +273,8 @@ module ext_mem
         //assign MSBs of address fields
    	assign vcache_be_req[`address_MIG_BUS((l+1), `ADDR_W)-`DDR_ADDR_W] = 0;
 	 	 
-   //    end
-   // endgenerate
+      end
+   endgenerate
 `endif
    
    // Merge caches back-ends
@@ -319,8 +319,6 @@ module ext_mem
 	     )
 	 merge_i_d_buses_into_l2_read
 	   (
-	    // masters
-	    (
 	     //inputs
 	     .clk(clk),
 	     .rst(rst),
