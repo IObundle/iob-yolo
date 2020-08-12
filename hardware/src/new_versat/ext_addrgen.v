@@ -63,8 +63,6 @@ module ext_addrgen #(
    // link int mem and ext databus
    assign data_out = databus_rdata;
    assign databus_wdata = data_in;
-   // assign databus_addr = ext_addr + addr_gen;
-   // assign databus_addr = ext_addr + (addr_gen<<2);
    assign databus_addr = ext_addr + (addr_gen<<1);
    assign addr = int_addr + counter_int;
 
