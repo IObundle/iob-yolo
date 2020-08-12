@@ -17,3 +17,4 @@ Repository for the implementation of an object detection application based on th
 - **versat_test:** performs one 3D convolution with 5 input FMs of 5x5 and kernels of 3x3. Goal: verify deep_versat pipeline is working.
 - **yolo_hw_full:** Full execution of YOLO pipeline using versat. Goal: adapt yolo-sw code to be easily accelerated by versat.
 - **new_versat_test:** Computing yolov3-tiny layer 1 output with nSTAGES of nYOLOvect each. Goal: verify new versat is working.
+- **dma_test:** Transfering 16 words of 256 bits each from vwrite to DDR via AXI-DMA (**only works in simulation**). Goal: verify AXI-DMA is working.

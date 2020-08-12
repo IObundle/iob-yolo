@@ -12,7 +12,7 @@ endif
 INC_DIR:=$(ROOT_DIR)/hardware/include
 SOC_INC_DIR:=$(SOC_DIR)/hardware/include
 
-INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR)
+INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR) $(incdir)$(INC_DIR)/dma
 # Versat yolo includes
 ifeq ($(USE_NEW_VERSAT),1)
 INCLUDE+=$(incdir)$(INC_DIR)/new_versat
@@ -43,7 +43,8 @@ $(MEM_DIR)/tdp_ram/iob_tdp_ram.v
 
 #ddr
 ifeq ($(USE_DDR),1)
-VSRC+=$(SRC_DIR)/ext_mem.v
+	VSRC+=$(SRC_DIR)/dma/axi_dma.v
+	VSRC+=$(SRC_DIR)/ext_mem.v
 endif
 
 #system
