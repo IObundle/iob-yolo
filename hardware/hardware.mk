@@ -61,6 +61,7 @@ endif
 endif
 #Versat memories
 VSRC+=$(MEM_DIR)/2p_mem/iob_2p_mem.v
+VSRC+=$(MEM_DIR)/2p_assim_mem/iob_2p_assim_mem_w_big.v
 
 # peripherals
 periphs:

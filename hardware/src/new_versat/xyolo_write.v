@@ -4,20 +4,9 @@
 `include "xyolo_write.vh"
 `include "xyolo_read.vh"
 
-// REQ/RESP VERSAT BUS DEFINES
-`define REQ_VWRITE_W (`VALID_W+`IO_ADDR_W+256+(256/8))
-`define RESP_VWRITE_W (256+`READY_W)
-`define WDATA_VWRITE_P (256/8)
-`define ADDR_VWRITE_P (`WDATA_VWRITE_P + 256)
-`define valid_VWRITE(I) (I+1)*`REQ_VWRITE_W-1
-`define address_VWRITE(I,W) I*`REQ_VWRITE_W+`ADDR_VWRITE_P+W-1 -: W
-`define wdata_VWRITE(I) I*`REQ_VWRITE_W+`WDATA_VWRITE_P +: 256
-`define wstrb_VWRITE(I) I*`REQ_VWRITE_W +: (256/8)
-`define rdata_VWRITE(I) I*`RESP_VWRITE_W+`RDATA_P +: 256
-`define ready_VWRITE(I) I*`RESP_VWRITE_W
-
 module xyolo_write #(
-    	parameter                       DATA_W = 32
+    	parameter                       DATAPATH_W = 32,
+        parameter			DATABUS_W = 256
     ) (
     	input                           clk,
     	input                           rst,
@@ -33,25 +22,17 @@ module xyolo_write #(
         input [`IO_ADDR_W-1:0]          wdata,
         input                           wstrb,
 
-        // vread databus interface
-        input                           vread_databus_ready,
-        output                          vread_databus_valid,
-        output [`IO_ADDR_W-1:0]         vread_databus_addr,
-        input [DATA_W-1:0]              vread_databus_rdata,
-        output [DATA_W-1:0]             vread_databus_wdata,
-        output [DATA_W/8-1:0]           vread_databus_wstrb,
-
-        // vwrite databus interface
-        input                           vwrite_databus_ready,
-        output                          vwrite_databus_valid,
-        output [`IO_ADDR_W-1:0]         vwrite_databus_addr,
-        input [256-1:0]                 vwrite_databus_rdata,
-        output [256-1:0]                vwrite_databus_wdata,
-        output [256/8-1:0]              vwrite_databus_wstrb,
+        // databus interface (1 vread merge + 1 vwrite merge)
+        input [1:0]                     databus_ready,
+        output [1:0]                    databus_valid,
+        output [2*`IO_ADDR_W-1:0]       databus_addr,
+        input [2*DATABUS_W-1:0]         databus_rdata,
+        output [2*DATABUS_W-1:0]        databus_wdata,
+        output [2*DATABUS_W/8-1:0]      databus_wstrb,
 
     	// input data
-    	input [`nYOLOvect*DATA_W-1:0]   flow_in_bias,
-    	input [`nYOLOvect*DATA_W-1:0]	flow_in_weight
+    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_bias,
+    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight
     );
 
    // vread latency
@@ -59,6 +40,7 @@ module xyolo_write #(
 
    // local parameter for merge
    localparam                           ADDR_W = `IO_ADDR_W;
+   localparam				DATA_W = DATABUS_W;
 
    // vwrite configuration enables
    reg                                  vwrite_ext_addr_en;
@@ -129,7 +111,7 @@ module xyolo_write #(
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
-   reg [`MEM_ADDR_W-1:0]		vread_int_addr, vread_int_addr_shadow;
+   reg [`W_ADDR_W-1:0]			vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
    reg [`EXT_PERIOD_W-1:0]              vread_perA, vread_perA_shadow;
    reg [`EXT_ADDR_W-1:0]                vread_shiftA, vread_shiftA_shadow;
@@ -180,21 +162,13 @@ module xyolo_write #(
    reg                                  ld_acc0, ld_acc1;
    reg [1:0]                            mp_cnt;
 
-   // vread merge master interface
-   wire [`nSTAGES*`REQ_W-1:0]           vread_m_req;
-   wire [`nSTAGES*`RESP_W-1:0]          vread_m_resp;
+   // merge master interface
+   wire [`nSTAGES*`REQ_W-1:0]           vread_m_req, vwrite_m_req;
+   wire [`nSTAGES*`RESP_W-1:0]          vread_m_resp, vwrite_m_resp;
 
-   //vread merge slave interface
-   wire [`REQ_W-1:0]                    vread_s_req;
-   wire [`RESP_W-1:0]                   vread_s_resp;
-
-   // vread merge master interface
-   wire [`nSTAGES*`REQ_VWRITE_W-1:0]    vwrite_m_req;
-   wire [`nSTAGES*`RESP_VWRITE_W-1:0]   vwrite_m_resp;
-
-   //vread merge slave interface
-   wire [`REQ_VWRITE_W-1:0]             vwrite_s_req;
-   wire [`RESP_VWRITE_W-1:0]            vwrite_s_resp;
+   // merge slave interface
+   wire [`REQ_W-1:0]                    vread_s_req, vwrite_s_req;
+   wire [`RESP_W-1:0]                   vread_s_resp, vwrite_s_resp;
 
    // register run
    always @ (posedge clk, posedge rst)
@@ -320,7 +294,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
-         vread_int_addr <= `MEM_ADDR_W'b0;
+         vread_int_addr <= {`W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
          vread_perA <= `EXT_PERIOD_W'b0;
 	 vread_shiftA <= `EXT_ADDR_W'b0;
@@ -366,7 +340,7 @@ module xyolo_write #(
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
-         if(vread_int_addr_en) vread_int_addr <= wdata[`MEM_ADDR_W-1:0];
+         if(vread_int_addr_en) vread_int_addr <= wdata[`W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
 	 if(vread_perA_en) vread_perA <= wdata[`EXT_PERIOD_W-1:0];
    	 if(vread_shiftA_en) vread_shiftA <= wdata[`EXT_ADDR_W-1:0];
@@ -433,7 +407,7 @@ module xyolo_write #(
          vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
-         vread_int_addr_shadow <= `MEM_ADDR_W'b0;
+         vread_int_addr_shadow <= {`W_ADDR_W{1'b0}};
          vread_iterA_shadow <= `EXT_ADDR_W'b0;
          vread_perA_shadow <= `EXT_PERIOD_W'b0;
 	 vread_shiftA_shadow <= `EXT_ADDR_W'b0;
@@ -518,7 +492,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 //XOR ensures ping-pong happens when acessing external mem
-	 vread_int_addr_shadow <= {vread_int_addr_shadow[`MEM_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`MEM_ADDR_W-2:0]};
+	 vread_int_addr_shadow <= {vread_int_addr_shadow[`W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`W_ADDR_W-2:0]};
 	 vread_iterA_shadow <= vread_iterA;
 	 vread_perA_shadow <= vread_perA;
 	 vread_shiftA_shadow <= vread_shiftA;
@@ -707,7 +681,8 @@ module xyolo_write #(
 
    // first stage
    xyolo_write_stage # (
-      .DATA_W(DATA_W)
+      .DATAPATH_W(DATAPATH_W),
+      .DATABUS_W(DATABUS_W)
    ) stage0 (
       .clk(clk),
       .rst(rst),
@@ -744,20 +719,13 @@ module xyolo_write #(
       .xyolo_maxpool(xyolo_maxpool_shadow),
       .xyolo_bypass(xyolo_bypass_shadow),
       .xyolo_shift(xyolo_shift_shadow),
-      //vread databus interface
-      .vread_databus_ready(vread_m_resp[`ready((`nSTAGES-1))]),
-      .vread_databus_valid(vread_m_req[`valid((`nSTAGES-1))]),
-      .vread_databus_addr(vread_m_req[`address((`nSTAGES-1), `IO_ADDR_W)]),
-      .vread_databus_rdata(vread_m_resp[`rdata((`nSTAGES-1))]),
-      .vread_databus_wdata(vread_m_req[`wdata((`nSTAGES-1))]),
-      .vread_databus_wstrb(vread_m_req[`wstrb((`nSTAGES-1))]),
-      //vwrite databus interface
-      .vwrite_databus_ready(vwrite_m_resp[`ready_VWRITE((`nSTAGES-1))]),
-      .vwrite_databus_valid(vwrite_m_req[`valid_VWRITE((`nSTAGES-1))]),
-      .vwrite_databus_addr(vwrite_m_req[`address_VWRITE((`nSTAGES-1), `IO_ADDR_W)]),
-      .vwrite_databus_rdata(vwrite_m_resp[`rdata_VWRITE((`nSTAGES-1))]),
-      .vwrite_databus_wdata(vwrite_m_req[`wdata_VWRITE((`nSTAGES-1))]),
-      .vwrite_databus_wstrb(vwrite_m_req[`wstrb_VWRITE((`nSTAGES-1))]),
+      //databus interface
+      .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1))], vread_m_resp[`ready((`nSTAGES-1))]}),
+      .databus_valid({vwrite_m_req[`valid((`nSTAGES-1))], vread_m_req[`valid((`nSTAGES-1))]}),
+      .databus_addr({vwrite_m_req[`address((`nSTAGES-1), `IO_ADDR_W)], vread_m_req[`address((`nSTAGES-1), `IO_ADDR_W)]}),
+      .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1))], vread_m_resp[`rdata((`nSTAGES-1))]}),
+      .databus_wdata({vwrite_m_req[`wdata((`nSTAGES-1))], vread_m_req[`wdata((`nSTAGES-1))]}),
+      .databus_wstrb({vwrite_m_req[`wstrb((`nSTAGES-1))], vread_m_req[`wstrb((`nSTAGES-1))]}),
       //input data
       .flow_in_bias(flow_in_bias),
       .flow_in_weight(flow_in_weight)
@@ -770,11 +738,12 @@ module xyolo_write #(
         //check if asking for the same data as previous vread
         wire cond = vread_m_req[`address((`nSTAGES-i), `IO_ADDR_W)] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)] && vread_m_req[`valid((`nSTAGES-i))] && vread_m_req[`valid((`nSTAGES-i-1))];
 	wire databus_ready_w = cond ? vread_m_resp[`ready((`nSTAGES-i))] : vread_m_resp[`ready((`nSTAGES-i-1))];
-	wire [DATA_W-1:0] databus_rdata_w = cond ? vread_m_resp[`rdata((`nSTAGES-i))] : vread_m_resp[`rdata((`nSTAGES-i-1))];
+	wire [DATABUS_W-1:0] databus_rdata_w = cond ? vread_m_resp[`rdata((`nSTAGES-i))] : vread_m_resp[`rdata((`nSTAGES-i-1))];
 
         //instantiate xyolo_write_stage
         xyolo_write_stage # (
-           .DATA_W(DATA_W)
+           .DATAPATH_W(DATAPATH_W),
+	   .DATABUS_W(DATABUS_W)
         ) stage (
            .clk(clk),
            .rst(rst),
@@ -811,20 +780,13 @@ module xyolo_write #(
            .xyolo_maxpool(xyolo_maxpool_shadow),
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_shift(xyolo_shift_shadow),
-           //vread databus interface
-      	   .vread_databus_ready(databus_ready_w),
-           .vread_databus_valid(vread_m_req[`valid((`nSTAGES-1-i))]),
-           .vread_databus_addr(vread_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)]),
-           .vread_databus_rdata(databus_rdata_w),
-           .vread_databus_wdata(vread_m_req[`wdata((`nSTAGES-1-i))]),
-           .vread_databus_wstrb(vread_m_req[`wstrb((`nSTAGES-1-i))]),
-           //vwrite databus interface
-      	   .vwrite_databus_ready(vwrite_m_resp[`ready_VWRITE((`nSTAGES-1-i))]),
-           .vwrite_databus_valid(vwrite_m_req[`valid_VWRITE((`nSTAGES-1-i))]),
-           .vwrite_databus_addr(vwrite_m_req[`address_VWRITE((`nSTAGES-1-i), `IO_ADDR_W)]),
-           .vwrite_databus_rdata(vwrite_m_resp[`rdata_VWRITE((`nSTAGES-1-i))]),
-           .vwrite_databus_wdata(vwrite_m_req[`wdata_VWRITE((`nSTAGES-1-i))]),
-           .vwrite_databus_wstrb(vwrite_m_req[`wstrb_VWRITE((`nSTAGES-1-i))]),
+      	   //databus interface
+      	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w}),
+           .databus_valid({vwrite_m_req[`valid((`nSTAGES-1-i))], vread_m_req[`valid((`nSTAGES-1-i))]}),
+           .databus_addr({vwrite_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)], vread_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)]}),
+           .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1-i))], databus_rdata_w}),
+           .databus_wdata({vwrite_m_req[`wdata((`nSTAGES-1-i))], vread_m_req[`wdata((`nSTAGES-1-i))]}),
+           .databus_wstrb({vwrite_m_req[`wstrb((`nSTAGES-1-i))], vread_m_req[`wstrb((`nSTAGES-1-i))]}),
            //input data
            .flow_in_bias(flow_in_bias),
            .flow_in_weight(flow_in_weight)
@@ -840,7 +802,7 @@ module xyolo_write #(
    //instantiate merge
    merge #(
       .N_MASTERS(`nSTAGES),
-      .DATA_W(DATA_W),
+      .DATA_W(DATABUS_W),
       .ADDR_W(ADDR_W)
    ) vread_merge (
       //masters interface
@@ -852,12 +814,12 @@ module xyolo_write #(
    );
 
    //unconcatenate merge slave interface back to native interface
-   assign vread_databus_addr = vread_s_req[`address(0, `IO_ADDR_W)];
-   assign vread_databus_wdata = vread_s_req[`wdata(0)];
-   assign vread_databus_wstrb = vread_s_req[`wstrb(0)];
-   assign vread_databus_valid = vread_s_req[`valid(0)];
-   assign vread_s_resp[`rdata(0)] = vread_databus_rdata;
-   assign vread_s_resp[`ready(0)] = vread_databus_ready;
+   assign databus_addr[`IO_ADDR_W-1:0] = vread_s_req[`address(0, `IO_ADDR_W)];
+   assign databus_wdata[DATABUS_W-1:0] = vread_s_req[`wdata(0)];
+   assign databus_wstrb[DATABUS_W/8-1:0] = vread_s_req[`wstrb(0)];
+   assign databus_valid[0] = vread_s_req[`valid(0)];
+   assign vread_s_resp[`rdata(0)] = databus_rdata[DATABUS_W-1:0];
+   assign vread_s_resp[`ready(0)] = databus_ready[0];
 
    //
    // vwrite MERGE
@@ -866,7 +828,7 @@ module xyolo_write #(
    //instantiate merge
    merge #(
       .N_MASTERS(`nSTAGES),
-      .DATA_W(256),
+      .DATA_W(DATABUS_W),
       .ADDR_W(ADDR_W)
    ) vwrite_merge (
       //masters interface
@@ -878,11 +840,11 @@ module xyolo_write #(
    );
 
    //unconcatenate merge slave interface back to native interface
-   assign vwrite_databus_addr = vwrite_s_req[`address_VWRITE(0, `IO_ADDR_W)];
-   assign vwrite_databus_wdata = vwrite_s_req[`wdata_VWRITE(0)];
-   assign vwrite_databus_wstrb = vwrite_s_req[`wstrb_VWRITE(0)];
-   assign vwrite_databus_valid = vwrite_s_req[`valid_VWRITE(0)];
-   assign vwrite_s_resp[`rdata_VWRITE(0)] = vwrite_databus_rdata;
-   assign vwrite_s_resp[`ready_VWRITE(0)] = vwrite_databus_ready;
+   assign databus_addr[2*`IO_ADDR_W-1:`IO_ADDR_W] = vwrite_s_req[`address(0, `IO_ADDR_W)];
+   assign databus_wdata[2*DATABUS_W-1:DATABUS_W] = vwrite_s_req[`wdata(0)];
+   assign databus_wstrb[2*DATABUS_W/8-1:DATABUS_W/8] = vwrite_s_req[`wstrb(0)];
+   assign databus_valid[1] = vwrite_s_req[`valid(0)];
+   assign vwrite_s_resp[`rdata(0)] = databus_rdata[2*DATABUS_W-1:DATABUS_W];
+   assign vwrite_s_resp[`ready(0)] = databus_ready[1];
 
 endmodule

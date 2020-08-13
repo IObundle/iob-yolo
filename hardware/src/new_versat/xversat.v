@@ -9,7 +9,8 @@
 `include "xyolo_read.vh"
 
 module xversat # (
-	parameter  			ADDR_W = 32
+	parameter  			ADDR_W = 32,
+	parameter			DATABUS_W = 256
     ) (
     	input                         	clk,
     	input                         	rst,
@@ -23,20 +24,20 @@ module xversat # (
     	output [`IO_ADDR_W-1:0]         rdata,
 
     	// vread databus interface
-    	input [1:0]                	databus_ready,
-    	input [2*`DATAPATH_W-1:0]	databus_rdata,
-    	output [1:0]          		databus_valid,
-    	output [2*`IO_ADDR_W-1:0]   	databus_addr,
-    	output [2*`DATAPATH_W-1:0]  	databus_wdata,
-    	output [2*`DATAPATH_W/8-1:0] 	databus_wstrb,
+    	input 	                	databus_ready,
+    	input [`DATAPATH_W-1:0]		databus_rdata,
+    	output           		databus_valid,
+    	output [`IO_ADDR_W-1:0]   	databus_addr,
+    	output [`DATAPATH_W-1:0]  	databus_wdata,
+    	output [`DATAPATH_W/8-1:0] 	databus_wstrb,
 
     	// vwrite databus interface
-    	input                 		vwrite_databus_ready,
-    	input [256-1:0]			vwrite_databus_rdata,
-    	output           		vwrite_databus_valid,
-    	output [`IO_ADDR_W-1:0]   	vwrite_databus_addr,
-    	output [256-1:0]  		vwrite_databus_wdata,
-    	output [256/8-1:0] 		vwrite_databus_wstrb
+    	input [1:0]                	ywrite_databus_ready,
+    	input [2*DATABUS_W-1:0]		ywrite_databus_rdata,
+    	output [1:0]           		ywrite_databus_valid,
+    	output [2*`IO_ADDR_W-1:0]   	ywrite_databus_addr,
+    	output [2*DATABUS_W-1:0]  	ywrite_databus_wdata,
+    	output [2*DATABUS_W/8-1:0] 	ywrite_databus_wstrb
     );
 
    // local parameters
@@ -113,12 +114,12 @@ module xversat # (
       .wdata(s_req[`wdata(0)]),
       .wstrb(|s_req[`wstrb(0)]),
       // databus interface
-      .databus_ready(databus_ready[0]),
-      .databus_valid(databus_valid[0]),
-      .databus_addr(databus_addr[`IO_ADDR_W-1:0]),
-      .databus_rdata(databus_rdata[`DATAPATH_W-1:0]),
-      .databus_wdata(databus_wdata[`DATAPATH_W-1:0]),
-      .databus_wstrb(databus_wstrb[`DATAPATH_W/8-1:0]),
+      .databus_ready(databus_ready),
+      .databus_valid(databus_valid),
+      .databus_addr(databus_addr),
+      .databus_rdata(databus_rdata),
+      .databus_wdata(databus_wdata),
+      .databus_wstrb(databus_wstrb),
       // output data
       .flow_out_bias(flow_bias),
       .flow_out_weight(flow_weight)
@@ -126,7 +127,8 @@ module xversat # (
 
    // instantiate xyolo_write FU
    xyolo_write # (
-      .DATA_W(`DATAPATH_W)
+      .DATAPATH_W(`DATAPATH_W),
+      .DATABUS_W(DATABUS_W)
    ) xyolo_write (
       .clk(clk),
       .rst(rst),
@@ -140,19 +142,12 @@ module xversat # (
       .wdata(s_req[`wdata(1)]),
       .wstrb(|s_req[`wstrb(1)]),
       // vread databus interface
-      .vread_databus_ready(databus_ready[1]),
-      .vread_databus_valid(databus_valid[1]),
-      .vread_databus_addr(databus_addr[2*`IO_ADDR_W-1:`IO_ADDR_W]),
-      .vread_databus_rdata(databus_rdata[2*`DATAPATH_W-1:`DATAPATH_W]),
-      .vread_databus_wdata(databus_wdata[2*`DATAPATH_W-1:`DATAPATH_W]),
-      .vread_databus_wstrb(databus_wstrb[2*`DATAPATH_W/8-1:`DATAPATH_W/8]),
-      // vread databus interface
-      .vwrite_databus_ready(vwrite_databus_ready),
-      .vwrite_databus_valid(vwrite_databus_valid),
-      .vwrite_databus_addr(vwrite_databus_addr),
-      .vwrite_databus_rdata(vwrite_databus_rdata),
-      .vwrite_databus_wdata(vwrite_databus_wdata),
-      .vwrite_databus_wstrb(vwrite_databus_wstrb),
+      .databus_ready(ywrite_databus_ready),
+      .databus_valid(ywrite_databus_valid),
+      .databus_addr(ywrite_databus_addr),
+      .databus_rdata(ywrite_databus_rdata),
+      .databus_wdata(ywrite_databus_wdata),
+      .databus_wstrb(ywrite_databus_wstrb),
       // output data
       .flow_in_bias(flow_bias),
       .flow_in_weight(flow_weight)

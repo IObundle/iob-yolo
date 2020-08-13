@@ -3,7 +3,10 @@
 `define XYOLO_WRITE_BYPASS_LAT  2
 
 // xyolo shift width
-`define SHIFT_W                 ($clog2(DATA_W)+1)
+`define SHIFT_W                 ($clog2(DATAPATH_W)+1)
+
+//define vread mem write address width
+`define W_ADDR_W		(`MEM_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
 
 // vwrites configuration offsets
 `define VWRITE_CONF_EXT_ADDR    0

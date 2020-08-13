@@ -29,12 +29,12 @@
 		       .databus_ready (dbus_ready),
 
 		       //vread databus interface
-		       .vwrite_databus_valid (vwrite_dbus_valid),
-		       .vwrite_databus_addr  (vwrite_dbus_addr),
-		       .vwrite_databus_wdata (vwrite_dbus_wdata),
-		       .vwrite_databus_wstrb (vwrite_dbus_wstrb),
-		       .vwrite_databus_rdata (vwrite_dbus_rdata),
-		       .vwrite_databus_ready (vwrite_dbus_ready)
+		       .ywrite_databus_valid (ywrite_dbus_valid),
+		       .ywrite_databus_addr  (ywrite_dbus_addr),
+		       .ywrite_databus_wdata (ywrite_dbus_wdata),
+		       .ywrite_databus_wstrb (ywrite_dbus_wstrb),
+		       .ywrite_databus_rdata (ywrite_dbus_rdata),
+		       .ywrite_databus_ready (ywrite_dbus_ready)
 		       );
 
 
