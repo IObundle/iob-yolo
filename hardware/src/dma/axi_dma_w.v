@@ -14,7 +14,7 @@
 
 `define NUM_TR `AXI_LEN_W'd16
 
-module axi_dma # (
+module axi_dma_w # (
 
 	parameter		       USE_RAM = 1
 

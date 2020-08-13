@@ -7,7 +7,7 @@
 //constants
 `define STRINGIFY(x) `"x`"
 
-module dma_test_tb;
+module dma_w_test_tb;
 
    //define parameters
    parameter file_name = {"../../../../dma_", `STRINGIFY(`MIG_BUS_W), ".hex"};
@@ -263,7 +263,7 @@ module dma_test_tb;
    // UNIT UNDER TEST (axi-dma)
    //
    
-   axi_dma # (
+   axi_dma_w # (
       .USE_RAM(1) //no need to 1-cycle delay on ready signal
    ) dma (
       .clk(clk),
