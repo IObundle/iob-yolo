@@ -19,20 +19,6 @@
 `define rdata_MIG_BUS(I) I*`RESP_MIG_BUS_W+`RDATA_P +: `MIG_BUS_W
 `define ready_MIG_BUS(I) I*`RESP_MIG_BUS_W
 
-// REQ/RESP VERSAT BUS DEFINES
-`ifdef USE_NEW_VERSAT
-  `define REQ_VERSAT_W (`VALID_W+`IO_ADDR_W+`DATAPATH_W+(`DATAPATH_W/8))
-  `define RESP_VERSAT_W (`DATAPATH_W+`READY_W)
-  `define WDATA_VERSAT_P (`DATAPATH_W/8)
-  `define ADDR_VERSAT_P (`WDATA_VERSAT_P + `DATAPATH_W)
-  `define valid_VERSAT(I) (I+1)*`REQ_VERSAT_W-1
-  `define address_VERSAT(I,W) I*`REQ_VERSAT_W+`ADDR_VERSAT_P+W-1 -: W
-  `define wdata_VERSAT(I) I*`REQ_VERSAT_W+`WDATA_VERSAT_P +: `DATAPATH_W
-  `define wstrb_VERSAT(I) I*`REQ_VERSAT_W +: (`DATAPATH_W/8)
-  `define rdata_VERSAT(I) I*`RESP_VERSAT_W+`RDATA_P +: `DATAPATH_W
-  `define ready_VERSAT(I) I*`RESP_VERSAT_W
-`endif
-
 module ext_mem
   #(
     parameter ADDR_W=32,
@@ -54,19 +40,12 @@ module ext_mem
 
 `ifdef USE_NEW_VERSAT
    //Versat bus
-   output 	 		databus_ready,
-   output [`DATAPATH_W-1:0]  	databus_rdata,
-   input  		   	databus_valid,
-   input [`IO_ADDR_W-1:0]    	databus_addr,
-   input [`DATAPATH_W-1:0]   	databus_wdata,
-   input [`DATAPATH_W/8-1:0] 	databus_wstrb,
-   //vwrite versat bus
-   output [1:0] 		ywrite_databus_ready,
-   output [2*`MIG_BUS_W-1:0]  	ywrite_databus_rdata,
-   input [1:0] 		   	ywrite_databus_valid,
-   input [2*`IO_ADDR_W-1:0]    	ywrite_databus_addr,
-   input [2*`MIG_BUS_W-1:0]   	ywrite_databus_wdata,
-   input [2*`MIG_BUS_W/8-1:0] 	ywrite_databus_wstrb,
+   output [2:0] 		databus_ready,
+   output [3*`MIG_BUS_W-1:0]  	databus_rdata,
+   input [2:0] 		   	databus_valid,
+   input [3*`IO_ADDR_W-1:0]    	databus_addr,
+   input [3*`MIG_BUS_W-1:0]   	databus_wdata,
+   input [3*`MIG_BUS_W/8-1:0] 	databus_wstrb,
 `endif
    
    // AXI interface 
@@ -219,52 +198,20 @@ module ext_mem
    wire [3*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
    wire [3*`RESP_MIG_BUS_W-1:0]	  vcache_be_resp;
 
-   //Connect xyolo_write databus directly to backend
+   //Connect versat databus directly to backend
    genvar			  l;
    generate
-      for(l = 0; l < 2; l++) begin : ywrite_backend
-         assign vcache_be_req[`valid_MIG_BUS(l)] = ywrite_databus_valid[2-l-1 -: 1];
-         assign vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)] = ywrite_databus_addr[2*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
-         assign vcache_be_req[`wdata_MIG_BUS(l)] = ywrite_databus_wdata[2*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W];
-         assign vcache_be_req[`wstrb_MIG_BUS(l)] = ywrite_databus_wstrb[2*`MIG_BUS_W/8-l*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8];
-      	 assign ywrite_databus_rdata[2*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W] = vcache_be_resp[`rdata_MIG_BUS(l)];
-   	 assign ywrite_databus_ready[2-l-1 -: 1] = vcache_be_resp[`ready_MIG_BUS(l)];
+      for(l = 0; l < 3; l++) begin : ywrite_backend
+         assign vcache_be_req[`valid_MIG_BUS(l)] = databus_valid[3-l-1 -: 1];
+         assign vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)] = databus_addr[3*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
+         assign vcache_be_req[`wdata_MIG_BUS(l)] = databus_wdata[3*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W];
+         assign vcache_be_req[`wstrb_MIG_BUS(l)] = databus_wstrb[3*`MIG_BUS_W/8-l*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8];
+      	 assign databus_rdata[3*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W] = vcache_be_resp[`rdata_MIG_BUS(l)];
+   	 assign databus_ready[3-l-1 -: 1] = vcache_be_resp[`ready_MIG_BUS(l)];
    	 assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
       end
    endgenerate
    
-   //Connect xyolo_read vread to L1 cache
-   iob_cache # (
-      .FE_ADDR_W(`DDR_ADDR_W),
-      .N_WAYS(1),        //Number of ways
-      .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
-      .WORD_OFF_W(5),    //Word Offset (number of words per line)
-      .WTBUF_DEPTH_W(4), //FIFO's depth
-      .CTRL_CNT(1),       //Counters for hits and misses (since previous parameter is 0)
-      .FE_DATA_W(`DATAPATH_W), //DATAPATH_W = 16 front-end
-      .BE_DATA_W(`MIG_BUS_W)
-   ) vcache (
-      .clk   (clk),
-      .reset (rst),
-
-      // Front-end interface
-      .valid (databus_valid),
-      .addr  (databus_addr[`DDR_ADDR_W:1]),
-      .wdata (databus_wdata),
-      .wstrb (databus_wstrb),
-      .rdata (databus_rdata),
-      .ready (databus_ready),
-		 
-      // Back-end interface
-      .mem_valid (vcache_be_req[`valid_MIG_BUS((2))]),
-      .mem_addr  (vcache_be_req[`address_MIG_BUS((2), `DDR_ADDR_W)]),
-      .mem_wdata (vcache_be_req[`wdata_MIG_BUS((2))]),
-      .mem_wstrb (vcache_be_req[`wstrb_MIG_BUS((2))]),
-      .mem_rdata (vcache_be_resp[`rdata_MIG_BUS((2))]),
-      .mem_ready (vcache_be_resp[`ready_MIG_BUS((2))])
-  );
-  assign vcache_be_req[`address_MIG_BUS(2, `ADDR_W)-`DDR_ADDR_W] = 0;
-
 `endif
    
    // Merge caches back-ends
@@ -385,4 +332,3 @@ module ext_mem
             );
 
 endmodule
-

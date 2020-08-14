@@ -33,7 +33,7 @@
 #define NTW_IN_W 416
 #define NTW_IN_KER_SIZE 3
 #define NTW_IN_NUM_KER 16
-#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C))
+#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)) //+4 to be 32 byte aligned
 #define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+10)) //+10 to be 32 byte aligned
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
 #define TILE_W 32
@@ -111,13 +111,13 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setOffset(2*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C));
-  versat.yread.setExtPer(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C);
-  versat.yread.setExtIncr(1);
+  versat.yread.setOffset(2*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)); //+4 so each filter is 32 byte aligned
+  versat.yread.setExtPer((1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)/16); //+4 so each filter is 32 byte aligned
+  versat.yread.setExtIncr(16);
 
   // configure xyolo_write vread to read tile from input fm
-  versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 to be 32 byte aligned
-  versat.ywrite.read.setExtPer((NTW_IN_C*(TILE_W+2)/16)+1);
+  versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 so each line is 32 byte aligned
+  versat.ywrite.read.setExtPer((NTW_IN_C*(TILE_W+2)+10)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
   versat.ywrite.read.setExtIter(NTW_IN_KER_SIZE+1); //+1 due to maxpool // 4
   versat.ywrite.read.setExtShift(((NTW_IN_W+2)*NTW_IN_C) - (NTW_IN_C*(TILE_W+2))); //+2 due to padding
@@ -169,7 +169,7 @@ void conv() {
 
     // read filter
     versat.yread.setExtIter(1);
-    versat.yread.setExtAddr(WEIGHTS_BASE_ADDRESS + 2*l*nYOLOvect*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C)); // 0x8001 0000
+    versat.yread.setExtAddr(WEIGHTS_BASE_ADDRESS + 2*l*nYOLOvect*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)); // 0x8001 0000
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {

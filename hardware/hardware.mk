@@ -43,7 +43,7 @@ $(MEM_DIR)/tdp_ram/iob_tdp_ram.v
 
 #ddr
 ifeq ($(USE_DDR),1)
-	VSRC+=$(SRC_DIR)/dma/*.v
+	VSRC+=$(wildcard $(SRC_DIR)/dma/*.v)
 	VSRC+=$(SRC_DIR)/ext_mem.v
 endif
 

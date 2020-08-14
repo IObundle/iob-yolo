@@ -37,7 +37,7 @@ module sync_merge
       s_req = {`REQ_W{1'b0}};
       m_resp = {N_MASTERS*`RESP_W{1'b0}};
       j = 0;
-      for (i = N_MASTERS - 1; i > -1; i--)
+      for (i = 0; i < N_MASTERS; i++)
         if(m_req[`valid(i)] && (!m_req[`valid(ptr)] || i == ptr)) begin //test valid bit 
            s_req = m_req[`req(i)];
            m_resp = {N_MASTERS*`RESP_W{1'b0}};

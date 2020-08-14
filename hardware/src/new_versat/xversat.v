@@ -23,21 +23,13 @@ module xversat # (
     	output	                        ready,
     	output [`IO_ADDR_W-1:0]         rdata,
 
-    	// vread databus interface
-    	input 	                	databus_ready,
-    	input [`DATAPATH_W-1:0]		databus_rdata,
-    	output           		databus_valid,
-    	output [`IO_ADDR_W-1:0]   	databus_addr,
-    	output [`DATAPATH_W-1:0]  	databus_wdata,
-    	output [`DATAPATH_W/8-1:0] 	databus_wstrb,
-
-    	// vwrite databus interface
-    	input [1:0]                	ywrite_databus_ready,
-    	input [2*DATABUS_W-1:0]		ywrite_databus_rdata,
-    	output [1:0]           		ywrite_databus_valid,
-    	output [2*`IO_ADDR_W-1:0]   	ywrite_databus_addr,
-    	output [2*DATABUS_W-1:0]  	ywrite_databus_wdata,
-    	output [2*DATABUS_W/8-1:0] 	ywrite_databus_wstrb
+    	// databus interface
+    	input [2:0]                	databus_ready,
+    	input [3*DATABUS_W-1:0]		databus_rdata,
+    	output [2:0]           		databus_valid,
+    	output [3*`IO_ADDR_W-1:0]   	databus_addr,
+    	output [3*DATABUS_W-1:0]  	databus_wdata,
+    	output [3*DATABUS_W/8-1:0] 	databus_wstrb
     );
 
    // local parameters
@@ -99,7 +91,8 @@ module xversat # (
 
    // instantiate xyolo_read FU
    xyolo_read # (
-      .DATA_W(`DATAPATH_W)
+      .DATAPATH_W(`DATAPATH_W),
+      .DATABUS_W(DATABUS_W)
    ) xyolo_read (
       .clk(clk),
       .rst(rst),
@@ -113,12 +106,12 @@ module xversat # (
       .wdata(s_req[`wdata(0)]),
       .wstrb(|s_req[`wstrb(0)]),
       // databus interface
-      .databus_ready(databus_ready),
-      .databus_valid(databus_valid),
-      .databus_addr(databus_addr),
-      .databus_rdata(databus_rdata),
-      .databus_wdata(databus_wdata),
-      .databus_wstrb(databus_wstrb),
+      .databus_ready(databus_ready[0]),
+      .databus_valid(databus_valid[0]),
+      .databus_addr(databus_addr[`IO_ADDR_W-1:0]),
+      .databus_rdata(databus_rdata[DATABUS_W-1:0]),
+      .databus_wdata(databus_wdata[DATABUS_W-1:0]),
+      .databus_wstrb(databus_wstrb[DATABUS_W/8-1:0]),
       // output data
       .flow_out_bias(flow_bias),
       .flow_out_weight(flow_weight)
@@ -141,12 +134,12 @@ module xversat # (
       .wdata(s_req[`wdata(1)]),
       .wstrb(|s_req[`wstrb(1)]),
       // vread databus interface
-      .databus_ready(ywrite_databus_ready),
-      .databus_valid(ywrite_databus_valid),
-      .databus_addr(ywrite_databus_addr),
-      .databus_rdata(ywrite_databus_rdata),
-      .databus_wdata(ywrite_databus_wdata),
-      .databus_wstrb(ywrite_databus_wstrb),
+      .databus_ready(databus_ready[2:1]),
+      .databus_valid(databus_valid[2:1]),
+      .databus_addr(databus_addr[3*`IO_ADDR_W-1:`IO_ADDR_W]),
+      .databus_rdata(databus_rdata[3*DATABUS_W-1:DATABUS_W]),
+      .databus_wdata(databus_wdata[3*DATABUS_W-1:DATABUS_W]),
+      .databus_wstrb(databus_wstrb[3*DATABUS_W/8-1:DATABUS_W/8]),
       // output data
       .flow_in_bias(flow_bias),
       .flow_in_weight(flow_weight)

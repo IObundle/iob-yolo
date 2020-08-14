@@ -1,6 +1,9 @@
 // Latency
 `define XYOLO_READ_LAT              3
 
+//define vread mem write address width
+`define W_ADDR_W		    (`MEM_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
+
 // Configuration offsets
 `define XYOLO_READ_CONF_EXT_ADDR    0
 `define XYOLO_READ_CONF_OFFSET      1

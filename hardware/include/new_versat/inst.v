@@ -26,15 +26,7 @@
 		       .databus_wdata (dbus_wdata),
 		       .databus_wstrb (dbus_wstrb),
 		       .databus_rdata (dbus_rdata),
-		       .databus_ready (dbus_ready),
-
-		       //vread databus interface
-		       .ywrite_databus_valid (ywrite_dbus_valid),
-		       .ywrite_databus_addr  (ywrite_dbus_addr),
-		       .ywrite_databus_wdata (ywrite_dbus_wdata),
-		       .ywrite_databus_wstrb (ywrite_dbus_wstrb),
-		       .ywrite_databus_rdata (ywrite_dbus_rdata),
-		       .ywrite_databus_ready (ywrite_dbus_ready)
+		       .databus_ready (dbus_ready)
 		       );
 
 
