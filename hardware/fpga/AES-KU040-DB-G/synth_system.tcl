@@ -102,7 +102,7 @@ synth_design -include_dirs $INCLUDE -verilog_define $DEFINE -part $PART -top $TO
 
 opt_design
 
-place_design
+place_design -no_bufg_opt
 
 route_design
 

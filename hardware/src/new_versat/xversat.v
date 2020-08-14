@@ -20,7 +20,7 @@ module xversat # (
     	input [ADDR_W-1:0]              addr,
     	input                           wstrb,
     	input [`IO_ADDR_W-1:0]        	wdata,
-    	output reg                      ready,
+    	output	                        ready,
     	output [`IO_ADDR_W-1:0]         rdata,
 
     	// vread databus interface
@@ -63,26 +63,25 @@ module xversat # (
    wire [`REQ_W-1:0]    		m_req;
    wire [N_SLAVES*`REQ_W-1:0] 		s_req;
 
-   //concatenate native interface to split master interface
+   // concatenate native interface to split master interface
    assign m_req[`valid(0)] = valid & ~run_clear;
    assign m_req[`address(0, ADDR_W)] = addr;
    assign m_req[`wdata(0)] = wdata;
    assign m_req[`wstrb(0)] = wstrb;
 
-   // cpu interface ready and versat run
+   // register versat run
    always @(posedge clk, posedge rst)
       if(rst) begin
-         ready <= 1'b0;
          run_r0 <= 1'b0;
          run_r1 <= 1'b0;
       end else begin
-         ready <= valid;
          run_r0 <= run;
          run_r1 <= run_r0;
       end
 
-   //versat only returns done signal in cpu interface
+   //versat only returns done signal in cpu interface and is always ready
    assign rdata = {{`IO_ADDR_W-1{1'b0}}, &{read_done, write_done}};
+   assign ready = 1'b1;
 
    // instantiate split
    split # (
