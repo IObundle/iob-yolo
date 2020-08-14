@@ -9,7 +9,7 @@
 // FSM States
 `define IDLE       `STATES_W'h0
 `define STANDBY    `STATES_W'h1
-`define EXT2INT    `STATES_W'h2
+`define READ_DATA  `STATES_W'h2
 
 `define NUM_TR `AXI_LEN_W'd16
 
@@ -96,11 +96,11 @@ module axi_dma_r (
 	    //addr handshake
 	    `STANDBY: begin
 	       if (m_axi_arready == 1'b1)
-	          state_nxt = `EXT2INT;
+	          state_nxt = `READ_DATA;
 	       m_axi_arvalid = 1'b1;
 	    end
 	    //data read
-	    `EXT2INT: begin
+	    `READ_DATA: begin
 	       if (counter_int == `NUM_TR) begin
 	          if (m_axi_rlast == 1'b1)
 		     error_nxt = 1'b0;

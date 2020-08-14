@@ -9,7 +9,7 @@
 // FSM States
 `define IDLE       `STATES_W'h0
 `define STANDBY    `STATES_W'h1
-`define INT2EXT    `STATES_W'h2
+`define WRITE_DATA `STATES_W'h2
 `define W_RESPONSE `STATES_W'h3
 
 `define NUM_TR `AXI_LEN_W'd16
@@ -129,11 +129,11 @@ module axi_dma_w # (
 	    //addr handshake
 	    `STANDBY: begin
 	       if (m_axi_awready == 1'b1)
-	          state_nxt = `INT2EXT;
+	          state_nxt = `WRITE_DATA;
 	       m_axi_awvalid = 1'b1;
 	    end
 	    //data write
-	    `INT2EXT: begin
+	    `WRITE_DATA: begin
 	       if (counter_int == `NUM_TR) begin
 	          m_axi_wlast_int = 1'b1;
 	          state_nxt = `W_RESPONSE;
