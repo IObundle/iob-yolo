@@ -217,8 +217,8 @@ module ext_mem
 `endif
    
    // Merge caches back-ends
-   wire [2*`REQ_MIG_BUS_W-1:0]      l2cache_req;
-   wire [2*`RESP_MIG_BUS_W-1:0]     l2cache_resp;
+   wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
+   wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
    
 `ifdef RUN_DDR_USE_SRAM
    assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
@@ -258,43 +258,10 @@ module ext_mem
  `endif
 `endif                 
 	     // slave
-	     .s_req  (l2cache_req[`req_MIG_BUS(0)]),
-	     .s_resp (l2cache_resp[`resp_MIG_BUS(0)])
+	     .s_req  (l2cache_req),
+	     .s_resp (l2cache_resp)
 	     );
 	    
-   merge
-     #(
-`ifdef RUN_DDR_USE_SRAM
-       .N_MASTERS(2),
-`else
- `ifdef USE_NEW_VERSAT
-       .N_MASTERS(1),
- `else
-       .N_MASTERS(1),
- `endif
-`endif
-       .DATA_W(`MIG_BUS_W)
-       )
-   merge_i_d_buses_into_l2_write
-     (
-      // masters
-`ifdef RUN_DDR_USE_SRAM
-      .m_req  ({icache_be_req, dcache_be_req}),
-      .m_resp ({icache_be_resp, dcache_be_resp}),
-`else
- `ifdef USE_NEW_VERSAT
-      .m_req  (vcache_be_req[`req_MIG_BUS(0)]),
-      .m_resp (vcache_be_resp[`resp_MIG_BUS(0)]),
- `else
-      .m_req  (dcache_be_req),
-      .m_resp (dcache_be_resp),
- `endif
-`endif                 
-      // slave
-      .s_req  (l2cache_req[`req_MIG_BUS(1)]),
-      .s_resp (l2cache_resp[`resp_MIG_BUS(1)])
-      );
-
    // AXI MASTER WRITE WIRES
    // axi address write
    wire [0:0] 			  m_l2_awid, m_dma_awid;
@@ -417,76 +384,55 @@ module ext_mem
             );
 
    // L2 cache instance
-   iob_cache_axi # 
-     (
-      .FE_ADDR_W(`DDR_ADDR_W),
-      .N_WAYS(1),        //Number of Ways
-      .LINE_OFF_W(1),    //Cache Line Offset (number of lines)
-      .WORD_OFF_W(1),    //Word Offset (number of words per line)
-      .WTBUF_DEPTH_W(4), //FIFO's depth
-      .BE_ADDR_W (`DDR_ADDR_W),
-      .CTRL_CACHE (0),
-      .CTRL_CNT(0),       //Remove counters
-      .FE_DATA_W(`MIG_BUS_W),
-      .BE_DATA_W(`MIG_BUS_W)
-      )
-   l2cache_write (
-            .clk   (clk),
-            .reset (rst),
-      
-            // Native interface
-            .valid    (l2cache_req[`valid_MIG_BUS(1)]),
-            .addr     (l2cache_req[`address_MIG_BUS(1,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
-            .wdata    (l2cache_req[`wdata_MIG_BUS(1)]),
-   	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(1)]),
-            .rdata    (),
-            .ready    (l2cache_resp[`ready_MIG_BUS(1)]),
+   axi_dma_w # (
+	.USE_RAM(0)
+   ) dma (
+	.clk(clk),
+	.rst(rst),
+        // Native interface
+        .valid    (vcache_be_req[`valid_MIG_BUS(0)]),
+        .addr     (vcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W)]),
+        .wdata    (vcache_be_req[`wdata_MIG_BUS(0)]),
+   	.wstrb    (vcache_be_req[`wstrb_MIG_BUS(0)]),
+        .ready    (vcache_be_resp[`ready_MIG_BUS(0)]),
+        // AXI interface
+        // Address write
+        .m_axi_awid(m_dma_awid), 
+        .m_axi_awaddr(m_dma_awaddr), 
+        .m_axi_awlen(m_dma_awlen), 
+        .m_axi_awsize(m_dma_awsize), 
+        .m_axi_awburst(m_dma_awburst), 
+        .m_axi_awlock(m_dma_awlock), 
+        .m_axi_awcache(m_dma_awcache), 
+        .m_axi_awprot(m_dma_awprot),
+        .m_axi_awqos(m_dma_awqos), 
+        .m_axi_awvalid(m_dma_awvalid), 
+        .m_axi_awready(m_dma_awready), 
+        //write
+        .m_axi_wdata(m_dma_wdata), 
+        .m_axi_wstrb(m_dma_wstrb), 
+        .m_axi_wlast(m_dma_wlast), 
+        .m_axi_wvalid(m_dma_wvalid), 
+        .m_axi_wready(m_dma_wready), 
+        //write response
+        .m_axi_bid(m_dma_bid), 
+        .m_axi_bresp(m_dma_bresp), 
+        .m_axi_bvalid(m_dma_bvalid), 
+        .m_axi_bready(m_dma_bready)
+     );
 
-	    
-            // AXI interface
-            // Address write
-            .axi_awid(m_dma_awid), 
-            .axi_awaddr(m_dma_awaddr), 
-            .axi_awlen(m_dma_awlen), 
-            .axi_awsize(m_dma_awsize), 
-            .axi_awburst(m_dma_awburst), 
-            .axi_awlock(m_dma_awlock), 
-            .axi_awcache(m_dma_awcache), 
-            .axi_awprot(m_dma_awprot),
-            .axi_awqos(m_dma_awqos), 
-            .axi_awvalid(m_dma_awvalid), 
-            .axi_awready(m_dma_awready), 
-            //write
-            .axi_wdata(m_dma_wdata), 
-            .axi_wstrb(m_dma_wstrb), 
-            .axi_wlast(m_dma_wlast), 
-            .axi_wvalid(m_dma_wvalid), 
-            .axi_wready(m_dma_wready), 
-            //write response
-            // .axi_bid(m_dma_bid), 
-            .axi_bresp(m_dma_bresp), 
-            .axi_bvalid(m_dma_bvalid), 
-            .axi_bready(m_dma_bready), 
-            //address read
-            .axi_arid(m_dma_arid), 
-            .axi_araddr(m_dma_araddr), 
-            .axi_arlen(m_dma_arlen), 
-            .axi_arsize(m_dma_arsize), 
-            .axi_arburst(m_dma_arburst), 
-            .axi_arlock(m_dma_arlock), 
-            .axi_arcache(m_dma_arcache), 
-            .axi_arprot(m_dma_arprot), 
-            .axi_arqos(m_dma_arqos), 
-            .axi_arvalid(m_dma_arvalid), 
-            .axi_arready(1'b0), //m_dma_arready), 
-            //read 
-            // .axi_rid(axi_rid), 
-            .axi_rdata({`MIG_BUS_W{1'b0}}),//m_dma_ardata), 
-            .axi_rresp(2'b0), //m_dma_rresp), 
-            .axi_rlast(1'b0), //m_dma_rlast), 
-            .axi_rvalid(1'b0), //m_dma_rvalid),  
-            .axi_rready(m_dma_rready)
-            );
+     // DMA read set to zero
+     assign m_dma_arid = 1'b0;
+     assign m_dma_araddr = `DDR_ADDR_W'b0;
+     assign m_dma_arlen = 8'b0;
+     assign m_dma_arsize = 3'b0;
+     assign m_dma_arburst = 2'b0;
+     assign m_dma_arlock = 1'b0;
+     assign m_dma_arcache = 4'b0;
+     assign m_dma_arprot = 3'b0;
+     assign m_dma_arqos = 4'b0;
+     assign m_dma_arvalid = 1'b0;
+     assign m_dma_rready = 1'b0;
 
    // AXI INTERCONNECT
    axi_interconnect #(
@@ -537,7 +483,6 @@ module ext_mem
    		      .s_axi_aruser({m_l2_aruser, m_dma_aruser}), //input reg = 0
    		      .s_axi_arvalid({m_l2_arvalid, m_dma_arvalid}),
    		      .s_axi_arready({m_l2_arready, m_dma_arready}),
-
    		      // read
    		      .s_axi_rid({m_l2_rid, m_dma_rid}),
    		      .s_axi_rdata({m_l2_rdata, m_dma_rdata}),
