@@ -63,6 +63,9 @@ endif
 VSRC+=$(MEM_DIR)/2p_mem/iob_2p_mem.v
 VSRC+=$(MEM_DIR)/2p_assim_mem/iob_2p_assim_mem_w_big.v
 
+# axi_crossbar_wr
+VSRC+=$(AXI_MEM_DIR)/rtl/arbiter.v $(AXI_MEM_DIR)/rtl/priority_encoder.v $(AXI_MEM_DIR)/rtl/axi_interconnect.v
+
 # peripherals
 periphs:
 	$(eval include $(SOC_SUBMODULES_DIR)/UART/hardware/hardware.mk)
