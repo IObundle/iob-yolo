@@ -280,21 +280,18 @@ module ext_mem
    // Merge caches back-ends
    wire [2*`REQ_MIG_BUS_W-1:0]      l2cache_req;
    wire [2*`RESP_MIG_BUS_W-1:0]     l2cache_resp;
-
-   wire 			  l2cache_read_valid, l2cache_read_ready;
-   wire 			  l2cache_write_valid, l2cache_write_ready;
    
-   wire [`REQ_MIG_BUS_W-1:0] 	  dcache_read_be_req, dcache_write_be_req;
-   wire [`RESP_MIG_BUS_W-1:0] 	  dcache_read_be_resp, dcache_write_be_resp;
+   // wire [`REQ_MIG_BUS_W-1:0] 	  dcache_read_be_req, dcache_write_be_req;
+   // wire [`RESP_MIG_BUS_W-1:0] 	  dcache_read_be_resp, dcache_write_be_resp;
 
-   assign dcache_read_be_req[`valid_MIG_BUS(0)] = dcache_be_req[`valid_MIG_BUS(0)] && (~(|dcache_be_req[`wstrb_MIG_BUS(0)]));
-   assign dcache_read_be_req[`REQ_MIG_BUS_W-2:0] = dcache_be_req[`REQ_MIG_BUS_W-2:0];
+   // assign dcache_read_be_req[`valid_MIG_BUS(0)] = dcache_be_req[`valid_MIG_BUS(0)] && (~(|dcache_be_req[`wstrb_MIG_BUS(0)]));
+   // assign dcache_read_be_req[`REQ_MIG_BUS_W-2:0] = dcache_be_req[`REQ_MIG_BUS_W-2:0];
 
-   assign dcache_write_be_req[`valid_MIG_BUS(0)] = dcache_be_req[`valid_MIG_BUS(0)] && (|dcache_be_req[`wstrb_MIG_BUS(0)]);
-   assign dcache_write_be_req[`REQ_MIG_BUS_W-2:0] = dcache_be_req[`REQ_MIG_BUS_W-2:0];
+   // assign dcache_write_be_req[`valid_MIG_BUS(0)] = dcache_be_req[`valid_MIG_BUS(0)] && (|dcache_be_req[`wstrb_MIG_BUS(0)]);
+   // assign dcache_write_be_req[`REQ_MIG_BUS_W-2:0] = dcache_be_req[`REQ_MIG_BUS_W-2:0];
    
-   assign dcache_be_resp[`ready_MIG_BUS(0)] = dcache_read_be_resp[`ready_MIG_BUS(0)] | dcache_write_be_resp[`ready_MIG_BUS(0)];
-   assign dcache_be_resp[`rdata_MIG_BUS(0)] = dcache_read_be_resp[`rdata_MIG_BUS(0)];
+   // assign dcache_be_resp[`ready_MIG_BUS(0)] = dcache_read_be_resp[`ready_MIG_BUS(0)] | dcache_write_be_resp[`ready_MIG_BUS(0)];
+   // assign dcache_be_resp[`rdata_MIG_BUS(0)] = dcache_read_be_resp[`rdata_MIG_BUS(0)];
    
    
 
@@ -328,8 +325,8 @@ module ext_mem
 	     .m_resp ({icache_be_resp, dcache_be_resp}),
 `else
  `ifdef USE_NEW_VERSAT
-	     .m_req  ({vcache_be_req[`req_MIG_BUS(2)],vcache_be_req[`req_MIG_BUS(1)], dcache_read_be_req}),
-	     .m_resp ({vcache_be_resp[`resp_MIG_BUS(2)],vcache_be_resp[`resp_MIG_BUS(1)], dcache_read_be_resp}),
+	     .m_req  ({vcache_be_req[`req_MIG_BUS(2)],vcache_be_req[`req_MIG_BUS(1)], dcache_be_req}),
+	     .m_resp ({vcache_be_resp[`resp_MIG_BUS(2)],vcache_be_resp[`resp_MIG_BUS(1)], dcache_be_resp}),
  `else
 	     .m_req  (dcache_be_req),
 	     .m_resp (dcache_be_resp),
@@ -346,7 +343,7 @@ module ext_mem
        .N_MASTERS(2),
 `else
  `ifdef USE_NEW_VERSAT
-       .N_MASTERS(1+1),
+       .N_MASTERS(1),
  `else
        .N_MASTERS(1),
  `endif
@@ -361,8 +358,8 @@ module ext_mem
       .m_resp ({icache_be_resp, dcache_be_resp}),
 `else
  `ifdef USE_NEW_VERSAT
-      .m_req  ({vcache_be_req[`req_MIG_BUS(0)], dcache_write_be_req}),
-      .m_resp ({vcache_be_resp[`resp_MIG_BUS(0)], dcache_write_be_resp}),
+      .m_req  (vcache_be_req[`req_MIG_BUS(0)]),
+      .m_resp (vcache_be_resp[`resp_MIG_BUS(0)]),
  `else
       .m_req  (dcache_be_req),
       .m_resp (dcache_be_resp),
@@ -434,7 +431,7 @@ module ext_mem
       .N_WAYS(1),        //Number of Ways
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
-      .WTBUF_DEPTH_W(2), //FIFO's depth
+      .WTBUF_DEPTH_W(4), //FIFO's depth
       .BE_ADDR_W (`DDR_ADDR_W),
       .CTRL_CACHE (0),
       .CTRL_CNT(0),       //Remove counters
@@ -466,17 +463,17 @@ module ext_mem
             .axi_awprot(m_l2_awprot),
             .axi_awqos(m_l2_awqos), 
             .axi_awvalid(m_l2_awvalid), 
-            .axi_awready(1'b0),//(m_l2_awready), 
+            .axi_awready(m_l2_awready),
             //write
             .axi_wdata(m_l2_wdata), 
             .axi_wstrb(m_l2_wstrb), 
             .axi_wlast(m_l2_wlast), 
             .axi_wvalid(m_l2_wvalid), 
-            .axi_wready(1'b0),//(m_l2_wready), 
+            .axi_wready(m_l2_wready), 
             //write response
             // .axi_bid(m_l2_bid), 
-            .axi_bresp(2'b0),//m_l2_bresp), 
-            .axi_bvalid(1'b0),//m_l2_bvalid), 
+            .axi_bresp(m_l2_bresp), 
+            .axi_bvalid(m_l2_bvalid), 
             .axi_bready(m_l2_bready), 
             //address read
             .axi_arid(m_l2_arid), 
@@ -573,6 +570,30 @@ module ext_mem
             );
 
 
+   // // bypass crossbar for axi read signals
+   // // address read
+   // assign axi_arid = m_l2_arid;
+   // assign axi_araddr = m_l2_araddr;
+   // assign axi_arlen = m_l2_arlen;
+   // assign axi_arsize = m_l2_arsize;
+   // assign axi_arburst = m_l2_arburst;
+   // assign axi_arlock = m_l2_arlock;
+   // assign axi_arcache = m_l2_arcache;
+   // assign axi_arprot = m_l2_arprot;
+   // assign axi_arqos = m_l2_arqos;
+   // assign axi_arvalid = m_l2_arvalid;
+   // assign m_l2_arready = axi_arready;
+   // // read
+   // assign m_l2_rid = axi_rid;
+   // assign m_l2_rdata =  axi_rdata;
+   // assign m_l2_rresp = axi_rresp;
+   // assign m_l2_rlast = axi_rlast;
+   // assign m_l2_rvalid = axi_rvalid;
+   // assign axi_rready = m_l2_rready;
+   
+
+
+   
    // // AXI CROSSBAR WRITE
    // axi_crossbar_wr #(
    // 		     .S_COUNT(2),
@@ -594,17 +615,17 @@ module ext_mem
    // 		 .s_axi_awcache({m_l2_awcache, m_dma_awcache}),
    // 		 .s_axi_awprot({m_l2_awprot, m_dma_awprot}),
    // 		 .s_axi_awqos({m_l2_awqos, m_dma_awqos}),
-   // 		 .s_axi_awuser(2'b0),
+   // 		 .s_axi_awuser({m_l2_awuser, m_dma_awuser}), //input reg = 0
    // 		 .s_axi_awvalid({m_l2_awvalid, m_dma_awvalid}),
    // 		 .s_axi_awready({m_l2_awready, m_dma_awready}),
 		 
    // 		 .s_axi_wdata({m_l2_wdata, m_dma_wdata}),
    // 		 .s_axi_wstrb({m_l2_wstrb, m_dma_wstrb}),
    // 		 .s_axi_wlast({m_l2_wlast, m_dma_wlast}),
-   // 		 .s_axi_wuser(2'b0),
+   // 		 .s_axi_wuser({m_l2_wuser, m_dma_wuser}), //input reg = 0
    // 		 .s_axi_wvalid({m_l2_wvalid, m_dma_wvalid}),
    // 		 .s_axi_wready({m_l2_wready, m_dma_wready}),
-   // 		 //.s_axi_bid({m_l2_bid, m_dma_bid}),
+   // 		 .s_axi_bid({m_l2_bid, m_dma_bid}),
    // 		 .s_axi_bresp({m_l2_bresp, m_dma_bresp}),
    // 		 .s_axi_bvalid({m_l2_bvalid, m_dma_bvalid}),
    // 		 .s_axi_bready({m_l2_bready, m_dma_bready}),
@@ -627,68 +648,7 @@ module ext_mem
    // 		 .m_axi_wlast(axi_wlast),
    // 		 .m_axi_wvalid(axi_wvalid),
    // 		 .m_axi_wready(axi_wready),
-   // 		 .m_axi_bid(axi_bid),
-   // 		 .m_axi_bresp(axi_bresp),
-   // 		 .m_axi_buser(1'b0),
-   // 		 .m_axi_bvalid(axi_bvalid),
-   // 		 .m_axi_bready(axi_bready)			 
-   // 		 );
-
-   // // AXI CROSSBAR WRITE
-   // axi_crossbar_wr #(
-   // 		     .S_COUNT(1),
-   // 		     .M_COUNT(1),
-   // 		     .DATA_WIDTH(`MIG_BUS_W),
-   // 		     .ADDR_WIDTH(`DDR_ADDR_W),
-   // 		     .S_ID_WIDTH(1)
-   // 		     )
-   // xbar_wr_inst (
-   // 		 .clk(clk),
-   // 		 .rst(rst),
-   // 		 // slave interface
-   // 		 .s_axi_awid(m_dma_awid),
-   // 		 .s_axi_awaddr(m_dma_awaddr),
-   // 		 .s_axi_awlen(m_dma_awlen),
-   // 		 .s_axi_awsize(m_dma_awsize),
-   // 		 .s_axi_awburst(m_dma_awburst),
-   // 		 .s_axi_awlock(m_dma_awlock),
-   // 		 .s_axi_awcache(m_dma_awcache),
-   // 		 .s_axi_awprot(m_dma_awprot),
-   // 		 .s_axi_awqos(m_dma_awqos),
-   // 		 .s_axi_awuser(m_dma_awuser), //input reg = 0
-   // 		 .s_axi_awvalid(m_dma_awvalid),
-   // 		 .s_axi_awready(m_dma_awready),
-		 
-   // 		 .s_axi_wdata(m_dma_wdata),
-   // 		 .s_axi_wstrb(m_dma_wstrb),
-   // 		 .s_axi_wlast(m_dma_wlast),
-   // 		 .s_axi_wuser(m_dma_wuser), //input reg = 0
-   // 		 .s_axi_wvalid(m_dma_wvalid),
-   // 		 .s_axi_wready(m_dma_wready),
-   // 		 .s_axi_bid(m_dma_bid),
-   // 		 .s_axi_bresp(m_dma_bresp),
-   // 		 .s_axi_bvalid(m_dma_bvalid),
-   // 		 .s_axi_bready(m_dma_bready),
-		 
-   // 		 // master interface
-   // 		 .m_axi_awid(axi_awid),
-   // 		 .m_axi_awaddr(axi_awaddr),
-   // 		 .m_axi_awlen(axi_awlen),
-   // 		 .m_axi_awsize(axi_awsize),
-   // 		 .m_axi_awburst(axi_awburst),
-   // 		 .m_axi_awlock(axi_awlock),
-   // 		 .m_axi_awcache(axi_awcache),
-   // 		 .m_axi_awprot(axi_awprot),
-   // 		 .m_axi_awqos(axi_awqos),
-   // 		 .m_axi_awvalid(axi_awvalid),
-   // 		 .m_axi_awready(axi_awready),
-		 
-   // 		 .m_axi_wdata(axi_wdata),
-   // 		 .m_axi_wstrb(axi_wstrb),
-   // 		 .m_axi_wlast(axi_wlast),
-   // 		 .m_axi_wvalid(axi_wvalid),
-   // 		 .m_axi_wready(axi_wready),
-   // 		 .m_axi_bid(axi_bid),
+   //  		 .m_axi_bid({2{axi_bid}}), // {m_l2_bready, axi_bid} AXI4: id1 != id0 
    // 		 .m_axi_bresp(axi_bresp),
    // 		 .m_axi_buser(s_axi_xbar_buser), //input reg = 0
    // 		 .m_axi_bvalid(axi_bvalid),
@@ -697,108 +657,109 @@ module ext_mem
 
    // AXI INTERCONNECT
    axi_interconnect #(
-		      .S_COUNT(1),
-		      .M_COUNT(1),
-		      .DATA_WIDTH(`MIG_BUS_W),
-		      .ADDR_WIDTH(`DDR_ADDR_W),
-		      .ID_WIDTH(1)
-		      )
+   		      .S_COUNT(2),
+   		      .M_COUNT(1),
+   		      .DATA_WIDTH(`MIG_BUS_W),
+   		      .ADDR_WIDTH(`DDR_ADDR_W),
+   		      .ID_WIDTH(1)
+   		      )
    interconnect_inst (
-		      .clk(clk),
-		      .rst(rst),
-		      // slave interface
-		      // address write
-		      .s_axi_awid(m_dma_awid),
-		      .s_axi_awaddr(m_dma_awaddr),
-		      .s_axi_awlen(m_dma_awlen),
-		      .s_axi_awsize(m_dma_awsize),
-		      .s_axi_awburst(m_dma_awburst),
-		      .s_axi_awlock(m_dma_awlock),
-		      .s_axi_awcache(m_dma_awcache),
-		      .s_axi_awprot(m_dma_awprot),
-		      .s_axi_awqos(m_dma_awqos),
-		      .s_axi_awuser(m_dma_awuser), //input reg = 0
-		      .s_axi_awvalid(m_dma_awvalid),
-		      .s_axi_awready(m_dma_awready),
-		      // write
-		      .s_axi_wdata(m_dma_wdata),
-		      .s_axi_wstrb(m_dma_wstrb),
-		      .s_axi_wlast(m_dma_wlast),
-		      .s_axi_wuser(m_dma_wuser), //input reg = 0
-		      .s_axi_wvalid(m_dma_wvalid),
-		      .s_axi_wready(m_dma_wready),
-		      .s_axi_bid(m_dma_bid),
-		      .s_axi_bresp(m_dma_bresp),
-		      .s_axi_bvalid(m_dma_bvalid),
-		      .s_axi_bready(m_dma_bready),
-		      // address read
-		      .s_axi_arid(m_l2_arid),
-		      .s_axi_araddr(m_l2_araddr),
-		      .s_axi_arlen(m_l2_arlen),
-		      .s_axi_arsize(m_l2_arsize),
-		      .s_axi_arburst(m_l2_arburst),
-		      .s_axi_arlock(m_l2_arlock),
-		      .s_axi_arcache(m_l2_arcache),
-		      .s_axi_arprot(m_l2_arprot),
-		      .s_axi_arqos(m_l2_arqos),
-		      .s_axi_aruser(m_l2_aruser),
-		      .s_axi_arvalid(m_l2_arvalid),
-		      .s_axi_arready(m_l2_arready),
-		      // read
-		      .s_axi_rid(m_l2_rid),
-		      .s_axi_rdata(m_l2_rdata),
-		      .s_axi_rresp(m_l2_rresp),
-		      .s_axi_rlast(m_l2_rlast),
-		      // .s_axi_ruser(),
-		      .s_axi_rvalid(m_l2_rvalid),
-		      .s_axi_rready(m_l2_rready),
+   		      .clk(clk),
+   		      .rst(rst),
+   		      // slave interface
+   		      // address write
+   		      .s_axi_awid({m_l2_awid, m_dma_awid}),
+   		      .s_axi_awaddr({m_l2_awaddr, m_dma_awaddr}),
+   		      .s_axi_awlen({m_l2_awlen, m_dma_awlen}),
+   		      .s_axi_awsize({m_l2_awsize, m_dma_awsize}),
+   		      .s_axi_awburst({m_l2_awburst, m_dma_awburst}),
+   		      .s_axi_awlock({m_l2_awlock, m_dma_awlock}),
+   		      .s_axi_awcache({m_l2_awcache, m_dma_awcache}),
+   		      .s_axi_awprot({m_l2_awprot, m_dma_awprot}),
+   		      .s_axi_awqos({m_l2_awqos, m_dma_awqos}),
+   		      .s_axi_awuser({m_l2_awuser, m_dma_awuser}), //input reg = 0
+   		      .s_axi_awvalid({m_l2_awvalid, m_dma_awvalid}),
+   		      .s_axi_awready({m_l2_awready, m_dma_awready}),
+   		      // write
+   		      .s_axi_wdata({m_l2_wdata, m_dma_wdata}),
+   		      .s_axi_wstrb({m_l2_wstrb, m_dma_wstrb}),
+   		      .s_axi_wlast({m_l2_wlast, m_dma_wlast}),
+   		      .s_axi_wuser({m_l2_wuser, m_dma_wuser}), //input reg = 0
+   		      .s_axi_wvalid({m_l2_wvalid, m_dma_wvalid}),
+   		      .s_axi_wready({m_l2_wready, m_dma_wready}),
+   		      .s_axi_bid({m_l2_bid, m_dma_bid}),
+   		      .s_axi_bresp({m_l2_bresp, m_dma_bresp}),
+   		      .s_axi_bvalid({m_l2_bvalid, m_dma_bvalid}),
+   		      .s_axi_bready({m_l2_bready, m_dma_bready}),
+   		      // address read
+   		      .s_axi_arid({m_l2_arid, m_dma_arid}),
+   		      .s_axi_araddr({m_l2_araddr, m_dma_araddr}),
+   		      .s_axi_arlen({m_l2_arlen, m_dma_arlen}),
+   		      .s_axi_arsize({m_l2_arsize, m_dma_arsize}),
+   		      .s_axi_arburst({m_l2_arburst, m_dma_arburst}),
+   		      .s_axi_arlock({m_l2_arlock, m_dma_arlock}),
+   		      .s_axi_arcache({m_l2_arcache, m_dma_arcache}),
+   		      .s_axi_arprot({m_l2_arprot, m_dma_arprot}),
+   		      .s_axi_arqos({m_l2_arqos, m_dma_arqos}),
+   		      .s_axi_aruser({m_l2_aruser, m_dma_aruser}), //input reg = 0
+   		      .s_axi_arvalid({m_l2_arvalid, m_dma_arvalid}),
+   		      .s_axi_arready({m_l2_arready, m_dma_arready}),
+
+   		      // read
+   		      .s_axi_rid({m_l2_rid, m_dma_rid}),
+   		      .s_axi_rdata({m_l2_rdata, m_dma_rdata}),
+   		      .s_axi_rresp({m_l2_rresp, m_dma_rresp}),
+   		      .s_axi_rlast({m_l2_rlast, m_dma_rlast}),
+   		      // .s_axi_ruser(),
+   		      .s_axi_rvalid({m_l2_rvalid, m_dma_rvalid}),
+   		      .s_axi_rready({m_l2_rready, m_dma_rready}),
 		      
-		      // master interface
-		      // address write
-		      .m_axi_awid(axi_awid),
-		      .m_axi_awaddr(axi_awaddr),
-		      .m_axi_awlen(axi_awlen),
-		      .m_axi_awsize(axi_awsize),
-		      .m_axi_awburst(axi_awburst),
-		      .m_axi_awlock(axi_awlock),
-		      .m_axi_awcache(axi_awcache),
-		      .m_axi_awprot(axi_awprot),
-		      .m_axi_awqos(axi_awqos),
-		      .m_axi_awvalid(axi_awvalid),
-		      .m_axi_awready(axi_awready),
-		      // write
-		      .m_axi_wdata(axi_wdata),
-		      .m_axi_wstrb(axi_wstrb),
-		      .m_axi_wlast(axi_wlast),
-		      .m_axi_wvalid(axi_wvalid),
-		      .m_axi_wready(axi_wready),
-		      .m_axi_bid(axi_bid),
-		      .m_axi_bresp(axi_bresp),
-		      .m_axi_buser(s_axi_xbar_buser), //input reg = 0
-		      .m_axi_bvalid(axi_bvalid),
-		      .m_axi_bready(axi_bready),			 
-		      // address read
-		      .m_axi_arid(axi_arid),
-		      .m_axi_araddr(axi_araddr),
-		      .m_axi_arlen(axi_arlen),
-		      .m_axi_arsize(axi_arsize),
-		      .m_axi_arburst(axi_arburst),
-		      .m_axi_arlock(axi_arlock),
-		      .m_axi_arcache(axi_arcache),
-		      .m_axi_arprot(axi_arprot),
-		      .m_axi_arqos(axi_arqos),
-		      .m_axi_aruser(),
-		      .m_axi_arvalid(axi_arvalid),
-		      .m_axi_arready(axi_arready),
-		      // read
-		      .m_axi_rid(axi_rid),
-		      .m_axi_rdata(axi_rdata),
-		      .m_axi_rresp(axi_rresp),
-		      .m_axi_rlast(axi_rlast),
-		      .m_axi_ruser(s_axi_xbar_ruser),
-		      .m_axi_rvalid(axi_rvalid),
-		      .m_axi_rready(axi_rready)
-		      );
+   		      // master interface
+   		      // address write
+   		      .m_axi_awid(axi_awid),
+   		      .m_axi_awaddr(axi_awaddr),
+   		      .m_axi_awlen(axi_awlen),
+   		      .m_axi_awsize(axi_awsize),
+   		      .m_axi_awburst(axi_awburst),
+   		      .m_axi_awlock(axi_awlock),
+   		      .m_axi_awcache(axi_awcache),
+   		      .m_axi_awprot(axi_awprot),
+   		      .m_axi_awqos(axi_awqos),
+   		      .m_axi_awvalid(axi_awvalid),
+   		      .m_axi_awready(axi_awready),
+   		      // write
+   		      .m_axi_wdata(axi_wdata),
+   		      .m_axi_wstrb(axi_wstrb),
+   		      .m_axi_wlast(axi_wlast),
+   		      .m_axi_wvalid(axi_wvalid),
+   		      .m_axi_wready(axi_wready),
+   		      .m_axi_bid(axi_bid),
+   		      .m_axi_bresp(axi_bresp),
+   		      .m_axi_buser(s_axi_xbar_buser), //input reg = 0
+   		      .m_axi_bvalid(axi_bvalid),
+   		      .m_axi_bready(axi_bready),			 
+   		      // address read
+   		      .m_axi_arid(axi_arid),
+   		      .m_axi_araddr(axi_araddr),
+   		      .m_axi_arlen(axi_arlen),
+   		      .m_axi_arsize(axi_arsize),
+   		      .m_axi_arburst(axi_arburst),
+   		      .m_axi_arlock(axi_arlock),
+   		      .m_axi_arcache(axi_arcache),
+   		      .m_axi_arprot(axi_arprot),
+   		      .m_axi_arqos(axi_arqos),
+   		      .m_axi_aruser(),
+   		      .m_axi_arvalid(axi_arvalid),
+   		      .m_axi_arready(axi_arready),
+   		      // read
+   		      .m_axi_rid(axi_rid),
+   		      .m_axi_rdata(axi_rdata),
+   		      .m_axi_rresp(axi_rresp),
+   		      .m_axi_rlast(axi_rlast),
+   		      .m_axi_ruser(s_axi_xbar_ruser), //input reg = 0
+   		      .m_axi_rvalid(axi_rvalid),
+   		      .m_axi_rready(axi_rready)
+   		      );
 
    
    
