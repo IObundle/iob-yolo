@@ -84,7 +84,7 @@ void rcv_data() {
      //save in DDR
      for(i = 0; i < bytes_to_receive; i++) {
        data_p[j*ETH_NBYTES + i] = data_rcv[14+i];
-       data_to_send[i] = data_rcv[14+i];
+       data_to_send[i] = data_p[j*ETH_NBYTES + i];
      }
 
      //send data back as ack
@@ -211,6 +211,8 @@ void conv() {
   int16_t * fp_data = (int16_t *) LAYER_3_BASE_ADDRESS;
   int i;
   uart_printf("Verifying...\n\n");
+  uart_printf("INITIAL ADDRESS of 2nd line = %x\n", LAYER_3_BASE_ADDRESS + 2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
+  uart_printf("INITIAL ADDRESS of 3rd line = %x\n", LAYER_3_BASE_ADDRESS + 2*2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   for(i = 0; i < k_delta*nSTAGES+1; i++) {
     uart_printf("%d\n", i);
     for(j = 0; j < NTW_IN_W/2+2; j++)

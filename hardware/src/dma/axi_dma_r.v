@@ -11,7 +11,7 @@
 `define STANDBY    `STATES_W'h1
 `define READ_DATA  `STATES_W'h2
 
-`define NUM_TR `AXI_LEN_W'd16
+`define NUM_TR `AXI_LEN_W'd15
 
 module axi_dma_r (
 

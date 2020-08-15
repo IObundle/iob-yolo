@@ -7,12 +7,11 @@
 `define STATES_W 2
 
 // FSM States
-`define IDLE       `STATES_W'h0
 `define STANDBY    `STATES_W'h1
 `define WRITE_DATA `STATES_W'h2
 `define W_RESPONSE `STATES_W'h3
 
-`define NUM_TR `AXI_LEN_W'd16
+`define NUM_TR `AXI_LEN_W'd15 //NUM_TRANSFERS-1
 
 module axi_dma_w # (
 
@@ -98,7 +97,7 @@ module axi_dma_w # (
    // Counter, error, state and ready registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
-       state <= `IDLE;
+       state <= `STANDBY;
        counter_int <= {`AXI_LEN_W{1'b0}};
        error <= 1'b0;
        ready_r <= 1'b0;
@@ -120,17 +119,14 @@ module axi_dma_w # (
       m_axi_wlast_int = 1'b0;
       m_axi_bready = 1'b1;
       case (state)
-	    `IDLE: begin
-       	       counter_int_nxt <= {`AXI_LEN_W{1'b0}};
-	       if (valid) begin
-	          state_nxt = `STANDBY;
-	       end
-	    end
 	    //addr handshake
 	    `STANDBY: begin
-	       if (m_axi_awready == 1'b1)
-	          state_nxt = `WRITE_DATA;
-	       m_axi_awvalid = 1'b1;
+       	       counter_int_nxt <= {`AXI_LEN_W{1'b0}};
+	       if(valid) begin
+	          if (m_axi_awready == 1'b1)
+	             state_nxt = `WRITE_DATA;
+	          m_axi_awvalid = 1'b1;
+	       end
 	    end
 	    //data write
 	    `WRITE_DATA: begin
@@ -148,10 +144,10 @@ module axi_dma_w # (
 	    `W_RESPONSE: begin
 	       if (m_axi_bvalid == 1'b1) begin
 	          if (m_axi_bresp == `AXI_RESP_W'b00)
-		    error_nxt = 1'b0;
+		     error_nxt = 1'b0;
 	          else
-		    error_nxt = 1'b1;
-	          state_nxt = `IDLE;
+		     error_nxt = 1'b1;
+	          state_nxt = `STANDBY;
 	       end
 	    end
       endcase

@@ -93,7 +93,7 @@ for j in range(num_frames_output+1):
     #Check if it is last packet (not enough for full payload)
     if j == num_frames_output:
         bytes_to_receive = output_file_size - count_bytes
-        padding = '\x00' * (eth_nbytes-bytes_to_send)
+        padding = '\x00' * (eth_nbytes-bytes_to_receive)
     else:
         bytes_to_receive = eth_nbytes
         padding = ''
