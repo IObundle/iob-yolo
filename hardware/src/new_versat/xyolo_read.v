@@ -2,6 +2,7 @@
 
 `include "xversat.vh"
 `include "xyolo_read.vh"
+`include "axi_dma.vh"
 
 module xyolo_read #(
     	parameter                      	DATAPATH_W = 32,
@@ -31,7 +32,10 @@ module xyolo_read #(
 
     	// output data
     	output [`nYOLOvect*DATAPATH_W-1:0] flow_out_bias,
-    	output [`nYOLOvect*DATAPATH_W-1:0] flow_out_weight
+    	output [`nYOLOvect*DATAPATH_W-1:0] flow_out_weight,
+
+	// DMA - number of tranfers per burst
+	output [`AXI_LEN_W-1:0]		dma_len
    );
 
    // local parameter for merge
@@ -41,6 +45,7 @@ module xyolo_read #(
    // configuration enables
    reg  		                ext_addr_en;
    reg  		                offset_en;
+   reg					len_en;
    reg 					int_addr_en;
    reg 					iterA_en;
    reg 					perA_en;
@@ -56,6 +61,7 @@ module xyolo_read #(
    reg [`IO_ADDR_W-1:0] 	        ext_addr;
    reg [`nYOLOvect*`IO_ADDR_W-1:0]      ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0] 	        offset;
+   reg [`AXI_LEN_W-1:0] 		len, len_shadow;
    reg [`W_ADDR_W-1:0] 			int_addr, int_addr_shadow;
    reg [`MEM_ADDR_W-1:0] 		iterA, iterA_shadow;
    reg [`PERIOD_W-1:0] 			perA, perA_shadow;
@@ -95,6 +101,9 @@ module xyolo_read #(
    wire                                 doneB;
    assign                               done = &{vread_done, doneB};
 
+   // define number of transactions (DMA)
+   assign				dma_len = len_shadow;
+
    // bias and run registers
    reg					run_reg;
    reg [`nYOLOvect*DATAPATH_W-1:0]	bias0, bias1;
@@ -125,6 +134,7 @@ module xyolo_read #(
    always @* begin
       ext_addr_en = 1'b0;
       offset_en = 1'b0;
+      len_en = 1'b0;
       int_addr_en = 1'b0;
       iterA_en = 1'b0;
       perA_en = 1'b0;
@@ -139,6 +149,7 @@ module xyolo_read #(
          case(addr)
             `XYOLO_READ_CONF_EXT_ADDR : ext_addr_en = 1'b1;
             `XYOLO_READ_CONF_OFFSET : offset_en = 1'b1;
+            `XYOLO_READ_CONF_LEN : len_en = 1'b1;
             `XYOLO_READ_CONF_INT_ADDR : int_addr_en = 1'b1;
             `XYOLO_READ_CONF_ITER_A : iterA_en = 1'b1;
 	    `XYOLO_READ_CONF_PER_A: perA_en = 1'b1;
@@ -158,6 +169,7 @@ module xyolo_read #(
       if(clear || rst) begin
 	 ext_addr <= `IO_ADDR_W'b0;
          offset <= {`IO_ADDR_W/2{1'b0}};
+         len <= `AXI_LEN_W'b0;
 	 int_addr <= {`W_ADDR_W{1'b0}};
 	 iterA <= `MEM_ADDR_W'b0;
 	 perA <= `PERIOD_W'b0;
@@ -171,6 +183,7 @@ module xyolo_read #(
       end else begin
          if(ext_addr_en) ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(offset_en) offset <= wdata[`IO_ADDR_W/2-1:0];
+         if(len_en) len <= wdata[`AXI_LEN_W-1:0];
          if(int_addr_en) int_addr <= wdata[`W_ADDR_W-1:0];
          if(iterA_en) iterA <= wdata[`MEM_ADDR_W-1:0];
          if(perA_en) perA <= wdata[`PERIOD_W-1:0];
@@ -187,6 +200,7 @@ module xyolo_read #(
    always @(posedge clk, posedge rst)
       if(rst) begin
 	 ext_addr_shadow <= `nYOLOvect*`IO_ADDR_W'b0;
+	 len_shadow <= `AXI_LEN_W'b0;
 	 int_addr_shadow <= {`W_ADDR_W{1'b0}};
 	 iterA_shadow <= `MEM_ADDR_W'b0;
 	 perA_shadow <= `PERIOD_W'b0;
@@ -204,6 +218,7 @@ module xyolo_read #(
 	 incrB_pip <= `MEM_ADDR_W'b0;
       end else if(run) begin
          ext_addr_shadow <= ext_addr_bus;
+	 len_shadow <= len;
 	 //XOR ensures ping-pong happens when acessing external mem
 	 int_addr_shadow <= {int_addr_shadow[`W_ADDR_W-1] ^ |iterA, int_addr[`W_ADDR_W-2:0]};
 	 iterA_shadow <= iterA;

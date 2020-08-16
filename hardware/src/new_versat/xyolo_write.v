@@ -32,7 +32,10 @@ module xyolo_write #(
 
     	// input data
     	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_bias,
-    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight
+    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight,
+
+	// DMA - number of tranfers per burst
+	output [`AXI_LEN_W-1:0]         dma_len
     );
 
    // vread latency
@@ -61,6 +64,7 @@ module xyolo_write #(
    // vread configuration enables
    reg					vread_ext_addr_en;
    reg					vread_offset_en;
+   reg					vread_len_en;
    reg					vread_int_addr_en;
    reg					vread_iterA_en;
    reg                                  vread_perA_en;
@@ -111,6 +115,7 @@ module xyolo_write #(
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
+   reg [`AXI_LEN_W-1:0]			vread_len, vread_len_shadow;
    reg [`W_ADDR_W-1:0]			vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
    reg [`EXT_PERIOD_W-1:0]              vread_perA, vread_perA_shadow;
@@ -152,6 +157,9 @@ module xyolo_write #(
    // done output
    wire [`nSTAGES-1:0]                  stages_done;
    assign                               done = &{vread_doneB, vwrite_doneB, stages_done};
+
+   // define number of transactions (DMA)
+   assign                               dma_len = vread_len_shadow;
 
    // run signals
    reg                                  run_reg;
@@ -197,6 +205,7 @@ module xyolo_write #(
       //vread
       vread_ext_addr_en = 1'b0;
       vread_offset_en = 1'b0;
+      vread_len_en = 1'b0;
       vread_int_addr_en = 1'b0;
       vread_iterA_en = 1'b0;
       vread_perA_en = 1'b0;
@@ -243,6 +252,7 @@ module xyolo_write #(
 	    //vread
 	    `VREAD_CONF_EXT_ADDR : vread_ext_addr_en = 1'b1;
 	    `VREAD_CONF_OFFSET : vread_offset_en = 1'b1;
+	    `VREAD_CONF_LEN : vread_len_en = 1'b1;
 	    `VREAD_CONF_INT_ADDR : vread_int_addr_en = 1'b1;
             `VREAD_CONF_ITER_A : vread_iterA_en = 1'b1;
             `VREAD_CONF_PER_A : vread_perA_en = 1'b1;
@@ -294,6 +304,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
+	 vread_len <= `AXI_LEN_W'b0;
          vread_int_addr <= {`W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
          vread_perA <= `EXT_PERIOD_W'b0;
@@ -340,6 +351,7 @@ module xyolo_write #(
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
+   	 if(vread_len_en) vread_len <= wdata[`AXI_LEN_W-1:0];
          if(vread_int_addr_en) vread_int_addr <= wdata[`W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
 	 if(vread_perA_en) vread_perA <= wdata[`EXT_PERIOD_W-1:0];
@@ -407,6 +419,7 @@ module xyolo_write #(
          vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
+         vread_len_shadow <= `AXI_LEN_W'b0;
          vread_int_addr_shadow <= {`W_ADDR_W{1'b0}};
          vread_iterA_shadow <= `EXT_ADDR_W'b0;
          vread_perA_shadow <= `EXT_PERIOD_W'b0;
@@ -491,6 +504,7 @@ module xyolo_write #(
          vwrite_bypass_shadow <= xyolo_bypass_shadow;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
+	 vread_len_shadow <= vread_len;
 	 //XOR ensures ping-pong happens when acessing external mem
 	 vread_int_addr_shadow <= {vread_int_addr_shadow[`W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`W_ADDR_W-2:0]};
 	 vread_iterA_shadow <= vread_iterA;

@@ -111,11 +111,13 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
+  versat.yread.setLen(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4 - 1); //+4 so each filter is 32 byte aligned
   versat.yread.setOffset(2*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)); //+4 so each filter is 32 byte aligned
   versat.yread.setExtPer((1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)/16); //+4 so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
 
   // configure xyolo_write vread to read tile from input fm
+  versat.ywrite.read.setLen((NTW_IN_C*(TILE_W+2)+10)/16-1); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtPer((NTW_IN_C*(TILE_W+2)+10)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);

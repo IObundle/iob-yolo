@@ -48,6 +48,7 @@ module ext_mem
    input [3*`IO_ADDR_W-1:0]    	databus_addr,
    input [3*`MIG_BUS_W-1:0]   	databus_wdata,
    input [3*`MIG_BUS_W/8-1:0] 	databus_wstrb,
+   input [`AXI_LEN_W-1:0]     dma_len,
 `endif
    
    // AXI interface 
@@ -190,80 +191,19 @@ module ext_mem
            .mem_ready (dcache_be_resp[`ready_MIG_BUS(0)])
            );
 
-`ifdef USE_NEW_VERSAT
-
-   //
-   // NATIVE INTERFACE TO INTERCONNECT INTERFACE
-   //
-
-   //Back-end bus
-   wire [3*`REQ_MIG_BUS_W-1:0] 	  vcache_be_req;
-   wire [3*`RESP_MIG_BUS_W-1:0]	  vcache_be_resp;
-
-   //Connect versat databus directly to backend
-   genvar			  l;
-   generate
-      for(l = 0; l < 3; l++) begin : ywrite_backend
-         assign vcache_be_req[`valid_MIG_BUS(l)] = databus_valid[3-l-1 -: 1];
-         assign vcache_be_req[`address_MIG_BUS(l, `DDR_ADDR_W)] = databus_addr[3*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
-         assign vcache_be_req[`wdata_MIG_BUS(l)] = databus_wdata[3*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W];
-         assign vcache_be_req[`wstrb_MIG_BUS(l)] = databus_wstrb[3*`MIG_BUS_W/8-l*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8];
-      	 assign databus_rdata[3*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W] = vcache_be_resp[`rdata_MIG_BUS(l)];
-   	 assign databus_ready[3-l-1 -: 1] = vcache_be_resp[`ready_MIG_BUS(l)];
-   	 assign vcache_be_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
-      end
-   endgenerate
-   
-`endif
-   
-   // Merge caches back-ends
-   wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
-   wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
-   
+   // set address offset to zero
 `ifdef RUN_DDR_USE_SRAM
    assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
 `endif
    assign dcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
-   
 
-	 sync_merge
-	   #(
-`ifdef RUN_DDR_USE_SRAM
-	     .N_MASTERS(2),
-`else
- `ifdef USE_NEW_VERSAT
-	     .N_MASTERS(1+1),
- `else
-	     .N_MASTERS(1),
- `endif
-`endif
-	     .DATA_W(`MIG_BUS_W)
-	     )
-	 merge_i_d_buses_into_l2_read
-	   (
-	     //inputs
-	     .clk(clk),
-	     .rst(rst),
-             // masters
-`ifdef RUN_DDR_USE_SRAM
-	     .m_req  ({icache_be_req, dcache_be_req}),
-	     .m_resp ({icache_be_resp, dcache_be_resp}),
-`else
- `ifdef USE_NEW_VERSAT
-	     .m_req  ({vcache_be_req[`req_MIG_BUS(2)], dcache_be_req}),
-	     .m_resp ({vcache_be_resp[`resp_MIG_BUS(2)], dcache_be_resp}),
- `else
-	     .m_req  (dcache_be_req),
-	     .m_resp (dcache_be_resp),
- `endif
-`endif                 
-	     // slave
-	     .s_req  (l2cache_req),
-	     .s_resp (l2cache_resp)
-	     );
-	    
+   //
+   // AXI4 wires
+   //
+
    // AXI MASTER WRITE WIRES
    // axi address write
+`ifdef USE_NEW_VERSAT
    wire [0:0] 			  m_l2_awid, m_dma_awid;
    wire [`DDR_ADDR_W-1:0] 	  m_l2_awaddr, m_dma_awaddr;
    wire [7:0] 			  m_l2_awlen, m_dma_awlen;
@@ -308,10 +248,38 @@ module ext_mem
    wire 			  m_l2_rvalid, m_dmna_rvalid;
    wire 			  m_l2_rready, m_dma_rready;
    
-// AXI SLAVE WIRES
+   // AXI SLAVE WIRES
    reg 				  s_axi_xbar_buser = 1'b0;
    reg 				  s_axi_xbar_ruser = 1'b0;
-				  
+`endif
+
+   //
+   // L2 Cache
+   //
+
+   //Merge instruction and data caches
+`ifdef RUN_DDR_USE_SRAM
+
+   //L2 buses
+   wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
+   wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
+       
+   merge #(
+      .N_MASTERS(2),
+      .DATA_W(`MIG_BUS_W)
+   ) merge_i_d_buses_into_l2_read (
+      //inputs
+      .clk(clk),
+      .rst(rst),
+      // masters
+      .m_req  ({icache_be_req, dcache_be_req}),
+      .m_resp ({icache_be_resp, dcache_be_resp}),
+      // slave
+      .s_req  (l2cache_req),
+      .s_resp (l2cache_resp)
+   );
+`endif
+
    // L2 cache instance
    iob_cache_axi # 
      (
@@ -331,14 +299,24 @@ module ext_mem
             .reset (rst),
       
             // Native interface
+	 `ifdef RUN_DDR_USE_SRAM
             .valid    (l2cache_req[`valid_MIG_BUS(0)]),
             .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
             .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
    	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
             .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
             .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
+	 `else
+            .valid    (dcache_be_req[`valid_MIG_BUS(0)]),
+            .addr     (dcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
+            .wdata    (dcache_be_req[`wdata_MIG_BUS(0)]),
+   	    .wstrb    (dcache_be_req[`wstrb_MIG_BUS(0)]),
+            .rdata    (dcache_be_resp[`rdata_MIG_BUS(0)]),
+            .ready    (dcache_be_resp[`ready_MIG_BUS(0)]),
+	 `endif
 	    
             // AXI interface
+	`ifdef USE_NEW_VERSAT
             // Address write
             .axi_awid(m_l2_awid), 
             .axi_awaddr(m_l2_awaddr), 
@@ -381,8 +359,126 @@ module ext_mem
             .axi_rlast(m_l2_rlast), 
             .axi_rvalid(m_l2_rvalid),  
             .axi_rready(m_l2_rready)
+	`else
+            // Address write
+            .axi_awid(axi_awid), 
+            .axi_awaddr(axi_awaddr), 
+            .axi_awlen(axi_awlen), 
+            .axi_awsize(axi_awsize), 
+            .axi_awburst(axi_awburst), 
+            .axi_awlock(axi_awlock), 
+            .axi_awcache(axi_awcache), 
+            .axi_awprot(axi_awprot),
+            .axi_awqos(axi_awqos), 
+            .axi_awvalid(axi_awvalid), 
+            .axi_awready(axi_awready),
+            //write
+            .axi_wdata(axi_wdata), 
+            .axi_wstrb(axi_wstrb), 
+            .axi_wlast(axi_wlast), 
+            .axi_wvalid(axi_wvalid), 
+            .axi_wready(axi_wready), 
+            //write response
+            // .axi_bid(axi_bid), 
+            .axi_bresp(axi_bresp), 
+            .axi_bvalid(axi_bvalid), 
+            .axi_bready(axi_bready), 
+            //address read
+            .axi_arid(axi_arid), 
+            .axi_araddr(axi_araddr), 
+            .axi_arlen(axi_arlen), 
+            .axi_arsize(axi_arsize), 
+            .axi_arburst(axi_arburst), 
+            .axi_arlock(axi_arlock), 
+            .axi_arcache(axi_arcache), 
+            .axi_arprot(axi_arprot), 
+            .axi_arqos(axi_arqos), 
+            .axi_arvalid(axi_arvalid), 
+            .axi_arready(axi_arready), 
+            //read 
+            //.axi_rid(axi_rid), 
+            .axi_rdata(axi_rdata), 
+            .axi_rresp(axi_rresp), 
+            .axi_rlast(axi_rlast), 
+            .axi_rvalid(axi_rvalid),  
+            .axi_rready(axi_rready)
+	`endif
             );
 
+   //
+   // VERSAT DMAs
+   //
+
+`ifdef USE_NEW_VERSAT
+
+   //Merge master interface
+   wire [2*`REQ_MIG_BUS_W-1:0] 	  vread_m_req;
+   wire [2*`RESP_MIG_BUS_W-1:0]	  vread_m_resp;
+
+   //Merge slave interface
+   wire [`REQ_MIG_BUS_W-1:0] 	  vread_s_req;
+   wire [`RESP_MIG_BUS_W-1:0]	  vread_s_resp;
+
+   //Concatenate vread databuses to merge master interface
+   genvar			  l;
+   generate
+      for(l = 0; l < 2; l++) begin : vread_merge
+         assign vread_m_req[`valid_MIG_BUS(l)] = databus_valid[2-l-1 -: 1];
+         assign vread_m_req[`address_MIG_BUS(l, `DDR_ADDR_W)] = databus_addr[2*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
+         assign vread_m_req[`wdata_MIG_BUS(l)] = databus_wdata[2*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W];
+         assign vread_m_req[`wstrb_MIG_BUS(l)] = databus_wstrb[2*`MIG_BUS_W/8-l*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8];
+      	 assign databus_rdata[2*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W] = vread_m_resp[`rdata_MIG_BUS(l)];
+   	 assign databus_ready[2-l-1 -: 1] = vread_m_resp[`ready_MIG_BUS(l)];
+   	 assign vread_m_req[`address_MIG_BUS(l, `ADDR_W)-`DDR_ADDR_W] = 0;
+      end
+   endgenerate
+
+   //Merge vreads
+   merge #(
+      .N_MASTERS(2),
+      .DATA_W(`MIG_BUS_W)
+   ) vreads_merge (
+      // masters
+      .m_req  (vread_m_req),
+      .m_resp (vread_m_resp),
+      // slave
+      .s_req  (vread_s_req),
+      .s_resp (vread_s_resp)
+   );
+
+   // AXI_DMA READ
+   axi_dma_r dma_r (
+      .clk(clk),
+      .rst(rst),
+      // Native interface
+      .valid    (vread_s_req[`valid_MIG_BUS(0)]),
+      .addr     (vread_s_req[`address_MIG_BUS(0,`DDR_ADDR_W)]),
+      .rdata    (vread_s_resp[`rdata_MIG_BUS(0)]),
+      .ready    (vread_s_resp[`ready_MIG_BUS(0)]),
+      // DMA configuration
+      .len	(dma_len),
+      // AXI interface
+      // Address read
+      .m_axi_arid(m_dma_arid),
+      .m_axi_araddr(m_dma_araddr),
+      .m_axi_arlen(m_dma_arlen),
+      .m_axi_arsize(m_dma_arsize),
+      .m_axi_arburst(m_dma_arburst),
+      .m_axi_arlock(m_dma_arlock),
+      .m_axi_arcache(m_dma_arcache),
+      .m_axi_arprot(m_dma_arprot),
+      .m_axi_arqos(m_dma_arqos),
+      .m_axi_arvalid(m_dma_arvalid),
+      .m_axi_arready(m_dma_arready),
+      // Read
+      .m_axi_rid(m_dma_rid),
+      .m_axi_rdata(m_dma_rdata),
+      .m_axi_rresp(m_dma_rresp),
+      .m_axi_rlast(m_dma_rlast),
+      .m_axi_rvalid(m_dma_rvalid),
+      .m_axi_rready(m_dma_rready)
+   );
+   
    // AXI_DMA WRITE
    axi_dma_w # (
       .USE_RAM(0)
@@ -390,11 +486,11 @@ module ext_mem
       .clk(clk),
       .rst(rst),
       // Native interface
-      .valid    (vcache_be_req[`valid_MIG_BUS(0)]),
-      .addr     (vcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W)]),
-      .wdata    (vcache_be_req[`wdata_MIG_BUS(0)]),
-      .wstrb    (vcache_be_req[`wstrb_MIG_BUS(0)]),
-      .ready    (vcache_be_resp[`ready_MIG_BUS(0)]),
+      .valid    (databus_valid[2]),
+      .addr     (databus_addr[3*`IO_ADDR_W-1-(`IO_ADDR_W-`DDR_ADDR_W) -: `DDR_ADDR_W]),
+      .wdata    (databus_wdata[3*`MIG_BUS_W-1 -: `MIG_BUS_W]),
+      .wstrb    (databus_wstrb[3*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8]),
+      .ready    (databus_ready[2]),
       // AXI interface
       // Address write
       .m_axi_awid(m_dma_awid), 
@@ -419,36 +515,6 @@ module ext_mem
       .m_axi_bresp(m_dma_bresp), 
       .m_axi_bvalid(m_dma_bvalid), 
       .m_axi_bready(m_dma_bready)
-   );
-
-   axi_dma_r dma_r (
-      .clk(clk),
-      .rst(rst),
-      // Native interface
-      .valid    (vcache_be_req[`valid_MIG_BUS(1)]),
-      .addr     (vcache_be_req[`address_MIG_BUS(1,`DDR_ADDR_W)]),
-      .rdata    (vcache_be_resp[`rdata_MIG_BUS(1)]),
-      .ready    (vcache_be_resp[`ready_MIG_BUS(1)]),
-      // AXI interface
-      // Address read
-      .m_axi_arid(m_dma_arid),
-      .m_axi_araddr(m_dma_araddr),
-      .m_axi_arlen(m_dma_arlen),
-      .m_axi_arsize(m_dma_arsize),
-      .m_axi_arburst(m_dma_arburst),
-      .m_axi_arlock(m_dma_arlock),
-      .m_axi_arcache(m_dma_arcache),
-      .m_axi_arprot(m_dma_arprot),
-      .m_axi_arqos(m_dma_arqos),
-      .m_axi_arvalid(m_dma_arvalid),
-      .m_axi_arready(m_dma_arready),
-      // Read
-      .m_axi_rid(m_dma_rid),
-      .m_axi_rdata(m_dma_rdata),
-      .m_axi_rresp(m_dma_rresp),
-      .m_axi_rlast(m_dma_rlast),
-      .m_axi_rvalid(m_dma_rvalid),
-      .m_axi_rready(m_dma_rready)
    );
 
    // AXI INTERCONNECT
@@ -555,5 +621,6 @@ module ext_mem
    		      .m_axi_rvalid(axi_rvalid),
    		      .m_axi_rready(axi_rready)
    		      );
-   
+`endif
+
 endmodule

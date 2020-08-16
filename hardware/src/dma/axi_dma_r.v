@@ -21,6 +21,9 @@ module axi_dma_r (
     	input	                       valid,
     	input [`DDR_ADDR_W-1:0]        addr,
     	output [`MIG_BUS_W-1:0]        rdata,
+
+        // DMA configuration
+        input [`AXI_LEN_W-1:0]	       len,
    
         // Master Interface Read Address
         output wire [`AXI_ID_W-1:0]    m_axi_arid,
@@ -44,9 +47,6 @@ module axi_dma_r (
 	output reg                     m_axi_rready
 	);
  
-   // number of transactions (TODO: input instead of local parameter)
-   localparam                          NUM_TR = `AXI_LEN_W'd6; //NUM_TRANSFERS-1
-  
    // counter, state and error regs
    reg [`AXI_LEN_W:0]                  counter_int, counter_int_nxt;
    reg [`R_STATES_W-1:0]               state, state_nxt;
@@ -55,7 +55,7 @@ module axi_dma_r (
    // Address read constants
    assign m_axi_arid = `AXI_ID_W'b0;
    assign m_axi_araddr = addr;
-   assign m_axi_arlen = NUM_TR; //number of trasfers per burst
+   assign m_axi_arlen = len; //number of trasfers per burst
    assign m_axi_arsize = $clog2(`MIG_BUS_W/8); //INCR interval
    assign m_axi_arburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_arlock = `AXI_LOCK_W'b0;
@@ -101,7 +101,7 @@ module axi_dma_r (
 	    `R_DATA: begin
 	       m_axi_rready = 1'b1;
 	       if (m_axi_rvalid == 1'b1) begin
-	          if (counter_int == NUM_TR) begin
+	          if (counter_int == len) begin
 	             if (m_axi_rlast == 1'b1)
 		        error_nxt = 1'b0;
 	             else

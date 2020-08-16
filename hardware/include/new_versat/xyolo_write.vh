@@ -24,33 +24,34 @@
 // vread configuration offsets
 `define VREAD_CONF_EXT_ADDR    	14
 `define VREAD_CONF_OFFSET    	15
-`define VREAD_CONF_INT_ADDR    	16
-`define VREAD_CONF_ITER_A      	17
-`define VREAD_CONF_PER_A       	18
-`define VREAD_CONF_SHIFT_A     	19
-`define VREAD_CONF_INCR_A      	20
-`define VREAD_CONF_START_B     	21
-`define VREAD_CONF_ITER_B      	22
-`define VREAD_CONF_PER_B       	23
-`define VREAD_CONF_SHIFT_B     	24
-`define VREAD_CONF_INCR_B      	25
-`define VREAD_CONF_ITER2_B      26
-`define VREAD_CONF_PER2_B       27
-`define VREAD_CONF_SHIFT2_B     28
-`define VREAD_CONF_INCR2_B      29
-`define VREAD_CONF_ITER3_B      30
-`define VREAD_CONF_PER3_B       31
-`define VREAD_CONF_SHIFT3_B     32
-`define VREAD_CONF_INCR3_B      33
+`define VREAD_CONF_LEN    	16
+`define VREAD_CONF_INT_ADDR    	17
+`define VREAD_CONF_ITER_A      	18
+`define VREAD_CONF_PER_A       	19
+`define VREAD_CONF_SHIFT_A     	20
+`define VREAD_CONF_INCR_A      	21
+`define VREAD_CONF_START_B     	22
+`define VREAD_CONF_ITER_B      	23
+`define VREAD_CONF_PER_B       	24
+`define VREAD_CONF_SHIFT_B     	25
+`define VREAD_CONF_INCR_B      	26
+`define VREAD_CONF_ITER2_B      27
+`define VREAD_CONF_PER2_B       28
+`define VREAD_CONF_SHIFT2_B     29
+`define VREAD_CONF_INCR2_B      30
+`define VREAD_CONF_ITER3_B      31
+`define VREAD_CONF_PER3_B       32
+`define VREAD_CONF_SHIFT3_B     33
+`define VREAD_CONF_INCR3_B      34
 
 // xyolo configuration offsets
-`define XYOLO_CONF_ITER  	34
-`define XYOLO_CONF_PER   	35
-`define XYOLO_CONF_SHIFT   	36
-`define XYOLO_CONF_BIAS   	37
-`define XYOLO_CONF_LEAKY   	38
-`define XYOLO_CONF_MAXPOOL   	39
-`define XYOLO_CONF_BYPASS   	40
+`define XYOLO_CONF_ITER  	35
+`define XYOLO_CONF_PER   	36
+`define XYOLO_CONF_SHIFT   	37
+`define XYOLO_CONF_BIAS   	38
+`define XYOLO_CONF_LEAKY   	39
+`define XYOLO_CONF_MAXPOOL   	40
+`define XYOLO_CONF_BYPASS   	41
 
 // Address
-`define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS))
+`define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS+1))

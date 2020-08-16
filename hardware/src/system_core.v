@@ -238,12 +238,12 @@ module system
 `ifdef USE_DDR
 
  `ifdef USE_NEW_VERSAT
-   // Connect Versat to L2 Caches merge in ext_mem
+   // Connect Versat to DMA
    wire [2:0]                   dbus_ready, dbus_valid;
    wire [3*`MIG_BUS_W-1:0]     	dbus_wdata, dbus_rdata;
    wire [3*`IO_ADDR_W-1:0]      dbus_addr;
    wire [3*`MIG_BUS_W/8-1:0]   	dbus_wstrb;
-
+   wire [`AXI_LEN_W-1:0] 	dbus_len;
  `endif
 
    //
@@ -272,6 +272,7 @@ module system
 	.databus_wstrb        (dbus_wstrb),
 	.databus_rdata        (dbus_rdata),
 	.databus_ready        (dbus_ready),
+	.dma_len	      (dbus_len),
 `endif
 	
         //AXI INTERFACE 

@@ -32,6 +32,9 @@ class CYoloRead {
     void setOffset(int offset) {
       MEMSET(base, XYOLO_READ_CONF_OFFSET, offset);
     }
+    void setLen(int len) {
+      MEMSET(base, XYOLO_READ_CONF_LEN, len);
+    }
     void setIntAddr(int intAddr) {
       MEMSET(base, XYOLO_READ_CONF_INT_ADDR, intAddr);
     }
@@ -84,6 +87,9 @@ class CRead {
     }
     void setOffset(int offset) {
       MEMSET(base, VREAD_CONF_OFFSET, offset);
+    }
+    void setLen(int len) {
+      MEMSET(base, VREAD_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VREAD_CONF_INT_ADDR, intAddr);
