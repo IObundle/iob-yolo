@@ -4,14 +4,12 @@
 `include "system.vh"
 
 // Log2 number of states
-`define STATES_W 2
+`define W_STATES_W 2
 
 // FSM States
-`define STANDBY    `STATES_W'h1
-`define WRITE_DATA `STATES_W'h2
-`define W_RESPONSE `STATES_W'h3
-
-`define NUM_TR `AXI_LEN_W'd15 //NUM_TRANSFERS-1
+`define W_ADDR_HS  `W_STATES_W'h0 //Write address handshake
+`define W_DATA 	   `W_STATES_W'h1 //Write data
+`define W_RESPONSE `W_STATES_W'h2 //Write response
 
 module axi_dma_w # (
 
@@ -57,9 +55,12 @@ module axi_dma_w # (
 	output reg                     m_axi_bready
 	);
    
+   // number of transactions (TODO: input instead of local parameter)
+   localparam 			       NUM_TR = `AXI_LEN_W'd15; //NUM_TRANSFERS-1
+
    // counter, state and errorsregs
    reg [`AXI_LEN_W:0]                  counter_int, counter_int_nxt;
-   reg [`STATES_W-1:0]                 state, state_nxt;
+   reg [`W_STATES_W-1:0]               state, state_nxt;
    reg                                 error, error_nxt;
 
    // data write delay regs
@@ -71,7 +72,7 @@ module axi_dma_w # (
    // Address write constants
    assign m_axi_awid = `AXI_ID_W'b0;
    assign m_axi_awaddr = addr;
-   assign m_axi_awlen = `NUM_TR; //number of trasfers per burst
+   assign m_axi_awlen = NUM_TR; //number of trasfers per burst
    assign m_axi_awsize = $clog2(`MIG_BUS_W/8); //INCR interval
    assign m_axi_awburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_awlock = `AXI_LOCK_W'b0;
@@ -97,7 +98,7 @@ module axi_dma_w # (
    // Counter, error, state and ready registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
-       state <= `STANDBY;
+       state <= `W_ADDR_HS;
        counter_int <= {`AXI_LEN_W{1'b0}};
        error <= 1'b0;
        ready_r <= 1'b0;
@@ -120,17 +121,17 @@ module axi_dma_w # (
       m_axi_bready = 1'b1;
       case (state)
 	    //addr handshake
-	    `STANDBY: begin
+	    `W_ADDR_HS: begin
        	       counter_int_nxt <= {`AXI_LEN_W{1'b0}};
 	       if(valid) begin
 	          if (m_axi_awready == 1'b1)
-	             state_nxt = `WRITE_DATA;
+	             state_nxt = `W_DATA;
 	          m_axi_awvalid = 1'b1;
 	       end
 	    end
 	    //data write
-	    `WRITE_DATA: begin
-	       if (counter_int == `NUM_TR) begin
+	    `W_DATA: begin
+	       if (counter_int == NUM_TR) begin
 	          m_axi_wlast_int = 1'b1;
 	          state_nxt = `W_RESPONSE;
 	       end
@@ -147,7 +148,7 @@ module axi_dma_w # (
 		     error_nxt = 1'b0;
 	          else
 		     error_nxt = 1'b1;
-	          state_nxt = `STANDBY;
+	          state_nxt = `W_ADDR_HS;
 	       end
 	    end
       endcase

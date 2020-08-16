@@ -85,7 +85,7 @@ module dma_r_test_tb;
 
       //configure ext_addrgen to write 16 lines to local mem
       iterations <= `EXT_ADDR_W'd1;
-      period <= `EXT_PERIOD_W'd16;
+      period <= `EXT_PERIOD_W'd7;
 
       //run and wait for done
       run_conf();
