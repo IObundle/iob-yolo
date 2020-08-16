@@ -238,11 +238,11 @@ module system
 `ifdef USE_DDR
 
  `ifdef USE_NEW_VERSAT
-   // Connect Versat to L1 Caches in ext_mem
-   wire [`nYOLOvect+`nSTAGES-1:0]                 dbus_ready, dbus_valid;
-   wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W-1:0]   dbus_wdata, dbus_rdata;
-   wire [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0]    dbus_addr;
-   wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W/8-1:0] dbus_wstrb;
+   // Connect Versat to L2 Caches merge in ext_mem
+   wire [2:0]                   dbus_ready, dbus_valid;
+   wire [3*`MIG_BUS_W-1:0]     	dbus_wdata, dbus_rdata;
+   wire [3*`IO_ADDR_W-1:0]      dbus_addr;
+   wire [3*`MIG_BUS_W/8-1:0]   	dbus_wstrb;
 
  `endif
 

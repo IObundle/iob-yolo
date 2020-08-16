@@ -4,12 +4,6 @@
    // VERSAT
    //
 
-   // // Connect Versat to L1 Caches in ext_mem
-   // wire [`nYOLOvect+`nSTAGES-1:0]                 dbus_ready, dbus_valid;
-   // wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W-1:0]   dbus_wdata, dbus_rdata;
-   // wire [(`nYOLOvect+`nSTAGES)*`IO_ADDR_W-1:0]    dbus_addr;
-   // wire [(`nYOLOvect+`nSTAGES)*`DATAPATH_W/8-1:0] dbus_wstrb;
-
    xversat #(
 	     .ADDR_W (ADDR_W-2-$clog2(`N_SLAVES)-2)
 	     //-2 to remove E and P bits
@@ -26,7 +20,7 @@
 		       .rdata     (slaves_resp[`rdata(`VERSAT)]),
 		       .ready     (slaves_resp[`ready(`VERSAT)]),
 
-		       //databus interface
+		       //vread databus interface
 		       .databus_valid (dbus_valid),
 		       .databus_addr  (dbus_addr),
 		       .databus_wdata (dbus_wdata),

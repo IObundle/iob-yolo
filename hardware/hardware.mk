@@ -12,7 +12,7 @@ endif
 INC_DIR:=$(ROOT_DIR)/hardware/include
 SOC_INC_DIR:=$(SOC_DIR)/hardware/include
 
-INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR)
+INCLUDE+=$(incdir). $(incdir)$(INC_DIR) $(incdir)$(SOC_INC_DIR) $(incdir)$(INC_DIR)/dma
 # Versat yolo includes
 ifeq ($(USE_NEW_VERSAT),1)
 INCLUDE+=$(incdir)$(INC_DIR)/new_versat
@@ -43,7 +43,8 @@ $(MEM_DIR)/tdp_ram/iob_tdp_ram.v
 
 #ddr
 ifeq ($(USE_DDR),1)
-VSRC+=$(SRC_DIR)/ext_mem.v
+	VSRC+=$(wildcard $(SRC_DIR)/dma/*.v)
+	VSRC+=$(SRC_DIR)/ext_mem.v
 endif
 
 #system
@@ -52,6 +53,7 @@ VSRC+=$(SRC_DIR)/system.v
 ifneq ($(VERSAT),)
 #Versat yolo
 ifeq ($(USE_NEW_VERSAT),1)
+VSRC+=$(SRC_DIR)/sync_merge.v
 VSRC+=$(wildcard $(SRC_DIR)/new_versat/*.v)
 else
 VSRC+=$(wildcard $(SRC_DIR)/versat/*.v)
@@ -59,6 +61,10 @@ endif
 endif
 #Versat memories
 VSRC+=$(MEM_DIR)/2p_mem/iob_2p_mem.v
+VSRC+=$(MEM_DIR)/2p_assim_mem/iob_2p_assim_mem_w_big.v
+
+# axi_crossbar_wr
+VSRC+=$(AXI_MEM_DIR)/rtl/arbiter.v $(AXI_MEM_DIR)/rtl/priority_encoder.v $(AXI_MEM_DIR)/rtl/axi_interconnect.v
 
 # peripherals
 periphs:
