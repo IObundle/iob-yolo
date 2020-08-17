@@ -48,7 +48,8 @@ module ext_mem
    input [3*`IO_ADDR_W-1:0]    	databus_addr,
    input [3*`MIG_BUS_W-1:0]   	databus_wdata,
    input [3*`MIG_BUS_W/8-1:0] 	databus_wstrb,
-   input [`AXI_LEN_W-1:0]     dma_len,
+   input [2*`AXI_LEN_W-1:0]     dma_len,
+   input [`AXI_SIZE_W-1:0]	dma_size,
 `endif
    
    // AXI interface 
@@ -456,7 +457,7 @@ module ext_mem
       .rdata    (vread_s_resp[`rdata_MIG_BUS(0)]),
       .ready    (vread_s_resp[`ready_MIG_BUS(0)]),
       // DMA configuration
-      .len	(dma_len),
+      .len	(dma_len[`AXI_LEN_W-1:0]),
       // AXI interface
       // Address read
       .m_axi_arid(m_dma_arid),
@@ -491,6 +492,9 @@ module ext_mem
       .wdata    (databus_wdata[3*`MIG_BUS_W-1 -: `MIG_BUS_W]),
       .wstrb    (databus_wstrb[3*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8]),
       .ready    (databus_ready[2]),
+      // DMA configurations
+      .len	(dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W]),
+      .size	(dma_size),
       // AXI interface
       // Address write
       .m_axi_awid(m_dma_awid), 

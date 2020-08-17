@@ -29,7 +29,8 @@
 		       .databus_ready (dbus_ready),
 
 		       // DMA - number of tranfers per burst
-		       .dma_len	      (dbus_len)
+		       .dma_len	      (dbus_len),
+		       .dma_size      (dbus_size)
 		       );
 
 

@@ -168,6 +168,12 @@ class CWrite {
     void setOffset(int offset) {
       MEMSET(base, VWRITE_CONF_OFFSET, offset);
     }
+    void setLen(int len) {
+      MEMSET(base, VWRITE_CONF_LEN, len);
+    }
+    void setSize(int size) {
+      MEMSET(base, VWRITE_CONF_SIZE, size);
+    }
     void setIntAddr(int intAddr) {
       MEMSET(base, VWRITE_CONF_INT_ADDR, intAddr);
     }

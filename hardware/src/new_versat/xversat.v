@@ -31,8 +31,9 @@ module xversat # (
     	output [3*DATABUS_W-1:0]  	databus_wdata,
     	output [3*DATABUS_W/8-1:0] 	databus_wstrb,
 
-	// DMA - number of tranfers per burst
-	output [`AXI_LEN_W-1:0]         dma_len
+	// DMA configurations
+	output [2*`AXI_LEN_W-1:0]       dma_len,
+	output [`AXI_SIZE_W-1:0]	dma_size
     );
 
    // local parameters
@@ -56,7 +57,7 @@ module xversat # (
 
    // select DMA len
    wire [`AXI_LEN_W-1:0] 		read_dma_len, write_dma_len;
-   assign				dma_len = databus_valid[0] ? read_dma_len :  write_dma_len;
+   assign				dma_len[`AXI_LEN_W-1:0] = databus_valid[0] ? read_dma_len :  write_dma_len;
 
    // split request interface
    wire [`REQ_W-1:0]    		m_req;
@@ -153,7 +154,8 @@ module xversat # (
       .flow_in_bias(flow_bias),
       .flow_in_weight(flow_weight),
       // dma burst
-      .dma_len(write_dma_len)
+      .dma_len({dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W], write_dma_len}),
+      .dma_size(dma_size)
    );
 
 endmodule
