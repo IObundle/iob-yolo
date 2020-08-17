@@ -65,6 +65,15 @@ class CYoloRead {
     void setIntIncr(int incr) {
       MEMSET(base, XYOLO_READ_CONF_INCR_B, incr);
     }
+    void setBiasExtAddr(int extAddr) {
+      MEMSET(base, BIAS_CONF_EXT_ADDR, extAddr);
+    }
+    void setBiasIntAddr(int intAddr) {
+      MEMSET(base, BIAS_CONF_INT_ADDR, intAddr);
+    }
+    void setBiasIntStart(int start) {
+      MEMSET(base, BIAS_CONF_START_B, start);
+    }
 };//end class CYoloRead
 
 //vread from xyolo_write
