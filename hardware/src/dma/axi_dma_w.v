@@ -27,6 +27,10 @@ module axi_dma_w # (
     	input [`DDR_ADDR_W-1:0]        addr,
     	input [`MIG_BUS_W-1:0]         wdata,
     	input [`MIG_BUS_W/8-1:0]       wstrb,
+
+	// DMA configuration
+	input [`AXI_LEN_W-1:0]         len,
+	input [`AXI_SIZE_W-1:0]	       size,
    
 	// Master Interface Write Address
 	output wire [`AXI_ID_W-1:0]    m_axi_awid,
@@ -55,9 +59,6 @@ module axi_dma_w # (
 	output reg                     m_axi_bready
 	);
    
-   // number of transactions (TODO: input instead of local parameter)
-   localparam 			       NUM_TR = `AXI_LEN_W'd15; //NUM_TRANSFERS-1
-
    // counter, state and errorsregs
    reg [`AXI_LEN_W:0]                  counter_int, counter_int_nxt;
    reg [`W_STATES_W-1:0]               state, state_nxt;
@@ -72,8 +73,8 @@ module axi_dma_w # (
    // Address write constants
    assign m_axi_awid = `AXI_ID_W'b0;
    assign m_axi_awaddr = addr;
-   assign m_axi_awlen = NUM_TR; //number of trasfers per burst
-   assign m_axi_awsize = $clog2(`MIG_BUS_W/8); //INCR interval
+   assign m_axi_awlen = len; //number of trasfers per burst
+   assign m_axi_awsize = size; //INCR interval
    assign m_axi_awburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_awlock = `AXI_LOCK_W'b0;
    assign m_axi_awcache = `AXI_CACHE_W'h2;
@@ -131,7 +132,7 @@ module axi_dma_w # (
 	    end
 	    //data write
 	    `W_DATA: begin
-	       if (counter_int == NUM_TR) begin
+	       if (counter_int == len) begin
 	          m_axi_wlast_int = 1'b1;
 	          state_nxt = `W_RESPONSE;
 	       end

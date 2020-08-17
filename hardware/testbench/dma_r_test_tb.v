@@ -56,6 +56,11 @@ module dma_r_test_tb;
    wire [`MIG_BUS_W-1:0]              	databus_rdata;
 
    /////////////////////////////////////////////
+   // DMA configuration
+   /////////////////////////////////////////////
+   reg [`AXI_LEN_W-1:0]			len;
+
+   /////////////////////////////////////////////
    // TEST PROCEDURE
    /////////////////////////////////////////////
    
@@ -75,6 +80,9 @@ module dma_r_test_tb;
       start <= `EXT_ADDR_W'b0;
       shift <= `EXT_ADDR_W'b0;
       incr <= `EXT_ADDR_W'b0;
+
+      //Transfer 7 values per burst
+      len <= `AXI_LEN_W'd6;
       
       // deassert rst
       repeat (100) @(posedge clk);
@@ -209,6 +217,8 @@ module dma_r_test_tb;
       .valid(databus_valid),
       .addr(databus_addr[`DDR_ADDR_W-1:0]),
       .rdata(databus_rdata),
+      //DMA configuration
+      .len(len),
       //address read
       .m_axi_arid    (ddr_arid),
       .m_axi_araddr  (ddr_araddr),
