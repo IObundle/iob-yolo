@@ -88,6 +88,12 @@ module dma_w_test_tb;
    wire [`MIG_BUS_W/8-1:0]        	databus_wstrb; 
 
    /////////////////////////////////////////////
+   // DMA configurations
+   /////////////////////////////////////////////
+   reg [`AXI_LEN_W-1:0]			len;
+   reg [`AXI_SIZE_W-1:0]		size;
+
+   /////////////////////////////////////////////
    // TEST PROCEDURE
    /////////////////////////////////////////////
    
@@ -111,6 +117,10 @@ module dma_w_test_tb;
       start <= `EXT_ADDR_W'b0;
       shift <= `EXT_ADDR_W'b0;
       incr <= `EXT_ADDR_W'b0;
+
+      // dma config
+      len <= `AXI_LEN_W'd15; //transfer 16 values in single burst
+      size <= `AXI_SIZE_W'd5; //2^5 = 32 bytes interval per transfer
       
       // deassert rst
       repeat (100) @(posedge clk);
@@ -274,6 +284,9 @@ module dma_w_test_tb;
       .addr(databus_addr[`DDR_ADDR_W-1:0]),
       .wdata(databus_wdata),
       .wstrb(databus_wstrb),
+      //dma configs
+      .len(len),
+      .size(size),
       //address write
       .m_axi_awid    (ddr_awid),
       .m_axi_awaddr  (ddr_awaddr),
