@@ -328,6 +328,7 @@ inline void versat_init(int base_addr) {
 
 inline void versat_end() {
   //last 2 runs
+  while(versat.done()==0);
   versat.run();
   while(versat.done()==0);
   versat.run();
