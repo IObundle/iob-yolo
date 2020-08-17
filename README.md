@@ -19,3 +19,4 @@ Repository for the implementation of an object detection application based on th
 - **new_versat_test:** Computing yolov3-tiny layer 1 output with nSTAGES of nYOLOvect each. Goal: verify new versat is working.
 - **dma_w_test:** Transfering 16 words of 256 bits each from vwrite to DDR via AXI-DMA (**only works in simulation**). Goal: verify AXI-DMA only-write is working.
 - **dma_r_test:** Transfering 7 words of 256 bits each from DDR to vread via AXI-DMA (**only works in simulation**). Goal: verify AXI-DMA only-read is working.
+- **yolo_hw:** Execution of yolov3-tiny CNN in new_versat. Goal: accelerate yolo with new versat system.
