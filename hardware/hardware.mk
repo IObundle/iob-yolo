@@ -53,7 +53,6 @@ VSRC+=$(SRC_DIR)/system.v
 ifneq ($(VERSAT),)
 #Versat yolo
 ifeq ($(USE_NEW_VERSAT),1)
-VSRC+=$(SRC_DIR)/sync_merge.v
 VSRC+=$(wildcard $(SRC_DIR)/new_versat/*.v)
 else
 VSRC+=$(wildcard $(SRC_DIR)/versat/*.v)

@@ -33,7 +33,7 @@
 #define NTW_IN_W 416
 #define NTW_IN_KER_SIZE 3
 #define NTW_IN_NUM_KER 16
-#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)) //+4 to be 32 byte aligned
+#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)) //+5 to be 32 byte aligned
 #define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+10)) //+10 to be 32 byte aligned
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
 #define TILE_W 32
@@ -102,8 +102,10 @@ void conv() {
 
   //local variables
   int j, k, l;
+  unsigned int bias_ba = WEIGHTS_BASE_ADDRESS; //bias base address
+  unsigned int weights_ba = WEIGHTS_BASE_ADDRESS + 2*NTW_IN_NUM_KER; //weight base address
 #ifdef SIM
-  int k_delta = NTW_IN_W/(2*nSTAGES);
+  int k_delta = 1; //NTW_IN_W/(2*nSTAGES);
 #endif
 
   /////////////////////////////////////////////////////////////////////////
@@ -111,9 +113,9 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4 - 1); //+4 so each filter is 32 byte aligned
-  versat.yread.setOffset(2*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)); //+4 so each filter is 32 byte aligned
-  versat.yread.setExtPer((1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)/16); //+4 so each filter is 32 byte aligned
+  versat.yread.setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5 - 1); //+5 so each filter is 32 byte aligned
+  versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)); //+4 so each filter is 32 byte aligned
+  versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)/16); //+4 so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
 
   // configure xyolo_write vread to read tile from input fm
@@ -125,7 +127,6 @@ void conv() {
   versat.ywrite.read.setExtShift(((NTW_IN_W+2)*NTW_IN_C) - (NTW_IN_C*(TILE_W+2))); //+2 due to padding
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
-  versat.yread.setIntStart(1); //first position reserved for bias
   versat.yread.setIntPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 27
   versat.yread.setIntIncr(1);
   versat.yread.setIntIter(2*TILE_W); //x2 due to maxpool // 8
@@ -160,6 +161,8 @@ void conv() {
   versat.ywrite.write.setIntIter(TILE_W/2); // 2
 
   // configure xyolo_write vwrite to write result back to DDR
+  versat.ywrite.write.setLen(16-1); //send 16 values per stage
+  versat.ywrite.write.setSize(5); //2^5 = 32 bytes interval
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -171,7 +174,8 @@ void conv() {
 
     // read filter
     versat.yread.setExtIter(1);
-    versat.yread.setExtAddr(WEIGHTS_BASE_ADDRESS + 2*l*nYOLOvect*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 4)); // 0x8001 0000
+    versat.yread.setExtAddr(weights_ba + 2*l*nYOLOvect*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5));
+    versat.yread.setBiasExtAddr(bias_ba + 2*l*nYOLOvect);
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {
