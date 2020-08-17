@@ -655,9 +655,9 @@ module xyolo_write #(
          ld_acc0 <= 1'b0;
          ld_acc1 <= 1'b0;
          if(xyolo_bypass_shadow)
-	   mp_cnt <= 2'd1;
+	   mp_cnt <= 2'd0;
          else
-           mp_cnt <= 2'd0;
+           mp_cnt <= 2'd3;
       end else begin
 	 ld_acc0 <= ld_acc;
          ld_acc1 <= ld_acc0;

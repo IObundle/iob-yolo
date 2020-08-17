@@ -17,9 +17,11 @@
 
 module new_versat_test_tb;
 
+   parameter clk_per = 8;
+
    //clock
    reg clk = 1;
-   always #5 clk = ~clk;
+   always #(clk_per/2) clk = ~clk;
 
    //reset 
    reg reset = 1;

@@ -1,5 +1,5 @@
 // Latency
-`define XYOLO_READ_LAT              3
+`define XYOLO_READ_LAT              4
 
 //define vread mem write address width
 `define W_ADDR_W		    (`MEM_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))

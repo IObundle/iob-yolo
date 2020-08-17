@@ -111,7 +111,7 @@ BAUD:=115200
 endif
 
 DEFINE+=$(define)BAUD=$(BAUD)
-DEFINE+=$(define)FREQ=100000000
+DEFINE+=$(define)FREQ=125000000
 dummy:= $(shell echo $(BAUD))
 
 #run target by default
