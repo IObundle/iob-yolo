@@ -27,7 +27,7 @@ s.bind((interface, 0))
 
 #Open input file
 print("\nStarting input file transmission...")
-input_filename = "../new_versat_in.bin"
+input_filename = "../yolo_hw_in.bin"
 f_input = open(input_filename, 'rb')
 
 #Frame parameters
@@ -74,7 +74,7 @@ print("input file transmitted with %d errors..." %(count_errors))
 
 #Open output image files
 print("\nStarting reception of result...")
-output_filename = '../new_versat_out.bin'
+output_filename = '../yolo_hw_out.bin'
 f_output = open(output_filename, "rb")
 
 #Reset counters
