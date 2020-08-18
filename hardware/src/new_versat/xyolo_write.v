@@ -484,7 +484,7 @@ module xyolo_write #(
 	 vwrite_len_pip1 <= vwrite_len_pip0;
 	 vwrite_len_shadow <= vwrite_len_pip1;
 	 //XOR ensures ping-pong happens when acessing external mem
-	 vwrite_int_addr_pip0 <= {vwrite_int_addr_pip0[`VWRITE_ADDR_W-1] ^ |vwrite_iterA, vwrite_int_addr[`VWRITE_ADDR_W-2:0]};
+	 vwrite_int_addr_pip0 <= {vwrite_int_addr_pip0[`VWRITE_ADDR_W-1] ^ |vwrite_iterA_pip0, vwrite_int_addr[`VWRITE_ADDR_W-2:0]};
          vwrite_int_addr_pip1 <= vwrite_int_addr_pip0;
          vwrite_int_addr_shadow <= vwrite_int_addr_pip1;
 	 vwrite_iterA_pip0 <= vwrite_iterA;
@@ -499,7 +499,7 @@ module xyolo_write #(
 	 vwrite_incrA_pip0 <= vwrite_incrA;
 	 vwrite_incrA_pip1 <= vwrite_incrA_pip0;
 	 vwrite_incrA_shadow <= vwrite_incrA_pip1;
-	 vwrite_startB_pip <= {vwrite_startB_pip[`VWRITE_ADDR_W-1] ^ |vwrite_iterA, vwrite_startB[`VWRITE_ADDR_W-2:0]};
+	 vwrite_startB_pip <= {vwrite_startB_pip[`VWRITE_ADDR_W-1] ^ |vwrite_iterA_pip0, vwrite_startB[`VWRITE_ADDR_W-2:0]};
 	 vwrite_startB_shadow <= vwrite_startB_pip;
          vwrite_dutyB_pip <= vwrite_dutyB;
          vwrite_dutyB_shadow <= vwrite_dutyB_pip;

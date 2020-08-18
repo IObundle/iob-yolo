@@ -145,13 +145,13 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
   versat.yread.setOffset(2*(ker_size*ker_size*c + w_off));
   versat.yread.setExtPer((ker_size*ker_size*c + w_off)/16);
   versat.yread.setExtIncr(16);
+  versat.yread.setExtIter(1);
 
   // configure xyolo_write vread to read tile from input fm
   versat.ywrite.read.setLen((c*(til_w+2)+p_off)/16-1);
   versat.ywrite.read.setOffset(2*(2*((w+2)*c+p_off)));
   versat.ywrite.read.setExtPer((c*(til_w+2)+p_off)/16);
   versat.ywrite.read.setExtIncr(16);
-  versat.ywrite.read.setExtIter(ker_size+1); //+1 due to maxpool
   versat.ywrite.read.setExtShift(((w+2)*c) - (c*(til_w+2))); //+2 due to padding
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
@@ -185,39 +185,42 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
   versat.ywrite.write.setIntDuty(1);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
   versat.ywrite.write.setIntPer(4*ker_size*ker_size*c);
-  versat.ywrite.write.setIntIncr(1);
+  versat.ywrite.write.setIntIncr(num_ker/nYOLOvect);
   versat.ywrite.write.setIntIter(til_w/2); // /2 due to maxpool
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setLen(write_len);
   versat.ywrite.write.setOffset(2*((w/2+2)*num_ker));
   versat.ywrite.write.setExtPer(1);
-  versat.ywrite.write.setExtIncr(nYOLOvect);
-  versat.ywrite.write.setExtIter(til_w/2);
-  versat.ywrite.write.setExtShift(num_ker-nYOLOvect);
 
-  // simulate for first yolo layer
-  for(l = 0; l < num_ker/nYOLOvect; l++) {
+#ifdef SIM
+  for(k = 0; k < k_delta; k++) {
+    uart_printf("%d\n", k);
+#else
+  for(k = 0; k < w/(2*nSTAGES); k++) { //2 due to maxpool
+#endif
+    for(j = 0; j < w/til_w; j++) {
+    //for(j = 0; j < 2; j++) {
 
-    // read filter
-    versat.yread.setExtIter(1);
-    versat.yread.setExtAddr(w_in + 2*l*nYOLOvect*(ker_size*ker_size*c + w_off));
-    versat.yread.setBiasExtAddr(b_in + 2*l*nYOLOvect);
+      // configure xyolo_write vread to read tile from input fm
+      versat.ywrite.read.setExtIter(ker_size+1); //+1 due to maxpool
+      versat.ywrite.read.setExtAddr(p_in + 2*(k*2*((w+2)*c+p_off)*nSTAGES + j*til_w*c));
 
-  #ifdef SIM
-    for(k = 0; k < k_delta; k++) {
-	//uart_printf("%d\n", k);
-  #else
-    for(k = 0; k < w/(2*nSTAGES); k++) { //2 due to maxpool
-  #endif
-      for(j = 0; j < w/til_w; j++) {
-      //for(j = 0; j < 1; j++) {
+      // simulate for first yolo layer
+      for(l = 0; l < num_ker/nYOLOvect; l++) {
 
-        // configure xyolo_write vread to read tile from input fm
-        versat.ywrite.read.setExtAddr(p_in + 2*(k*2*((w+2)*c+p_off)*nSTAGES + j*til_w*c));
+        // read filter
+        versat.yread.setExtAddr(w_in + 2*l*nYOLOvect*(ker_size*ker_size*c + w_off));
+        versat.yread.setBiasExtAddr(b_in + 2*l*nYOLOvect);
+
+        // configure xyolo_write vwrite start
+        versat.ywrite.write.setIntStart(l);
 
         // configure xyolo_write vwrite to write result back to DDR
-        versat.ywrite.write.setExtAddr(p_out + 2*(k*(w/2+2)*num_ker*nSTAGES + j*(til_w/2)*num_ker + l*nYOLOvect));
+        if(l == num_ker/nYOLOvect-1) {
+          versat.ywrite.write.setExtAddr(p_out + 2*(k*(w/2+2)*num_ker*nSTAGES + j*(til_w/2)*num_ker));
+  	  versat.ywrite.write.setExtIter(write_len+1);
+        } else versat.ywrite.write.setExtIter(0);
 
         // wait until done
         while(versat.done()==0);
@@ -225,8 +228,8 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
         // run configuration
         versat.run();
 
-       // stop xyolo_read reading from DDR
-       versat.yread.setExtIter(0);
+        // stop xyolo_write vread reading from DDR
+        versat.ywrite.read.setExtIter(0);
       }
     }
   }
@@ -306,7 +309,7 @@ int main(int argc, char **argv) {
   //layers 3 and 4
   uart_printf("\nRunning layers 3 and 4...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, 0);
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, 15);
   // end versat
   versat_end();
   end = timer_time_us(TIMER_BASE);
