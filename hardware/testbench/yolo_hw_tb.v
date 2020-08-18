@@ -7,13 +7,15 @@
 `define OFFSET (2**`FIRM_ADDR_W)
 
 //FM constants
-`define DATA_LAYER_1 (418*(418*3+10))
+`define DATA_LAYER_1 (418*(418*3+10)) //+10 to be 32 byte aligned
 `define DATA_LAYER_2 (210*210*16)
-`define TOTAL_FM (2*(`DATA_LAYER_1 + 2*`DATA_LAYER_2))
+`define DATA_LAYER_4 (106*106*32)
+`define TOTAL_FM (2*(`DATA_LAYER_1 + `DATA_LAYER_2 + 2*`DATA_LAYER_4))
 
 //Weight constants
-`define WEIGHTS_LAYER_1 (16 + 16*(3*3*3+5))
-`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_1))
+`define WEIGHTS_LAYER_1 (16 + 16*(3*3*3+5)) //+5 to be 32 byte aligned
+`define WEIGHTS_LAYER_3 (32 + 32*3*3*16)
+`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_1 + `WEIGHTS_LAYER_3))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
@@ -66,7 +68,7 @@ module yolo_hw_tb;
    integer                i;
 
    //define parameters
-   parameter file_ddr = {"../../../../new_versat_", `STRINGIFY(`MIG_BUS_W), ".hex"};
+   parameter file_ddr = {"../../../../yolo_hw_", `STRINGIFY(`MIG_BUS_W), ".hex"};
    parameter file_size = `FILE_SIZE;
    
 

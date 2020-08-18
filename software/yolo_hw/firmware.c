@@ -13,11 +13,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 #ifdef SIM
   int k_delta;
 #endif
-
 
 //define peripheral base addresses
 #ifndef PCSIM
@@ -34,12 +32,13 @@
 
 //TILE sizes
 #define LAYER_1_TILE_W 32  //34*4*3 = 408
+#define LAYER_3_TILE_W 16  //18*4*16 = 1152
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_2*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_4*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -71,6 +70,10 @@ void reset_DDR() {
 
   //layer 2
   for(i = 0; i < DATA_LAYER_2; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_2;
+
+  //layer 4
+  for(i = 0; i < DATA_LAYER_4; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_time_us(TIMER_BASE);
@@ -121,7 +124,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
   //local variables
   int j, k, l;
 #ifdef SIM
-  k_delta = 1; //w/(2*nSTAGES);
+  k_delta = w/(2*nSTAGES);
 #endif
   unsigned int b_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int w_in = b_in + 2*num_ker;
@@ -204,11 +207,12 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {
+	uart_printf("%d\n", k);
   #else
     for(k = 0; k < w/(2*nSTAGES); k++) { //2 due to maxpool
   #endif
       for(j = 0; j < w/til_w; j++) {
-      //for(j = 0; j < 3; j++) {
+      //for(j = 0; j < 1; j++) {
 
         // configure xyolo_write vread to read tile from input fm
         versat.ywrite.read.setExtAddr(p_in + 2*(k*2*((w+2)*c+p_off)*nSTAGES + j*til_w*c));
@@ -238,7 +242,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*DATA_LAYER_1;
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -288,12 +292,22 @@ int main(int argc, char **argv) {
 
   //receive data via ethernet
   rcv_data();
-#endif
 
   //layers 1 and 2
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
   conv(LAYER_1_W, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILE_W, LAYER_1_W_OFF, LAYER_1_P_OFF, 15, 5);
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+#else
+  w_pos += WEIGHTS_LAYER_1;
+  p_pos += DATA_LAYER_1;
+#endif
+
+  //layers 3 and 4
+  uart_printf("\nRunning layers 3 and 4...\n");
+  start = timer_time_us(TIMER_BASE);
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, 0, 5);
   // end versat
   versat_end();
   end = timer_time_us(TIMER_BASE);
@@ -302,15 +316,17 @@ int main(int argc, char **argv) {
   //verify results
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1;
+  fp_data += DATA_LAYER_1 + DATA_LAYER_2;
   int i, j, k;
   uart_printf("Verifying...\n\n");
+  uart_printf("INITIAL ADDR 2nd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + LAYER_4_W*LAYER_3_NUM_KER));
+  uart_printf("INITIAL ADDR 3rd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + 2*LAYER_4_W*LAYER_3_NUM_KER));
   for(i = 0; i < k_delta*nSTAGES+1; i++) {
     uart_printf("%d\n", i);
-    for(j = 0; j < LAYER_2_W; j++)
-      for(k = 0; k < LAYER_1_NUM_KER; k++)
-        if(fp_data[i*LAYER_2_W*LAYER_1_NUM_KER + j*LAYER_1_NUM_KER + k] != fp_data[DATA_LAYER_2 + i*LAYER_2_W*LAYER_1_NUM_KER + j*LAYER_1_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + i*LAYER_2_W*LAYER_1_NUM_KER + j*LAYER_1_NUM_KER + k), fp_data[i*LAYER_2_W*LAYER_1_NUM_KER + j*LAYER_1_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_2 + i*LAYER_2_W*LAYER_1_NUM_KER + j*LAYER_1_NUM_KER + k] & 0xFFFF);  }
+    for(j = 0; j < LAYER_4_W; j++)
+      for(k = 0; k < LAYER_3_NUM_KER; k++)
+        if(fp_data[i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] != fp_data[DATA_LAYER_4 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k), fp_data[i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_4 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] & 0xFFFF);  }
 #else
   send_data();
 #endif
