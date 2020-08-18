@@ -32,8 +32,7 @@ module xversat # (
     	output [3*DATABUS_W/8-1:0] 	databus_wstrb,
 
 	// DMA configurations
-	output [2*`AXI_LEN_W-1:0]       dma_len,
-	output [`AXI_SIZE_W-1:0]	dma_size
+	output [2*`AXI_LEN_W-1:0]       dma_len
     );
 
    // local parameters
@@ -154,8 +153,7 @@ module xversat # (
       .flow_in_bias(flow_bias),
       .flow_in_weight(flow_weight),
       // dma burst
-      .dma_len({dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W], write_dma_len}),
-      .dma_size(dma_size)
+      .dma_len({dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W], write_dma_len})
    );
 
 endmodule

@@ -119,12 +119,12 @@ void rcv_data() {
 }
 
 //1st layer convolution
-void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_off, int write_len, int write_size) {
+void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_off, int write_len) {
 
   //local variables
   int j, k, l;
 #ifdef SIM
-  k_delta = w/(2*nSTAGES);
+  k_delta = 1; //w/(2*nSTAGES);
 #endif
   unsigned int b_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int w_in = b_in + 2*num_ker;
@@ -190,7 +190,6 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setLen(write_len);
-  versat.ywrite.write.setSize(write_size);
   versat.ywrite.write.setOffset(2*((w/2+2)*num_ker));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -207,7 +206,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {
-	uart_printf("%d\n", k);
+	//uart_printf("%d\n", k);
   #else
     for(k = 0; k < w/(2*nSTAGES); k++) { //2 due to maxpool
   #endif
@@ -296,7 +295,7 @@ int main(int argc, char **argv) {
   //layers 1 and 2
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_1_W, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILE_W, LAYER_1_W_OFF, LAYER_1_P_OFF, 15, 5);
+  conv(LAYER_1_W, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILE_W, LAYER_1_W_OFF, LAYER_1_P_OFF, 15);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
 #else
@@ -307,7 +306,7 @@ int main(int argc, char **argv) {
   //layers 3 and 4
   uart_printf("\nRunning layers 3 and 4...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, 0, 5);
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, 0);
   // end versat
   versat_end();
   end = timer_time_us(TIMER_BASE);

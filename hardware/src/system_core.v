@@ -293,7 +293,6 @@ module system
    wire [3*`IO_ADDR_W-1:0]      dbus_addr;
    wire [3*`MIG_BUS_W/8-1:0]   	dbus_wstrb;
    wire [2*`AXI_LEN_W-1:0] 	dbus_len;
-   wire [`AXI_SIZE_W-1:0]	dbus_size;
  `endif
 
    //
@@ -323,7 +322,6 @@ module system
 	.databus_rdata        (dbus_rdata),
 	.databus_ready        (dbus_ready),
 	.dma_len	      (dbus_len),
-	.dma_size	      (dbus_size),
 `endif
 	
         //AXI INTERFACE 

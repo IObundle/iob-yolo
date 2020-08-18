@@ -162,7 +162,6 @@ void conv() {
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setLen(16-1); //send 16 values per stage
-  versat.ywrite.write.setSize(5); //2^5 = 32 bytes interval
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
