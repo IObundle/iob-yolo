@@ -32,6 +32,9 @@ class CYoloRead {
     void setOffset(int offset) {
       MEMSET(base, XYOLO_READ_CONF_OFFSET, offset);
     }
+    void setPingPong(int pp) {
+      MEMSET(base, XYOLO_READ_CONF_PP, pp);
+    }
     void setLen(int len) {
       MEMSET(base, XYOLO_READ_CONF_LEN, len);
     }

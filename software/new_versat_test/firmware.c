@@ -117,6 +117,7 @@ void conv() {
   versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)); //+4 so each filter is 32 byte aligned
   versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)/16); //+4 so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
+  versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read tile from input fm
   versat.ywrite.read.setLen((NTW_IN_C*(TILE_W+2)+10)/16-1); //+10 so each line is 32 byte aligned
