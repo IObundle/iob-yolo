@@ -140,13 +140,22 @@ void rcv_data() {
   uart_printf("Image and weights received in %d ms\n", (end-start)/1000);
 }
 
-//1st layer convolution
-void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_off, int w_len, int mp) {
+// w -> input feature map width (same as height)
+// c -> number of input channels
+// num_ker -> number of kernels
+// ker_size -> width of kernel (same as height)
+// til_w -> width of tile
+// w_off -> offset (padding) added to kernel (only for layer 1)
+// p_off -> offset (padding) added to input feature map (only for layer 1)
+// w_len -> number of transactions for read DMA per burst (for reading weights)
+// mp -> flag to indicate if perform stride 2 maxpool (1) or not (0) after convolution
+// w_start -> flag to indicate if weight mem starts writing from zero (0) or from given position (1) -> only for layer 3
+void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_off, int w_len, int mp, int w_start) {
 
   //local variables
   int j, k, l;
 #ifdef SIM
-  k_delta = w/((1+mp)*nSTAGES);
+  k_delta = 1; //w/((1+mp)*nSTAGES);
 #endif
   unsigned int b_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int w_in = b_in + 2*num_ker;
@@ -222,7 +231,6 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
 
 #ifdef SIM
   for(k = 0; k < k_delta; k++) {
-    //uart_printf("%d\n", k);
 #else
   for(k = 0; k < w/((1+mp)*nSTAGES); k++) {
 #endif
@@ -240,9 +248,15 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
       // simulate for first yolo layer
       for(l = 0; l < num_ker/nYOLOvect; l++) {
 
-        // read filter
+        // read weights
         versat.yread.setExtAddr(w_in + 2*l*nYOLOvect*(ker_size*ker_size*c + w_off));
+	versat.yread.setIntAddr(((ker_size*ker_size*c + w_off)*l + 144*w_start)/16); //144 is the final position of the first filter of layer 5
+        versat.yread.setIntStart((ker_size*ker_size*c + w_off)*l + 144*w_start);
+
+	// read bias
         versat.yread.setBiasExtAddr(b_in + 2*l*nYOLOvect);
+        versat.yread.setBiasIntAddr(l + w_start);
+	versat.yread.setBiasIntStart(l + w_start);
 
         // configure xyolo_write vwrite start
         versat.ywrite.write.setIntStart(l);
@@ -262,6 +276,9 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_off, int p_o
         // stop xyolo_write vread reading from DDR
         versat.ywrite.read.setExtIter(0);
       }
+
+      //stop xyolo_read vread reading from DDR
+      versat.yread.setExtIter(0);
     }
   }
 
@@ -329,28 +346,28 @@ int main(int argc, char **argv) {
   //layers 1 and 2
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_1_W, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILE_W, LAYER_1_W_OFF, LAYER_1_P_OFF, LAYER_1_W_LEN, LAYER_1_MAXPOOL);
+  conv(LAYER_1_W, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILE_W, LAYER_1_W_OFF, LAYER_1_P_OFF, LAYER_1_W_LEN, LAYER_1_MAXPOOL, 0);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
 
   //layers 3 and 4
   uart_printf("\nRunning layers 3 and 4...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, LAYER_3_W_LEN, LAYER_3_MAXPOOL);
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 0, 0, LAYER_3_W_LEN, LAYER_3_MAXPOOL, 1);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
 
   //layers 5 and 6
   uart_printf("\nRunning layers 5 and 6...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0, 0, LAYER_5_W_LEN, LAYER_5_MAXPOOL);
+  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0, 0, LAYER_5_W_LEN, LAYER_5_MAXPOOL, 0);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
 
   //layers 7 and 8
   uart_printf("\nRunning layers 7 and 8...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0, 0, LAYER_7_W_LEN, LAYER_7_MAXPOOL);
+  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0, 0, LAYER_7_W_LEN, LAYER_7_MAXPOOL, 0);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
 #else
@@ -361,7 +378,7 @@ int main(int argc, char **argv) {
   //layer 9
   uart_printf("\nRunning layer 9...\n");
   start = timer_time_us(TIMER_BASE);
-  conv(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILE_W, 0, 0, LAYER_9_W_LEN, LAYER_9_MAXPOOL);
+  conv(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILE_W, 0, 0, LAYER_9_W_LEN, LAYER_9_MAXPOOL, 0);
   // end versat
   versat_end();
   end = timer_time_us(TIMER_BASE);
