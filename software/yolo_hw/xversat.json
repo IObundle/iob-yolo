@@ -7,6 +7,6 @@
 	"PERIOD_W":		12,
 	"EXT_ADDR_W":		14,
 	"EXT_PERIOD_W":		14,
-        "VWRITE_ADDR_W":        5,
+        "VWRITE_ADDR_W":        6,
         "BIAS_ADDR_W":          2
 }
