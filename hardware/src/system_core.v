@@ -15,53 +15,102 @@ module system
    //PIO
 
 `ifdef USE_DDR //AXI MASTER INTERFACE
+`ifdef USE_NEW_VERSAT
 
    //address write
-   output [0:0] 	     m_axi_awid, 
+   output [2*1-1:0] 	     m_axi_awid, 
+   output [2*`DDR_ADDR_W-1:0]  m_axi_awaddr,
+   output [2*8-1:0] 	     m_axi_awlen,
+   output [2*3-1:0] 	     m_axi_awsize,
+   output [2*2-1:0] 	     m_axi_awburst,
+   output [2*1-1:0] 	     m_axi_awlock,
+   output [2*4-1:0] 	     m_axi_awcache,
+   output [2*3-1:0] 	     m_axi_awprot,
+   output [2*4-1:0] 	     m_axi_awqos,
+   output [2*1-1:0]	     m_axi_awvalid,
+   input [2*1-1:0]	     m_axi_awready,
+
+   //write
+   output [2*`MIG_BUS_W-1:0]   m_axi_wdata,
+   output [2*`MIG_BUS_W/8-1:0] m_axi_wstrb,
+   output [2*1-1:0]	     m_axi_wlast,
+   output [2*1-1:0]	     m_axi_wvalid, 
+   input [2*1-1:0]	     m_axi_wready,
+
+   //write response
+   // input [2*1-1:0]	     m_axi_bid,
+   input [2*2-1:0]	     m_axi_bresp,
+   input [2*1-1:0]	     m_axi_bvalid,
+   output [2*1-1:0]	     m_axi_bready,
+  
+   //address read
+   output [2*1-1:0] 	     m_axi_arid,
+   output [2*`DDR_ADDR_W-1:0]  m_axi_araddr, 
+   output [2*8-1:0] 	     m_axi_arlen,
+   output [2*3-1:0] 	     m_axi_arsize,
+   output [2*2-1:0] 	     m_axi_arburst,
+   output [2*1-1:0] 	     m_axi_arlock,
+   output [2*4-1:0] 	     m_axi_arcache,
+   output [2*3-1:0] 	     m_axi_arprot,
+   output [2*4-1:0] 	     m_axi_arqos,
+   output [2*1-1:0]	     m_axi_arvalid, 
+   input [2*1-1:0]	     m_axi_arready,
+
+   //read
+   // input [2*1-1:0]	     m_axi_rid,
+   input [2*`MIG_BUS_W-1:0]  m_axi_rdata,
+   input [2*2-1:0]	     m_axi_rresp,
+   input [2*1-1:0]	     m_axi_rlast, 
+   input [2*1-1:0]	     m_axi_rvalid, 
+   output [2*1-1:0]	     m_axi_rready,
+`else   
+   //address write
+   output [1-1:0] 	     m_axi_awid, 
    output [`DDR_ADDR_W-1:0]  m_axi_awaddr,
-   output [7:0] 	     m_axi_awlen,
-   output [2:0] 	     m_axi_awsize,
-   output [1:0] 	     m_axi_awburst,
-   output [0:0] 	     m_axi_awlock,
-   output [3:0] 	     m_axi_awcache,
-   output [2:0] 	     m_axi_awprot,
-   output [3:0] 	     m_axi_awqos,
-   output 		     m_axi_awvalid,
-   input 		     m_axi_awready,
+   output [8-1:0] 	     m_axi_awlen,
+   output [3-1:0] 	     m_axi_awsize,
+   output [2-1:0] 	     m_axi_awburst,
+   output [1-1:0] 	     m_axi_awlock,
+   output [4-1:0] 	     m_axi_awcache,
+   output [3-1:0] 	     m_axi_awprot,
+   output [4-1:0] 	     m_axi_awqos,
+   output [1-1:0]	     m_axi_awvalid,
+   input [1-1:0]	     m_axi_awready,
 
    //write
    output [`MIG_BUS_W-1:0]   m_axi_wdata,
    output [`MIG_BUS_W/8-1:0] m_axi_wstrb,
-   output 		     m_axi_wlast,
-   output 		     m_axi_wvalid, 
-   input 		     m_axi_wready,
+   output [1-1:0]	     m_axi_wlast,
+   output [1-1:0]	     m_axi_wvalid, 
+   input [1-1:0]	     m_axi_wready,
 
    //write response
-   input [0:0] 		     m_axi_bid,
-   input [1:0] 		     m_axi_bresp,
-   input 		     m_axi_bvalid,
-   output 		     m_axi_bready,
+   // input [1-1:0]	     m_axi_bid,
+   input [2-1:0]	     m_axi_bresp,
+   input [1-1:0]	     m_axi_bvalid,
+   output [1-1:0]	     m_axi_bready,
   
    //address read
-   output [0:0] 	     m_axi_arid,
+   output [1-1:0] 	     m_axi_arid,
    output [`DDR_ADDR_W-1:0]  m_axi_araddr, 
-   output [7:0] 	     m_axi_arlen,
-   output [2:0] 	     m_axi_arsize,
-   output [1:0] 	     m_axi_arburst,
-   output [0:0] 	     m_axi_arlock,
-   output [3:0] 	     m_axi_arcache,
-   output [2:0] 	     m_axi_arprot,
-   output [3:0] 	     m_axi_arqos,
-   output 		     m_axi_arvalid, 
-   input 		     m_axi_arready,
+   output [8-1:0] 	     m_axi_arlen,
+   output [3-1:0] 	     m_axi_arsize,
+   output [2-1:0] 	     m_axi_arburst,
+   output [1-1:0] 	     m_axi_arlock,
+   output [4-1:0] 	     m_axi_arcache,
+   output [3-1:0] 	     m_axi_arprot,
+   output [4-1:0] 	     m_axi_arqos,
+   output [1-1:0]	     m_axi_arvalid, 
+   input [1-1:0]	     m_axi_arready,
 
    //read
-   input [0:0] 		     m_axi_rid,
+   // input [1-1:0]	     m_axi_rid,
    input [`MIG_BUS_W-1:0]    m_axi_rdata,
-   input [1:0] 		     m_axi_rresp,
-   input 		     m_axi_rlast, 
-   input 		     m_axi_rvalid, 
-   output 		     m_axi_rready,
+   input [2-1:0]	     m_axi_rresp,
+   input [1-1:0]	     m_axi_rlast, 
+   input [1-1:0]	     m_axi_rvalid, 
+   output [1-1:0]	     m_axi_rready,
+`endif // ifdef USE_NEW_VERSAT
 `endif //  `ifdef USE_DDR
    input 		     clk,
    input 		     reset,
@@ -238,12 +287,13 @@ module system
 `ifdef USE_DDR
 
  `ifdef USE_NEW_VERSAT
-   // Connect Versat to L2 Caches merge in ext_mem
+   // Connect Versat to DMA
    wire [2:0]                   dbus_ready, dbus_valid;
    wire [3*`MIG_BUS_W-1:0]     	dbus_wdata, dbus_rdata;
    wire [3*`IO_ADDR_W-1:0]      dbus_addr;
    wire [3*`MIG_BUS_W/8-1:0]   	dbus_wstrb;
-
+   wire [2*`AXI_LEN_W-1:0] 	dbus_len;
+   wire [`AXI_SIZE_W-1:0]	dbus_size;
  `endif
 
    //
@@ -272,6 +322,8 @@ module system
 	.databus_wstrb        (dbus_wstrb),
 	.databus_rdata        (dbus_rdata),
 	.databus_ready        (dbus_ready),
+	.dma_len	      (dbus_len),
+	.dma_size	      (dbus_size),
 `endif
 	
         //AXI INTERFACE 
@@ -294,7 +346,7 @@ module system
         .axi_wvalid(m_axi_wvalid), 
         .axi_wready(m_axi_wready), 
         //write response
-        .axi_bid(m_axi_bid), 
+        // .axi_bid(m_axi_bid), 
         .axi_bresp(m_axi_bresp), 
         .axi_bvalid(m_axi_bvalid), 
         .axi_bready(m_axi_bready), 
@@ -311,7 +363,7 @@ module system
         .axi_arvalid(m_axi_arvalid), 
         .axi_arready(m_axi_arready), 
         //read 
-        .axi_rid(m_axi_rid), 
+        // .axi_rid(m_axi_rid), 
         .axi_rdata(m_axi_rdata), 
         .axi_rresp(m_axi_rresp), 
         .axi_rlast(m_axi_rlast), 

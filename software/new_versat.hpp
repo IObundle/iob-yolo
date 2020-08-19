@@ -32,6 +32,9 @@ class CYoloRead {
     void setOffset(int offset) {
       MEMSET(base, XYOLO_READ_CONF_OFFSET, offset);
     }
+    void setLen(int len) {
+      MEMSET(base, XYOLO_READ_CONF_LEN, len);
+    }
     void setIntAddr(int intAddr) {
       MEMSET(base, XYOLO_READ_CONF_INT_ADDR, intAddr);
     }
@@ -62,6 +65,15 @@ class CYoloRead {
     void setIntIncr(int incr) {
       MEMSET(base, XYOLO_READ_CONF_INCR_B, incr);
     }
+    void setBiasExtAddr(int extAddr) {
+      MEMSET(base, BIAS_CONF_EXT_ADDR, extAddr);
+    }
+    void setBiasIntAddr(int intAddr) {
+      MEMSET(base, BIAS_CONF_INT_ADDR, intAddr);
+    }
+    void setBiasIntStart(int start) {
+      MEMSET(base, BIAS_CONF_START_B, start);
+    }
 };//end class CYoloRead
 
 //vread from xyolo_write
@@ -84,6 +96,9 @@ class CRead {
     }
     void setOffset(int offset) {
       MEMSET(base, VREAD_CONF_OFFSET, offset);
+    }
+    void setLen(int len) {
+      MEMSET(base, VREAD_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VREAD_CONF_INT_ADDR, intAddr);
@@ -161,6 +176,12 @@ class CWrite {
     }
     void setOffset(int offset) {
       MEMSET(base, VWRITE_CONF_OFFSET, offset);
+    }
+    void setLen(int len) {
+      MEMSET(base, VWRITE_CONF_LEN, len);
+    }
+    void setSize(int size) {
+      MEMSET(base, VWRITE_CONF_SIZE, size);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VWRITE_CONF_INT_ADDR, intAddr);

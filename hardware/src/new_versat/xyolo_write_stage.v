@@ -138,7 +138,7 @@ module xyolo_write_stage #(
       .W_ADDR_W(`W_ADDR_W),
       .R_DATA_W(DATAPATH_W),
       .R_ADDR_W(`MEM_ADDR_W),
-      .USE_RAM(0)
+      .USE_RAM(1)
    ) vread_mem (
        .clk(clk),
        // Writting port

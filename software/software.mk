@@ -1,4 +1,4 @@
-define:=-D
+defmacro:=-D
 incdir:=-I
 include $(ROOT_DIR)/system.mk
 
@@ -43,7 +43,7 @@ else #Compile for riscv
 
   #Define SIM
 ifeq ($(SIM),1)
-DEFINE+=$(define)SIM
+DEFINE+=$(defmacro)SIM
 endif
 
 endif

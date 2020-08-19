@@ -29,7 +29,11 @@ module xversat # (
     	output [2:0]           		databus_valid,
     	output [3*`IO_ADDR_W-1:0]   	databus_addr,
     	output [3*DATABUS_W-1:0]  	databus_wdata,
-    	output [3*DATABUS_W/8-1:0] 	databus_wstrb
+    	output [3*DATABUS_W/8-1:0] 	databus_wstrb,
+
+	// DMA configurations
+	output [2*`AXI_LEN_W-1:0]       dma_len,
+	output [`AXI_SIZE_W-1:0]	dma_size
     );
 
    // local parameters
@@ -50,6 +54,10 @@ module xversat # (
 
    // data flow between FUs
    wire [`nYOLOvect*`DATAPATH_W-1:0]	flow_bias, flow_weight;
+
+   // select DMA len
+   wire [`AXI_LEN_W-1:0] 		read_dma_len, write_dma_len;
+   assign				dma_len[`AXI_LEN_W-1:0] = databus_valid[0] ? read_dma_len :  write_dma_len;
 
    // split request interface
    wire [`REQ_W-1:0]    		m_req;
@@ -114,7 +122,9 @@ module xversat # (
       .databus_wstrb(databus_wstrb[DATABUS_W/8-1:0]),
       // output data
       .flow_out_bias(flow_bias),
-      .flow_out_weight(flow_weight)
+      .flow_out_weight(flow_weight),
+      // dma burst
+      .dma_len(read_dma_len)
    );
 
    // instantiate xyolo_write FU
@@ -142,7 +152,10 @@ module xversat # (
       .databus_wstrb(databus_wstrb[3*DATABUS_W/8-1:DATABUS_W/8]),
       // output data
       .flow_in_bias(flow_bias),
-      .flow_in_weight(flow_weight)
+      .flow_in_weight(flow_weight),
+      // dma burst
+      .dma_len({dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W], write_dma_len}),
+      .dma_size(dma_size)
    );
 
 endmodule

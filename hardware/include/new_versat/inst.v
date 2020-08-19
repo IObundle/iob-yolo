@@ -26,7 +26,11 @@
 		       .databus_wdata (dbus_wdata),
 		       .databus_wstrb (dbus_wstrb),
 		       .databus_rdata (dbus_rdata),
-		       .databus_ready (dbus_ready)
+		       .databus_ready (dbus_ready),
+
+		       // DMA - number of tranfers per burst
+		       .dma_len	      (dbus_len),
+		       .dma_size      (dbus_size)
 		       );
 
 

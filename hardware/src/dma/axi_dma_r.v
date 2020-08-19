@@ -4,14 +4,11 @@
 `include "system.vh"
 
 // Log2 number of states
-`define STATES_W 2
+`define R_STATES_W 1
 
 // FSM States
-`define IDLE       `STATES_W'h0
-`define STANDBY    `STATES_W'h1
-`define READ_DATA  `STATES_W'h2
-
-`define NUM_TR `AXI_LEN_W'd15
+`define R_ADDR_HS `R_STATES_W'h0 //Read address handshake
+`define R_DATA    `R_STATES_W'h1 //Read data
 
 module axi_dma_r (
 
@@ -24,6 +21,9 @@ module axi_dma_r (
     	input	                       valid,
     	input [`DDR_ADDR_W-1:0]        addr,
     	output [`MIG_BUS_W-1:0]        rdata,
+
+        // DMA configuration
+        input [`AXI_LEN_W-1:0]	       len,
    
         // Master Interface Read Address
         output wire [`AXI_ID_W-1:0]    m_axi_arid,
@@ -39,23 +39,23 @@ module axi_dma_r (
 	input wire                     m_axi_arready,
 
 	// Master Interface Read Data
-	input wire [`AXI_ID_W-1:0]     m_axi_rid,
+	// input wire [`AXI_ID_W-1:0]     m_axi_rid,
 	input wire [`MIG_BUS_W-1:0]    m_axi_rdata,
 	input wire [`AXI_RESP_W-1:0]   m_axi_rresp,
 	input wire                     m_axi_rlast,
 	input wire                     m_axi_rvalid,
 	output reg                     m_axi_rready
 	);
-   
+ 
    // counter, state and error regs
    reg [`AXI_LEN_W:0]                  counter_int, counter_int_nxt;
-   reg [`STATES_W-1:0]                 state, state_nxt;
+   reg [`R_STATES_W-1:0]               state, state_nxt;
    reg                                 error, error_nxt;
 
    // Address read constants
    assign m_axi_arid = `AXI_ID_W'b0;
    assign m_axi_araddr = addr;
-   assign m_axi_arlen = `NUM_TR; //number of trasfers per burst
+   assign m_axi_arlen = len; //number of trasfers per burst
    assign m_axi_arsize = $clog2(`MIG_BUS_W/8); //INCR interval
    assign m_axi_arburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_arlock = `AXI_LOCK_W'b0;
@@ -69,7 +69,7 @@ module axi_dma_r (
    // Counter, error and state registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
-       state <= `IDLE;
+       state <= `R_ADDR_HS;
        counter_int <= {`AXI_LEN_W{1'b0}};
        error <= 1'b0;
      end else begin
@@ -87,29 +87,27 @@ module axi_dma_r (
       m_axi_arvalid = 1'b0;
       m_axi_rready = 1'b0;
       case (state)
-	    `IDLE: begin
+	    //addr handshake
+	    `R_ADDR_HS: begin
        	       counter_int_nxt <= {`AXI_LEN_W{1'b0}};
 	       if (valid) begin
-	          state_nxt = `STANDBY;
+	          if (m_axi_arready == 1'b1) begin
+	             state_nxt = `R_DATA;
+		  end
+	          m_axi_arvalid = 1'b1;
 	       end
-	    end
-	    //addr handshake
-	    `STANDBY: begin
-	       if (m_axi_arready == 1'b1)
-	          state_nxt = `READ_DATA;
-	       m_axi_arvalid = 1'b1;
 	    end
 	    //data read
-	    `READ_DATA: begin
-	       if (counter_int == `NUM_TR) begin
-	          if (m_axi_rlast == 1'b1)
-		     error_nxt = 1'b0;
-	          else
-		     error_nxt = 1'b1;
-	          state_nxt = `IDLE;
-	       end
+	    `R_DATA: begin
 	       m_axi_rready = 1'b1;
 	       if (m_axi_rvalid == 1'b1) begin
+	          if (counter_int == len) begin
+	             if (m_axi_rlast == 1'b1)
+		        error_nxt = 1'b0;
+	             else
+		        error_nxt = 1'b1;
+	             state_nxt = `R_ADDR_HS;
+	          end
 	          ready = 1'b1;
 	          counter_int_nxt = counter_int + 1'b1;
 	       end

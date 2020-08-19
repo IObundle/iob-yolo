@@ -32,7 +32,11 @@ module xyolo_write #(
 
     	// input data
     	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_bias,
-    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight
+    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight,
+
+	// DMA - number of tranfers per burst
+	output [2*`AXI_LEN_W-1:0]       dma_len,
+	output [`AXI_SIZE_W-1:0]	dma_size
     );
 
    // vread latency
@@ -45,6 +49,8 @@ module xyolo_write #(
    // vwrite configuration enables
    reg                                  vwrite_ext_addr_en;
    reg                                  vwrite_offset_en;
+   reg                                  vwrite_len_en;
+   reg                                  vwrite_size_en;
    reg                                  vwrite_int_addr_en;
    reg                                  vwrite_iterA_en;
    reg                                  vwrite_perA_en;
@@ -61,6 +67,7 @@ module xyolo_write #(
    // vread configuration enables
    reg					vread_ext_addr_en;
    reg					vread_offset_en;
+   reg					vread_len_en;
    reg					vread_int_addr_en;
    reg					vread_iterA_en;
    reg                                  vread_perA_en;
@@ -93,6 +100,8 @@ module xyolo_write #(
    reg [`IO_ADDR_W-1:0]                 vwrite_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]        vwrite_ext_addr_shadow, vwrite_ext_addr_pip0, vwrite_ext_addr_pip1;
    reg [`IO_ADDR_W/2-1:0]               vwrite_offset;
+   reg [`AXI_LEN_W-1:0]             	vwrite_len, vwrite_len_shadow, vwrite_len_pip0, vwrite_len_pip1;
+   reg [`AXI_SIZE_W-1:0]             	vwrite_size, vwrite_size_shadow, vwrite_size_pip0, vwrite_size_pip1;
    reg [`VWRITE_ADDR_W-1:0]             vwrite_int_addr, vwrite_int_addr_shadow, vwrite_int_addr_pip0, vwrite_int_addr_pip1;
    reg [`MEM_ADDR_W-1:0]                vwrite_iterA, vwrite_iterA_shadow, vwrite_iterA_pip0, vwrite_iterA_pip1;
    reg [`PERIOD_W-1:0]                  vwrite_perA, vwrite_perA_shadow, vwrite_perA_pip0, vwrite_perA_pip1;
@@ -111,6 +120,7 @@ module xyolo_write #(
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
+   reg [`AXI_LEN_W-1:0]			vread_len, vread_len_shadow;
    reg [`W_ADDR_W-1:0]			vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
    reg [`EXT_PERIOD_W-1:0]              vread_perA, vread_perA_shadow;
@@ -153,6 +163,10 @@ module xyolo_write #(
    wire [`nSTAGES-1:0]                  stages_done;
    assign                               done = &{vread_doneB, vwrite_doneB, stages_done};
 
+   // define number of transactions (DMA)
+   assign                               dma_len = {vwrite_len_shadow, vread_len_shadow};
+   assign				dma_size = vwrite_size_shadow;
+
    // run signals
    reg                                  run_reg;
 
@@ -182,6 +196,8 @@ module xyolo_write #(
       //vwrite
       vwrite_ext_addr_en = 1'b0;
       vwrite_offset_en = 1'b0;
+      vwrite_len_en = 1'b0;
+      vwrite_size_en = 1'b0;
       vwrite_int_addr_en = 1'b0;
       vwrite_iterA_en = 1'b0;
       vwrite_perA_en = 1'b0;
@@ -197,6 +213,7 @@ module xyolo_write #(
       //vread
       vread_ext_addr_en = 1'b0;
       vread_offset_en = 1'b0;
+      vread_len_en = 1'b0;
       vread_int_addr_en = 1'b0;
       vread_iterA_en = 1'b0;
       vread_perA_en = 1'b0;
@@ -228,6 +245,8 @@ module xyolo_write #(
 	    //vwrite
             `VWRITE_CONF_EXT_ADDR : vwrite_ext_addr_en = 1'b1;
             `VWRITE_CONF_OFFSET : vwrite_offset_en = 1'b1;
+            `VWRITE_CONF_LEN : vwrite_len_en = 1'b1;
+            `VWRITE_CONF_SIZE : vwrite_size_en = 1'b1;
             `VWRITE_CONF_INT_ADDR : vwrite_int_addr_en = 1'b1;
             `VWRITE_CONF_ITER_A : vwrite_iterA_en = 1'b1;
             `VWRITE_CONF_PER_A: vwrite_perA_en = 1'b1;
@@ -243,6 +262,7 @@ module xyolo_write #(
 	    //vread
 	    `VREAD_CONF_EXT_ADDR : vread_ext_addr_en = 1'b1;
 	    `VREAD_CONF_OFFSET : vread_offset_en = 1'b1;
+	    `VREAD_CONF_LEN : vread_len_en = 1'b1;
 	    `VREAD_CONF_INT_ADDR : vread_int_addr_en = 1'b1;
             `VREAD_CONF_ITER_A : vread_iterA_en = 1'b1;
             `VREAD_CONF_PER_A : vread_perA_en = 1'b1;
@@ -279,6 +299,8 @@ module xyolo_write #(
 	 //vwrite
          vwrite_ext_addr <= `IO_ADDR_W'b0;
          vwrite_offset <= {`IO_ADDR_W/2{1'b0}};
+	 vwrite_len <= `AXI_LEN_W'b0;
+	 vwrite_size <= `AXI_SIZE_W'b0;
          vwrite_int_addr <= `VWRITE_ADDR_W'b0;
          vwrite_iterA <= `MEM_ADDR_W'b0;
          vwrite_perA <= `PERIOD_W'b0;
@@ -294,6 +316,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
+	 vread_len <= `AXI_LEN_W'b0;
          vread_int_addr <= {`W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
          vread_perA <= `EXT_PERIOD_W'b0;
@@ -325,6 +348,8 @@ module xyolo_write #(
 	 //vwrite
          if(vwrite_ext_addr_en) vwrite_ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(vwrite_offset_en) vwrite_offset <= wdata[`IO_ADDR_W/2-1:0];
+   	 if(vwrite_len_en) vwrite_len <= wdata[`AXI_LEN_W-1:0];
+   	 if(vwrite_size_en) vwrite_size <= wdata[`AXI_SIZE_W-1:0];
          if(vwrite_int_addr_en) vwrite_int_addr <= wdata[`VWRITE_ADDR_W-1:0];
          if(vwrite_iterA_en) vwrite_iterA <= wdata[`MEM_ADDR_W-1:0];
          if(vwrite_perA_en) vwrite_perA <= wdata[`PERIOD_W-1:0];
@@ -340,6 +365,7 @@ module xyolo_write #(
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
+   	 if(vread_len_en) vread_len <= wdata[`AXI_LEN_W-1:0];
          if(vread_int_addr_en) vread_int_addr <= wdata[`W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
 	 if(vread_perA_en) vread_perA <= wdata[`EXT_PERIOD_W-1:0];
@@ -375,6 +401,12 @@ module xyolo_write #(
          vwrite_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
          vwrite_ext_addr_pip0 <= `nSTAGES*`IO_ADDR_W'b0;
          vwrite_ext_addr_pip1 <= `nSTAGES*`IO_ADDR_W'b0;
+         vwrite_len_shadow <= `AXI_LEN_W'b0;
+         vwrite_len_pip0 <= `AXI_LEN_W'b0;
+         vwrite_len_pip1 <= `AXI_LEN_W'b0;
+         vwrite_size_shadow <= `AXI_SIZE_W'b0;
+         vwrite_size_pip0 <= `AXI_SIZE_W'b0;
+         vwrite_size_pip1 <= `AXI_SIZE_W'b0;
          vwrite_int_addr_shadow <= `VWRITE_ADDR_W'b0;
          vwrite_int_addr_pip0 <= `VWRITE_ADDR_W'b0;
          vwrite_int_addr_pip1 <= `VWRITE_ADDR_W'b0;
@@ -407,6 +439,7 @@ module xyolo_write #(
          vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
+         vread_len_shadow <= `AXI_LEN_W'b0;
          vread_int_addr_shadow <= {`W_ADDR_W{1'b0}};
          vread_iterA_shadow <= `EXT_ADDR_W'b0;
          vread_perA_shadow <= `EXT_PERIOD_W'b0;
@@ -458,6 +491,12 @@ module xyolo_write #(
          vwrite_ext_addr_pip0 <= vwrite_ext_addr_bus;
          vwrite_ext_addr_pip1 <= vwrite_ext_addr_pip0;
          vwrite_ext_addr_shadow <= vwrite_ext_addr_pip1;
+	 vwrite_len_pip0 <= vwrite_len;
+	 vwrite_len_pip1 <= vwrite_len_pip0;
+	 vwrite_len_shadow <= vwrite_len_pip1;
+	 vwrite_size_pip0 <= vwrite_size;
+	 vwrite_size_pip1 <= vwrite_size_pip0;
+	 vwrite_size_shadow <= vwrite_size_pip1;
 	 //XOR ensures ping-pong happens when acessing external mem
 	 vwrite_int_addr_pip0 <= {vwrite_int_addr_pip0[`VWRITE_ADDR_W-1] ^ |vwrite_iterA, vwrite_int_addr[`VWRITE_ADDR_W-2:0]};
          vwrite_int_addr_pip1 <= vwrite_int_addr_pip0;
@@ -491,6 +530,7 @@ module xyolo_write #(
          vwrite_bypass_shadow <= xyolo_bypass_shadow;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
+	 vread_len_shadow <= vread_len;
 	 //XOR ensures ping-pong happens when acessing external mem
 	 vread_int_addr_shadow <= {vread_int_addr_shadow[`W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`W_ADDR_W-2:0]};
 	 vread_iterA_shadow <= vread_iterA;
@@ -641,9 +681,9 @@ module xyolo_write #(
          ld_acc0 <= 1'b0;
          ld_acc1 <= 1'b0;
          if(xyolo_bypass_shadow)
-	   mp_cnt <= 2'd1;
+	   mp_cnt <= 2'd0;
          else
-           mp_cnt <= 2'd0;
+           mp_cnt <= 2'd3;
       end else begin
 	 ld_acc0 <= ld_acc;
          ld_acc1 <= ld_acc0;

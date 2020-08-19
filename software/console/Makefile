@@ -1,32 +1,32 @@
 ROOT_DIR:=../..
 include $(ROOT_DIR)/system.mk
 
-SERIAL := /dev/ttyUSB0
+SERIAL:=/dev/ttyUSB0
 
-CC := gcc
-CFLAGS := -g -Wall
+CC:=gcc
+CFLAGS:=-g -Wall
 
 INCLUDE+=-I$(UART_DIR)/software -I$(CONSOLE_SRC_DIR)
 SRC:=console.c
 
-CONSOLE:=./console -s $(SERIAL)
 
 USERNAME := $(shell pgrep console | xargs -r ps -o uname= -p)
+
+CONSOLE:=./console -s $(SERIAL)
 
 run: console firmware.bin
 ifneq ($(USERNAME),)
 	@echo "FPGA is being used by $(USERNAME)"
+	exit 1
 else
-ifeq ($(INIT_MEM),1)
-	./console -s $(SERIAL)
-else
-	$(CONSOLE) 
-endif
+	$(CONSOLE)
 endif
 
 ./firmware.bin: $(FIRM_DIR)/firmware.bin
-	cp $(FIRM_DIR)/$@ .
-	$(eval CONSOLE:=./console -s $(SERIAL) -f firmware.bin)
+ifeq ($(INIT_MEM),0)
+	$(eval CONSOLE:=./console -s $(SERIAL) -f $@)
+	cp $(FIRM_DIR)/firmware.bin $@
+endif
 
 console: $(SRC)
 	$(CC) $(CFLAGS) $(INCLUDE) $(SRC) -o $@

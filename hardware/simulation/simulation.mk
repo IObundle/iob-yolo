@@ -1,13 +1,10 @@
 include $(ROOT_DIR)/hardware/hardware.mk
 
 #testbench defines 
-DEFINE+=$(define)SIM
+DEFINE+=$(defmacro)SIM
 ifeq ($(VCD),1)
-DEFINE+=$(define)VCD
+DEFINE+=$(defmacro)VCD
 endif
 
 #testbench source files
-VSRC+=$(HW_DIR)/testbench/$(TEST)_tb.v $(AXI_MEM_DIR)/rtl/axi_ram.v
-
-firmware.bin: $(FIRM_DIR)/firmware.bin
-	cp $(FIRM_DIR)/firmware.bin .
+VSRC+=$(TB_DIR)/$(TEST)_tb.v $(AXI_MEM_DIR)/rtl/axi_ram.v
