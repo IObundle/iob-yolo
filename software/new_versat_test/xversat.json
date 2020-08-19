@@ -3,10 +3,9 @@
 	"nSTAGES":		13,
 	"IO_ADDR_W":		32,
 	"DATAPATH_W":		16,
-	"MEM_ADDR_W":		10,
-	"PERIOD_W":		10,
+        "BIAS_ADDR_W":          2,
+	"WEIGHT_ADDR_W":	10,
+	"PIXEL_ADDR_W":		10,
 	"EXT_ADDR_W":		12,
-	"EXT_PERIOD_W":		12,
-        "VWRITE_ADDR_W":        5,
-        "BIAS_ADDR_W":          2
+        "VWRITE_ADDR_W":        5
 }

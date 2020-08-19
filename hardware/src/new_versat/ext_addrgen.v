@@ -12,9 +12,9 @@
 
 module ext_addrgen #(
     parameter 			     DATA_W = 32,
-    parameter			     EXT_ADDR_W = `MEM_ADDR_W,
-    parameter			     EXT_PERIOD_W = `PERIOD_W,
-    parameter                        MEM_ADDR_W = `MEM_ADDR_W
+    parameter			     EXT_ADDR_W = 10,
+    parameter			     EXT_PERIOD_W = 10,
+    parameter                        MEM_ADDR_W = 10
     ) (
     input                            clk,
     input                            rst,
