@@ -2,8 +2,8 @@
 `include "xversat.vh"
 
 module xaddrgen # (
-		 parameter				MEM_ADDR_W = `MEM_ADDR_W,
-		 parameter				PERIOD_W = `PERIOD_W
+		 parameter				MEM_ADDR_W = 10,
+		 parameter				PERIOD_W = 10
 		) (
 		 input                         		clk,
 		 input                         		rst,

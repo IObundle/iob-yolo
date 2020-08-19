@@ -39,7 +39,7 @@ module xyolo_write #(
     );
 
    // vread latency
-   localparam [`PERIOD_W-1:0]           vread_lat = `XYOLO_READ_LAT;
+   localparam [`PIXEL_ADDR_W-1:0]       vread_lat = `XYOLO_READ_LAT;
 
    // local parameter for merge
    localparam                           ADDR_W = `IO_ADDR_W;
@@ -100,17 +100,17 @@ module xyolo_write #(
    reg [`IO_ADDR_W/2-1:0]               vwrite_offset;
    reg [`AXI_LEN_W-1:0]             	vwrite_len, vwrite_len_shadow, vwrite_len_pip0, vwrite_len_pip1;
    reg [`VWRITE_ADDR_W-1:0]             vwrite_int_addr, vwrite_int_addr_shadow, vwrite_int_addr_pip0, vwrite_int_addr_pip1;
-   reg [`MEM_ADDR_W-1:0]                vwrite_iterA, vwrite_iterA_shadow, vwrite_iterA_pip0, vwrite_iterA_pip1;
-   reg [`PERIOD_W-1:0]                  vwrite_perA, vwrite_perA_shadow, vwrite_perA_pip0, vwrite_perA_pip1;
-   reg [`MEM_ADDR_W-1:0]                vwrite_shiftA, vwrite_shiftA_shadow, vwrite_shiftA_pip0, vwrite_shiftA_pip1;
-   reg [`MEM_ADDR_W-1:0]                vwrite_incrA, vwrite_incrA_shadow, vwrite_incrA_pip0, vwrite_incrA_pip1;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_iterA, vwrite_iterA_shadow, vwrite_iterA_pip0, vwrite_iterA_pip1;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_perA, vwrite_perA_shadow, vwrite_perA_pip0, vwrite_perA_pip1;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_shiftA, vwrite_shiftA_shadow, vwrite_shiftA_pip0, vwrite_shiftA_pip1;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_incrA, vwrite_incrA_shadow, vwrite_incrA_pip0, vwrite_incrA_pip1;
    reg [`VWRITE_ADDR_W-1:0]             vwrite_startB, vwrite_startB_pip, vwrite_startB_shadow;
-   reg [`PERIOD_W-1:0]                  vwrite_dutyB, vwrite_dutyB_pip, vwrite_dutyB_shadow;
-   reg [`PERIOD_W-1:0]                  vwrite_delayB, vwrite_delayB_pip, vwrite_delayB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vwrite_iterB, vwrite_iterB_pip, vwrite_iterB_shadow;
-   reg [`PERIOD_W-1:0]                  vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_dutyB, vwrite_dutyB_pip, vwrite_dutyB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_delayB, vwrite_delayB_pip, vwrite_delayB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_iterB, vwrite_iterB_pip, vwrite_iterB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
    reg                                  vwrite_bypass_shadow; //used for maxpool and upsample
 
    // vread configuration parameters
@@ -118,28 +118,28 @@ module xyolo_write #(
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
    reg [`AXI_LEN_W-1:0]			vread_len, vread_len_shadow;
-   reg [`W_ADDR_W-1:0]			vread_int_addr, vread_int_addr_shadow;
+   reg [`PIXEL_W_ADDR_W-1:0]		vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
-   reg [`EXT_PERIOD_W-1:0]              vread_perA, vread_perA_shadow;
+   reg [`EXT_ADDR_W-1:0]              	vread_perA, vread_perA_shadow;
    reg [`EXT_ADDR_W-1:0]                vread_shiftA, vread_shiftA_shadow;
    reg [`EXT_ADDR_W-1:0]                vread_incrA, vread_incrA_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_startB, vread_startB_pip, vread_startB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_iterB, vread_iterB_pip, vread_iterB_shadow;
-   reg [`PERIOD_W-1:0]                  vread_perB, vread_perB_pip, vread_perB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_shiftB, vread_shiftB_pip, vread_shiftB_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_incrB, vread_incrB_pip, vread_incrB_shadow;
-   reg [`MEM_ADDR_W-1:0]		vread_iter2B, vread_iter2B_pip, vread_iter2B_shadow;
-   reg [`PERIOD_W-1:0]                  vread_per2B, vread_per2B_pip, vread_per2B_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_shift2B, vread_shift2B_pip, vread_shift2B_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_incr2B, vread_incr2B_pip, vread_incr2B_shadow;
-   reg [`MEM_ADDR_W-1:0]		vread_iter3B, vread_iter3B_pip, vread_iter3B_shadow;
-   reg [`PERIOD_W-1:0]                  vread_per3B, vread_per3B_pip, vread_per3B_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_shift3B, vread_shift3B_pip, vread_shift3B_shadow;
-   reg [`MEM_ADDR_W-1:0]                vread_incr3B, vread_incr3B_pip, vread_incr3B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_startB, vread_startB_pip, vread_startB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_iterB, vread_iterB_pip, vread_iterB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_perB, vread_perB_pip, vread_perB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_shiftB, vread_shiftB_pip, vread_shiftB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_incrB, vread_incrB_pip, vread_incrB_shadow;
+   reg [`PIXEL_ADDR_W-1:0]		vread_iter2B, vread_iter2B_pip, vread_iter2B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_per2B, vread_per2B_pip, vread_per2B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_shift2B, vread_shift2B_pip, vread_shift2B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_incr2B, vread_incr2B_pip, vread_incr2B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]		vread_iter3B, vread_iter3B_pip, vread_iter3B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_per3B, vread_per3B_pip, vread_per3B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_shift3B, vread_shift3B_pip, vread_shift3B_shadow;
+   reg [`PIXEL_ADDR_W-1:0]              vread_incr3B, vread_incr3B_pip, vread_incr3B_shadow;
 
    // xyolo configuration parameters
-   reg [`MEM_ADDR_W-1:0]		xyolo_iter, xyolo_iter_pip, xyolo_iter_shadow;
-   reg [`PERIOD_W-1:0]			xyolo_per, xyolo_per_pip, xyolo_per_shadow;
+   reg [`PIXEL_ADDR_W-1:0]		xyolo_iter, xyolo_iter_pip, xyolo_iter_shadow;
+   reg [`PIXEL_ADDR_W-1:0]		xyolo_per, xyolo_per_pip, xyolo_per_shadow;
    reg [`SHIFT_W-1:0]			xyolo_shift, xyolo_shift_pip, xyolo_shift_shadow;
    reg 					xyolo_bias, xyolo_bias_pip, xyolo_bias_shadow;
    reg					xyolo_leaky, xyolo_leaky_pip, xyolo_leaky_shadow;
@@ -152,8 +152,8 @@ module xyolo_write #(
    // internal addrgen wires and regs
    wire                                 vread_enB, vwrite_enB;
    reg                                  vread_enB_reg;
-   wire [`MEM_ADDR_W-1:0]               vread_addrB, vwrite_addrB;
-   reg [`MEM_ADDR_W-1:0]                vread_addrB_reg;
+   wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB;
+   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg;
    wire                                 vread_doneB, vwrite_doneB;
 
    // done output
@@ -167,7 +167,7 @@ module xyolo_write #(
    reg                                  run_reg;
 
    // xyolo wires and regs
-   wire [`MEM_ADDR_W-1:0]		xyolo_addr;
+   wire [`PIXEL_ADDR_W-1:0]		xyolo_addr;
    wire                                 ld_acc, ld_mp, ld_res;
    reg                                  ld_acc0, ld_acc1;
    reg [1:0]                            mp_cnt;
@@ -295,42 +295,42 @@ module xyolo_write #(
          vwrite_offset <= {`IO_ADDR_W/2{1'b0}};
 	 vwrite_len <= `AXI_LEN_W'b0;
          vwrite_int_addr <= `VWRITE_ADDR_W'b0;
-         vwrite_iterA <= `MEM_ADDR_W'b0;
-         vwrite_perA <= `PERIOD_W'b0;
-         vwrite_shiftA <= `MEM_ADDR_W'b0;
-         vwrite_incrA <= `MEM_ADDR_W'b0;
+         vwrite_iterA <= `PIXEL_ADDR_W'b0;
+         vwrite_perA <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftA <= `PIXEL_ADDR_W'b0;
+         vwrite_incrA <= `PIXEL_ADDR_W'b0;
          vwrite_startB <= `VWRITE_ADDR_W'b0;
-         vwrite_dutyB <= `PERIOD_W'b0;
-         vwrite_delayB <= `PERIOD_W'b0;
-         vwrite_iterB <= `MEM_ADDR_W'b0;
-         vwrite_perB <= `PERIOD_W'b0;
-         vwrite_shiftB <= `MEM_ADDR_W'b0;
-         vwrite_incrB <= `MEM_ADDR_W'b0;
+         vwrite_dutyB <= `PIXEL_ADDR_W'b0;
+         vwrite_delayB <= `PIXEL_ADDR_W'b0;
+         vwrite_iterB <= `PIXEL_ADDR_W'b0;
+         vwrite_perB <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftB <= `PIXEL_ADDR_W'b0;
+         vwrite_incrB <= `PIXEL_ADDR_W'b0;
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
 	 vread_len <= `AXI_LEN_W'b0;
-         vread_int_addr <= {`W_ADDR_W{1'b0}};
+         vread_int_addr <= {`PIXEL_W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
-         vread_perA <= `EXT_PERIOD_W'b0;
+         vread_perA <= `EXT_ADDR_W'b0;
 	 vread_shiftA <= `EXT_ADDR_W'b0;
 	 vread_incrA <= `EXT_ADDR_W'b0;
-	 vread_startB <= `MEM_ADDR_W'b0;
-	 vread_iterB <= `MEM_ADDR_W'b0;
-	 vread_perB <= `PERIOD_W'b0;
-	 vread_shiftB <= `MEM_ADDR_W'b0;
-	 vread_incrB <= `MEM_ADDR_W'b0;
-	 vread_iter2B <= `MEM_ADDR_W'b0;
-	 vread_per2B <= `PERIOD_W'b0;
-	 vread_shift2B <= `MEM_ADDR_W'b0;
-	 vread_incr2B <= `MEM_ADDR_W'b0;
-	 vread_iter3B <= `MEM_ADDR_W'b0;
-	 vread_per3B <= `PERIOD_W'b0;
-	 vread_shift3B <= `MEM_ADDR_W'b0;
-	 vread_incr3B <= `MEM_ADDR_W'b0;
+	 vread_startB <= `PIXEL_ADDR_W'b0;
+	 vread_iterB <= `PIXEL_ADDR_W'b0;
+	 vread_perB <= `PIXEL_ADDR_W'b0;
+	 vread_shiftB <= `PIXEL_ADDR_W'b0;
+	 vread_incrB <= `PIXEL_ADDR_W'b0;
+	 vread_iter2B <= `PIXEL_ADDR_W'b0;
+	 vread_per2B <= `PIXEL_ADDR_W'b0;
+	 vread_shift2B <= `PIXEL_ADDR_W'b0;
+	 vread_incr2B <= `PIXEL_ADDR_W'b0;
+	 vread_iter3B <= `PIXEL_ADDR_W'b0;
+	 vread_per3B <= `PIXEL_ADDR_W'b0;
+	 vread_shift3B <= `PIXEL_ADDR_W'b0;
+	 vread_incr3B <= `PIXEL_ADDR_W'b0;
 	 //xyolo
-   	 xyolo_iter <= `MEM_ADDR_W'b0;
-	 xyolo_per <= `PERIOD_W'b0;
+   	 xyolo_iter <= `PIXEL_ADDR_W'b0;
+	 xyolo_per <= `PIXEL_ADDR_W'b0;
 	 xyolo_shift <= {`SHIFT_W{1'b0}};
 	 xyolo_bias <= 1'b0;
 	 xyolo_leaky <= 1'b0;
@@ -343,42 +343,42 @@ module xyolo_write #(
          if(vwrite_offset_en) vwrite_offset <= wdata[`IO_ADDR_W/2-1:0];
    	 if(vwrite_len_en) vwrite_len <= wdata[`AXI_LEN_W-1:0];
          if(vwrite_int_addr_en) vwrite_int_addr <= wdata[`VWRITE_ADDR_W-1:0];
-         if(vwrite_iterA_en) vwrite_iterA <= wdata[`MEM_ADDR_W-1:0];
-         if(vwrite_perA_en) vwrite_perA <= wdata[`PERIOD_W-1:0];
-         if(vwrite_shiftA_en) vwrite_shiftA <= wdata[`MEM_ADDR_W-1:0];
-         if(vwrite_incrA_en) vwrite_incrA <= wdata[`MEM_ADDR_W-1:0];
+         if(vwrite_iterA_en) vwrite_iterA <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_perA_en) vwrite_perA <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_shiftA_en) vwrite_shiftA <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_incrA_en) vwrite_incrA <= wdata[`PIXEL_ADDR_W-1:0];
          if(vwrite_startB_en) vwrite_startB <= wdata[`VWRITE_ADDR_W-1:0];
-         if(vwrite_dutyB_en) vwrite_dutyB <= wdata[`PERIOD_W-1:0];
-         if(vwrite_delayB_en) vwrite_delayB <= wdata[`PERIOD_W-1:0];
-         if(vwrite_iterB_en) vwrite_iterB <= wdata[`MEM_ADDR_W-1:0];
-         if(vwrite_perB_en) vwrite_perB <= wdata[`PERIOD_W-1:0];
-         if(vwrite_shiftB_en) vwrite_shiftB <= wdata[`MEM_ADDR_W-1:0];
-         if(vwrite_incrB_en) vwrite_incrB <= wdata[`MEM_ADDR_W-1:0];
+         if(vwrite_dutyB_en) vwrite_dutyB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_delayB_en) vwrite_delayB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_iterB_en) vwrite_iterB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_perB_en) vwrite_perB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_shiftB_en) vwrite_shiftB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vwrite_incrB_en) vwrite_incrB <= wdata[`PIXEL_ADDR_W-1:0];
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
    	 if(vread_len_en) vread_len <= wdata[`AXI_LEN_W-1:0];
-         if(vread_int_addr_en) vread_int_addr <= wdata[`W_ADDR_W-1:0];
+         if(vread_int_addr_en) vread_int_addr <= wdata[`PIXEL_W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
-	 if(vread_perA_en) vread_perA <= wdata[`EXT_PERIOD_W-1:0];
+	 if(vread_perA_en) vread_perA <= wdata[`EXT_ADDR_W-1:0];
    	 if(vread_shiftA_en) vread_shiftA <= wdata[`EXT_ADDR_W-1:0];
    	 if(vread_incrA_en) vread_incrA <= wdata[`EXT_ADDR_W-1:0];
-	 if(vread_startB_en) vread_startB <= wdata[`MEM_ADDR_W-1:0];
-	 if(vread_iterB_en) vread_iterB <= wdata[`MEM_ADDR_W-1:0];
-	 if(vread_perB_en) vread_perB <= wdata[`PERIOD_W-1:0];
-	 if(vread_shiftB_en) vread_shiftB <= wdata[`MEM_ADDR_W-1:0];
-	 if(vread_incrB_en) vread_incrB <= wdata[`MEM_ADDR_W-1:0];
-         if(vread_iter2B_en) vread_iter2B <= wdata[`MEM_ADDR_W-1:0];
-	 if(vread_per2B_en) vread_per2B <= wdata[`PERIOD_W-1:0];
-   	 if(vread_shift2B_en) vread_shift2B <= wdata[`MEM_ADDR_W-1:0];
-   	 if(vread_incr2B_en) vread_incr2B <= wdata[`MEM_ADDR_W-1:0];
-         if(vread_iter3B_en) vread_iter3B <= wdata[`MEM_ADDR_W-1:0];
-	 if(vread_per3B_en) vread_per3B <= wdata[`PERIOD_W-1:0];
-   	 if(vread_shift3B_en) vread_shift3B <= wdata[`MEM_ADDR_W-1:0];
-   	 if(vread_incr3B_en) vread_incr3B <= wdata[`MEM_ADDR_W-1:0];
+	 if(vread_startB_en) vread_startB <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_iterB_en) vread_iterB <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_perB_en) vread_perB <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_shiftB_en) vread_shiftB <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_incrB_en) vread_incrB <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vread_iter2B_en) vread_iter2B <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_per2B_en) vread_per2B <= wdata[`PIXEL_ADDR_W-1:0];
+   	 if(vread_shift2B_en) vread_shift2B <= wdata[`PIXEL_ADDR_W-1:0];
+   	 if(vread_incr2B_en) vread_incr2B <= wdata[`PIXEL_ADDR_W-1:0];
+         if(vread_iter3B_en) vread_iter3B <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(vread_per3B_en) vread_per3B <= wdata[`PIXEL_ADDR_W-1:0];
+   	 if(vread_shift3B_en) vread_shift3B <= wdata[`PIXEL_ADDR_W-1:0];
+   	 if(vread_incr3B_en) vread_incr3B <= wdata[`PIXEL_ADDR_W-1:0];
 	 //xyolo
-   	 if(xyolo_iter_en) xyolo_iter <= wdata[`MEM_ADDR_W-1:0];
-	 if(xyolo_per_en) xyolo_per <= wdata[`PERIOD_W-1:0];
+   	 if(xyolo_iter_en) xyolo_iter <= wdata[`PIXEL_ADDR_W-1:0];
+	 if(xyolo_per_en) xyolo_per <= wdata[`PIXEL_ADDR_W-1:0];
 	 if(xyolo_shift_en) xyolo_shift <= wdata[`SHIFT_W-1:0];
 	 if(xyolo_bias_en) xyolo_bias <= wdata[0];
 	 if(xyolo_leaky_en) xyolo_leaky <= wdata[0];
@@ -399,72 +399,72 @@ module xyolo_write #(
          vwrite_int_addr_shadow <= `VWRITE_ADDR_W'b0;
          vwrite_int_addr_pip0 <= `VWRITE_ADDR_W'b0;
          vwrite_int_addr_pip1 <= `VWRITE_ADDR_W'b0;
-         vwrite_iterA_shadow <= `MEM_ADDR_W'b0;
-         vwrite_iterA_pip0 <= `MEM_ADDR_W'b0;
-         vwrite_iterA_pip1 <= `MEM_ADDR_W'b0;
-         vwrite_perA_shadow <= `PERIOD_W'b0;
-         vwrite_perA_pip0 <= `PERIOD_W'b0;
-         vwrite_perA_pip1 <= `PERIOD_W'b0;
-         vwrite_shiftA_shadow <= `MEM_ADDR_W'b0;
-         vwrite_shiftA_pip0 <= `MEM_ADDR_W'b0;
-         vwrite_shiftA_pip1 <= `MEM_ADDR_W'b0;
-         vwrite_incrA_shadow <= `MEM_ADDR_W'b0;
-         vwrite_incrA_pip0 <= `MEM_ADDR_W'b0;
-         vwrite_incrA_pip1 <= `MEM_ADDR_W'b0;
+         vwrite_iterA_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_iterA_pip0 <= `PIXEL_ADDR_W'b0;
+         vwrite_iterA_pip1 <= `PIXEL_ADDR_W'b0;
+         vwrite_perA_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_perA_pip0 <= `PIXEL_ADDR_W'b0;
+         vwrite_perA_pip1 <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftA_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftA_pip0 <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftA_pip1 <= `PIXEL_ADDR_W'b0;
+         vwrite_incrA_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_incrA_pip0 <= `PIXEL_ADDR_W'b0;
+         vwrite_incrA_pip1 <= `PIXEL_ADDR_W'b0;
          vwrite_startB_shadow <= `VWRITE_ADDR_W'b0;
          vwrite_startB_pip <= `VWRITE_ADDR_W'b0;
-         vwrite_dutyB_shadow <= `PERIOD_W'b0;
-         vwrite_dutyB_pip <= `PERIOD_W'b0;
-         vwrite_delayB_shadow <= `PERIOD_W'b0;
-         vwrite_delayB_pip <= `PERIOD_W'b0;
-         vwrite_iterB_shadow <= `MEM_ADDR_W'b0;
-         vwrite_iterB_pip <= `MEM_ADDR_W'b0;
-         vwrite_perB_shadow <= `PERIOD_W'b0;
-         vwrite_perB_pip <= `PERIOD_W'b0;
-         vwrite_shiftB_shadow <= `MEM_ADDR_W'b0;
-         vwrite_shiftB_pip <= `MEM_ADDR_W'b0;
-         vwrite_incrB_shadow <= `MEM_ADDR_W'b0;
-         vwrite_incrB_pip <= `MEM_ADDR_W'b0;
+         vwrite_dutyB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_dutyB_pip <= `PIXEL_ADDR_W'b0;
+         vwrite_delayB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_delayB_pip <= `PIXEL_ADDR_W'b0;
+         vwrite_iterB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_iterB_pip <= `PIXEL_ADDR_W'b0;
+         vwrite_perB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_perB_pip <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_shiftB_pip <= `PIXEL_ADDR_W'b0;
+         vwrite_incrB_shadow <= `PIXEL_ADDR_W'b0;
+         vwrite_incrB_pip <= `PIXEL_ADDR_W'b0;
          vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
          vread_len_shadow <= `AXI_LEN_W'b0;
-         vread_int_addr_shadow <= {`W_ADDR_W{1'b0}};
+         vread_int_addr_shadow <= {`PIXEL_W_ADDR_W{1'b0}};
          vread_iterA_shadow <= `EXT_ADDR_W'b0;
-         vread_perA_shadow <= `EXT_PERIOD_W'b0;
+         vread_perA_shadow <= `EXT_ADDR_W'b0;
 	 vread_shiftA_shadow <= `EXT_ADDR_W'b0;
 	 vread_incrA_shadow <= `EXT_ADDR_W'b0;
-	 vread_startB_shadow <= `MEM_ADDR_W'b0;
-	 vread_startB_pip <= `MEM_ADDR_W'b0;
-	 vread_iterB_shadow <= `MEM_ADDR_W'b0;
-	 vread_iterB_pip <= `MEM_ADDR_W'b0;
-	 vread_perB_shadow <= `PERIOD_W'b0;
-	 vread_perB_pip <= `PERIOD_W'b0;
-	 vread_shiftB_shadow <= `MEM_ADDR_W'b0;
-	 vread_shiftB_pip <= `MEM_ADDR_W'b0;
-	 vread_incrB_shadow <= `MEM_ADDR_W'b0;
-	 vread_incrB_pip <= `MEM_ADDR_W'b0;
-	 vread_iter2B_shadow <= `MEM_ADDR_W'b0;
-	 vread_iter2B_pip <= `MEM_ADDR_W'b0;
-	 vread_per2B_shadow <= `PERIOD_W'b0;
-	 vread_per2B_pip <= `PERIOD_W'b0;
-	 vread_shift2B_shadow <= `MEM_ADDR_W'b0;
-	 vread_shift2B_pip <= `MEM_ADDR_W'b0;
-	 vread_incr2B_shadow <= `MEM_ADDR_W'b0;
-	 vread_incr2B_pip <= `MEM_ADDR_W'b0;
-	 vread_iter3B_shadow <= `MEM_ADDR_W'b0;
-	 vread_iter3B_pip <= `MEM_ADDR_W'b0;
-	 vread_per3B_shadow <= `PERIOD_W'b0;
-	 vread_per3B_pip <= `PERIOD_W'b0;
-	 vread_shift3B_shadow <= `MEM_ADDR_W'b0;
-	 vread_shift3B_pip <= `MEM_ADDR_W'b0;
-	 vread_incr3B_shadow <= `MEM_ADDR_W'b0;
-	 vread_incr3B_pip <= `MEM_ADDR_W'b0;
+	 vread_startB_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_startB_pip <= `PIXEL_ADDR_W'b0;
+	 vread_iterB_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_iterB_pip <= `PIXEL_ADDR_W'b0;
+	 vread_perB_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_perB_pip <= `PIXEL_ADDR_W'b0;
+	 vread_shiftB_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_shiftB_pip <= `PIXEL_ADDR_W'b0;
+	 vread_incrB_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_incrB_pip <= `PIXEL_ADDR_W'b0;
+	 vread_iter2B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_iter2B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_per2B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_per2B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_shift2B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_shift2B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_incr2B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_incr2B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_iter3B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_iter3B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_per3B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_per3B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_shift3B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_shift3B_pip <= `PIXEL_ADDR_W'b0;
+	 vread_incr3B_shadow <= `PIXEL_ADDR_W'b0;
+	 vread_incr3B_pip <= `PIXEL_ADDR_W'b0;
 	 //xyolo
-   	 xyolo_iter_shadow <= `MEM_ADDR_W'b0;
-   	 xyolo_iter_pip <= `MEM_ADDR_W'b0;
-	 xyolo_per_shadow <= `PERIOD_W'b0;
-	 xyolo_per_pip <= `PERIOD_W'b0;
+   	 xyolo_iter_shadow <= `PIXEL_ADDR_W'b0;
+   	 xyolo_iter_pip <= `PIXEL_ADDR_W'b0;
+	 xyolo_per_shadow <= `PIXEL_ADDR_W'b0;
+	 xyolo_per_pip <= `PIXEL_ADDR_W'b0;
 	 xyolo_shift_shadow <= {`SHIFT_W{1'b0}};
 	 xyolo_shift_pip <= {`SHIFT_W{1'b0}};
 	 xyolo_bias_shadow <= 1'b0;
@@ -518,12 +518,12 @@ module xyolo_write #(
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 vread_len_shadow <= vread_len;
 	 //XOR ensures ping-pong happens when acessing external mem
-	 vread_int_addr_shadow <= {vread_int_addr_shadow[`W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`W_ADDR_W-2:0]};
+	 vread_int_addr_shadow <= {vread_int_addr_shadow[`PIXEL_W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`PIXEL_W_ADDR_W-2:0]};
 	 vread_iterA_shadow <= vread_iterA;
 	 vread_perA_shadow <= vread_perA;
 	 vread_shiftA_shadow <= vread_shiftA;
 	 vread_incrA_shadow <= vread_incrA;
-	 vread_startB_pip <= {vread_startB_pip[`MEM_ADDR_W-1] ^ |vread_iterA, vread_startB[`MEM_ADDR_W-2:0]};
+	 vread_startB_pip <= {vread_startB_pip[`PIXEL_ADDR_W-1] ^ |vread_iterA, vread_startB[`PIXEL_ADDR_W-2:0]};
 	 vread_startB_shadow <= vread_startB_pip;
 	 vread_iterB_pip <= vread_iterB;
 	 vread_iterB_shadow <= vread_iterB_pip;
@@ -609,7 +609,10 @@ module xyolo_write #(
    //
 
    //vread internal address generator
-   xaddrgen3 vread_addrgenB (
+   xaddrgen3 # (
+      .MEM_ADDR_W(`PIXEL_ADDR_W),
+      .PERIOD_W(`PIXEL_ADDR_W)
+   ) vread_addrgenB (
       .clk(clk),
       .rst(rst),
       .run(run_reg),
@@ -619,7 +622,7 @@ module xyolo_write #(
       .start(vread_startB_shadow),
       .shift(vread_shiftB_shadow),
       .incr(vread_incrB_shadow),
-      .delay(`PERIOD_W'd0),
+      .delay(`PIXEL_ADDR_W'd0),
       .iterations2(vread_iter2B_shadow),
       .period2(vread_per2B_shadow),
       .shift2(vread_shift2B_shadow),
@@ -634,7 +637,10 @@ module xyolo_write #(
    );
 
    //xyolo address generator
-   xaddrgen xyolo_addrgen (
+   xaddrgen # (
+      .MEM_ADDR_W(`PIXEL_ADDR_W),
+      .PERIOD_W(`PIXEL_ADDR_W)
+   ) xyolo_addrgen (
       .clk(clk),
       .rst(rst),
       .init(run_reg),
@@ -643,9 +649,9 @@ module xyolo_write #(
       .iterations(xyolo_iter_shadow),
       .period(xyolo_per_shadow),
       .duty(xyolo_per_shadow),
-      .start(`MEM_ADDR_W'b0),
-      .shift(-xyolo_per_shadow[`MEM_ADDR_W-1:0]),
-      .incr(`MEM_ADDR_W'b1),
+      .start(`PIXEL_ADDR_W'b0),
+      .shift(-xyolo_per_shadow[`PIXEL_ADDR_W-1:0]),
+      .incr(`PIXEL_ADDR_W'b1),
       .delay(vread_lat),
       .addr(xyolo_addr),
       .mem_en(),
@@ -653,7 +659,7 @@ module xyolo_write #(
    );
 
    //compute xyolo load wires
-   assign ld_acc = (xyolo_addr == {`MEM_ADDR_W{1'd0}});
+   assign ld_acc = (xyolo_addr == {`PIXEL_ADDR_W{1'd0}});
    assign ld_mp = |mp_cnt;
    assign ld_res = ld_acc1 || xyolo_bypass_shadow;
 
@@ -677,7 +683,10 @@ module xyolo_write #(
       end
 
    //vwrite internal address generator
-   xaddrgen vwrite_addrgenB (
+   xaddrgen # (
+      .MEM_ADDR_W(`PIXEL_ADDR_W),
+      .PERIOD_W(`PIXEL_ADDR_W)
+   ) vwrite_addrgenB (
       .clk(clk),
       .rst(rst),
       .init(run_reg),
@@ -686,7 +695,7 @@ module xyolo_write #(
       .iterations(vwrite_iterB_shadow),
       .period(vwrite_perB_shadow),
       .duty(vwrite_dutyB_shadow),
-      .start({{`MEM_ADDR_W-`VWRITE_ADDR_W{1'b0}}, vwrite_startB_shadow}),
+      .start({{`PIXEL_ADDR_W-`VWRITE_ADDR_W{1'b0}}, vwrite_startB_shadow}),
       .shift(vwrite_shiftB_shadow),
       .incr(vwrite_incrB_shadow),
       .delay(vwrite_delayB_shadow),
