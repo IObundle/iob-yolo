@@ -13,8 +13,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+//print time of each run
+#define TIME_RUN
+
 //define peripheral base addresses
-//#define DDR_MEM (CACHE_BASE<<(ADDR_W-N_SLAVES_W))
 // set pointer to DDR base
 #ifndef PCSIM
   //USE_DDR==1 to run yolo anyways
@@ -36,7 +38,7 @@
 #define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)) //+5 to be 32 byte aligned
 #define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+10)) //+10 to be 32 byte aligned
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
-#define TILE_W 32
+#define TILE_W 208 //any value divisor of 416
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
@@ -105,7 +107,7 @@ void conv() {
   unsigned int bias_ba = WEIGHTS_BASE_ADDRESS; //bias base address
   unsigned int weights_ba = WEIGHTS_BASE_ADDRESS + 2*NTW_IN_NUM_KER; //weight base address
 #ifdef SIM
-  int k_delta = 1; //NTW_IN_W/(2*nSTAGES);
+  int k_delta = 2; //NTW_IN_W/(2*nSTAGES);
 #endif
 
   /////////////////////////////////////////////////////////////////////////
@@ -113,19 +115,17 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5 - 1); //+5 so each filter is 32 byte aligned
+  versat.yread.setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5); //+5 so each filter is 32 byte aligned
   versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)); //+4 so each filter is 32 byte aligned
   versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)/16); //+4 so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
   versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read tile from input fm
-  versat.ywrite.read.setLen((NTW_IN_C*(TILE_W+2)+10)/16-1); //+10 so each line is 32 byte aligned
+  versat.ywrite.read.setLen((NTW_IN_C*(NTW_IN_W+2)+10)*(nSTAGES*2+2)/16-1); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 so each line is 32 byte aligned
-  versat.ywrite.read.setExtPer((NTW_IN_C*(TILE_W+2)+10)/16); //+10 so each line is 32 byte aligned
+  versat.ywrite.read.setExtPer((NTW_IN_C*(NTW_IN_W+2)+10)*(NTW_IN_KER_SIZE+1)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
-  versat.ywrite.read.setExtIter(NTW_IN_KER_SIZE+1); //+1 due to maxpool // 4
-  versat.ywrite.read.setExtShift(((NTW_IN_W+2)*NTW_IN_C) - (NTW_IN_C*(TILE_W+2))); //+2 due to padding
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 27
@@ -137,11 +137,11 @@ void conv() {
   versat.ywrite.read.setIntPer(NTW_IN_KER_SIZE*NTW_IN_C); // 9
   versat.ywrite.read.setIntIncr(1);
   versat.ywrite.read.setIntIter(NTW_IN_KER_SIZE); // 3
-  versat.ywrite.read.setIntShift((TILE_W+2)*NTW_IN_C+10 - NTW_IN_KER_SIZE*NTW_IN_C); //+2 due to padding // 9
+  versat.ywrite.read.setIntShift((NTW_IN_W+2)*NTW_IN_C+10 - NTW_IN_KER_SIZE*NTW_IN_C); //+2 due to padding // 9
   versat.ywrite.read.setIntPer2(2);
   versat.ywrite.read.setIntIncr2(NTW_IN_C); // 3
   versat.ywrite.read.setIntIter2(2);
-  versat.ywrite.read.setIntShift2((TILE_W+2)*NTW_IN_C+10 - 2*NTW_IN_C); //+2 due to padding // 12
+  versat.ywrite.read.setIntShift2((NTW_IN_W+2)*NTW_IN_C+10 - 2*NTW_IN_C); //+2 due to padding // 12
   versat.ywrite.read.setIntPer3(TILE_W/2); // /2 due to maxpool //2
   versat.ywrite.read.setIntIncr3(2*NTW_IN_C); // 6
   versat.ywrite.read.setIntIter3(1);
@@ -162,7 +162,7 @@ void conv() {
   versat.ywrite.write.setIntIter(TILE_W/2); // 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(16-1); //send 16 values per stage
+  versat.ywrite.write.setLen(TILE_W/2-1); //send 16 values per stage
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -183,32 +183,42 @@ void conv() {
   #else
     for(k = 0; k < NTW_IN_W/(2*nSTAGES); k++) { //2 due to maxpool
   #endif
-      for(j = 0; j < NTW_IN_W/TILE_W; j++) {
-      //for(j = 0; j < 3; j++) {
 
-        // configure xyolo_write vread to read tile from input fm
-        versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*((NTW_IN_W+2)*NTW_IN_C+10)*nSTAGES + j*TILE_W*NTW_IN_C));
+      // configure xyolo_write vread to read tile from input fm
+      versat.ywrite.read.setExtIter(1);
+      versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*((NTW_IN_W+2)*NTW_IN_C+10)*nSTAGES));
+
+      for(j = 0; j < NTW_IN_W/TILE_W; j++) {
+      //for(j = 0; j < 1; j++) {
+
+        // configure xyolo_write vread start
+        versat.ywrite.read.setIntStart(j*TILE_W*NTW_IN_C);
 
         // configure xyolo_write vwrite to write result back to DDR
         versat.ywrite.write.setExtAddr(LAYER_3_BASE_ADDRESS + 2*((NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
 
         // wait until done
         while(versat.done()==0);
+      #ifdef TIME_RUN
+        end = (unsigned int) timer_get_count(TIMER_BASE);
+        if(l != 0 || k != 0 || j != 0) uart_printf("%d\n", (end - start)*8);
+      #endif
 
         // run configuration
         versat.run();
+      #ifdef TIME_RUN
+        start = (unsigned int) timer_get_count(TIMER_BASE);
+      #endif
 
-       // stop xyolo_read reading from DDR
-       versat.yread.setExtIter(0);
+        // stop reading from DDR
+        versat.ywrite.read.setExtIter(0);
+        versat.yread.setExtIter(0);
       }
     }
   }
 
   // clear configs
   versat.clear();
-
-  // wait until done
-  while(versat.done()==0);
 
   // end versat
   versat_end();
@@ -356,10 +366,14 @@ int main(int argc, char **argv) {
 
   //first layer conv
   uart_printf("Running convolution...\n");
+#ifndef TIME_RUN
   start = timer_time_us(TIMER_BASE);
+#endif
   conv();
+#ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("\nConvolution done in %d us\n\n", (end-start));
+#endif
 
   //send results back
 #ifndef SIM
