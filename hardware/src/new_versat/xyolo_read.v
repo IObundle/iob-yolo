@@ -67,7 +67,7 @@ module xyolo_read #(
    reg [`nYOLOvect*`IO_ADDR_W-1:0]      ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0] 	        offset;
    reg					pp; //ping pong
-   reg [`AXI_LEN_W-1:0] 		len, len_shadow;
+   reg [`IO_ADDR_W/2-1:0] 		len, len_shadow;
    reg [`WEIGHT_W_ADDR_W-1:0] 		int_addr, int_addr_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		iterA, iterA_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		perA, perA_shadow;
@@ -122,12 +122,26 @@ module xyolo_read #(
    wire [(`nYOLOvect+1)*`REQ_W-1:0]     m_req;
    wire [(`nYOLOvect+1)*`RESP_W-1:0]    m_resp;
 
-   //merge slave interface
+   // merge slave interface
    wire [`REQ_W-1:0]                    s_req;
    wire [`RESP_W-1:0]                   s_resp;
 
-   // define number of transactions (DMA) -> for bias, only 1 transfer per burst
-   assign				dma_len = m_req[`valid((`nYOLOvect))] ? `AXI_LEN_W'd0 : len_shadow;
+   // define number of transactions (DMA)
+   reg [`IO_ADDR_W/2-1:0]               dma_cnt;
+   assign				dma_len = |dma_cnt[`IO_ADDR_W/2-1:`AXI_LEN_W] ? {`AXI_LEN_W{1'b1}} : dma_cnt[`AXI_LEN_W-1:0];
+
+   // update DMA length
+   always @ (posedge clk, posedge rst)
+      if(rst)
+         dma_cnt <= {`IO_ADDR_W/2{1'b0}};
+      else if(run)
+         dma_cnt <= len;
+      else if(databus_ready) begin
+         if(dma_cnt == {`IO_ADDR_W/2{1'b0}})
+            dma_cnt <= len_shadow;
+         else
+            dma_cnt <= dma_cnt - 1;
+      end
 
    // register run
    always @ (posedge clk, posedge rst)
@@ -190,7 +204,7 @@ module xyolo_read #(
 	 ext_addr <= `IO_ADDR_W'b0;
          offset <= {`IO_ADDR_W/2{1'b0}};
          pp <= 1'b0;
-         len <= `AXI_LEN_W'b0;
+         len <= {`IO_ADDR_W/2{1'b0}};
 	 int_addr <= {`WEIGHT_W_ADDR_W{1'b0}};
 	 iterA <= `WEIGHT_ADDR_W'b0;
 	 perA <= `WEIGHT_ADDR_W'b0;
@@ -209,7 +223,7 @@ module xyolo_read #(
          if(ext_addr_en) ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(offset_en) offset <= wdata[`IO_ADDR_W/2-1:0];
          if(pp_en) pp <= wdata[0];
-         if(len_en) len <= wdata[`AXI_LEN_W-1:0];
+         if(len_en) len <= wdata[`IO_ADDR_W/2-1:0];
          if(int_addr_en) int_addr <= wdata[`WEIGHT_W_ADDR_W-1:0];
          if(iterA_en) iterA <= wdata[`WEIGHT_ADDR_W-1:0];
          if(perA_en) perA <= wdata[`WEIGHT_ADDR_W-1:0];
@@ -230,7 +244,7 @@ module xyolo_read #(
    always @(posedge clk, posedge rst)
       if(rst) begin
 	 ext_addr_shadow <= `nYOLOvect*`IO_ADDR_W'b0;
-	 len_shadow <= `AXI_LEN_W'b0;
+         len_shadow <= {`IO_ADDR_W/2{1'b0}};
 	 int_addr_shadow <= {`WEIGHT_W_ADDR_W{1'b0}};
 	 iterA_shadow <= `WEIGHT_ADDR_W'b0;
 	 perA_shadow <= `WEIGHT_ADDR_W'b0;
