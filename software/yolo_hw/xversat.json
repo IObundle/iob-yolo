@@ -4,8 +4,8 @@
 	"IO_ADDR_W":		32,
 	"DATAPATH_W":		16,
         "BIAS_ADDR_W":          4,
-	"WEIGHT_ADDR_W":	15,
-	"PIXEL_ADDR_W":		12,
+	"WEIGHT_ADDR_W":	14,
+	"PIXEL_ADDR_W":		14,
 	"EXT_ADDR_W":		14,
-        "VWRITE_ADDR_W":        6
+        "VWRITE_ADDR_W":        8
 }
