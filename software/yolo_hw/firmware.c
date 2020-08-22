@@ -36,7 +36,7 @@
 //TILE sizes
 #define LAYER_1_TILE_W 208
 #define LAYER_3_TILE_W 52
-#define LAYER_5_TILE_W 8
+#define LAYER_5_TILE_W 26
 #define LAYER_7_TILE_W 4
 #define LAYER_9_TILE_W 2
 
@@ -44,7 +44,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_4*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_6*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -421,7 +421,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -483,47 +483,50 @@ int main(int argc, char **argv) {
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
  #endif
 
-#else
-  w_pos += WEIGHTS_LAYER_1;
-  p_pos += DATA_LAYER_1;
-#endif
-
   //layers 3 and 4
   uart_printf("\nRunning layers 3 and 4...\n");
  #ifndef TIME_RUN
   start = timer_time_us(TIMER_BASE);
  #endif
   conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, LAYER_3_MAXPOOL, 1);
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+ #endif
+#else
+  w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3;
+  p_pos += DATA_LAYER_1 + DATA_LAYER_2;
+#endif
+
+  //layers 5 and 6
+  uart_printf("\nRunning layers 5 and 6...\n");
+ #ifndef TIME_RUN
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, LAYER_5_MAXPOOL, 0);
   //end versat
   versat_end();
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
-#endif
+ #endif
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1 + DATA_LAYER_2;
+  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4;
   int i, j, k;
   uart_printf("Verifying...\n\n");
-  uart_printf("INITIAL ADDR 2nd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + LAYER_4_W*LAYER_3_NUM_KER));
-  uart_printf("INITIAL ADDR 3rd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + 2*LAYER_4_W*LAYER_3_NUM_KER));
+  uart_printf("INITIAL ADDR 2nd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + LAYER_6_W*LAYER_5_NUM_KER));
+  uart_printf("INITIAL ADDR 3rd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + 2*LAYER_6_W*LAYER_5_NUM_KER));
   for(i = 0; i < k_delta*nSTAGES+1; i++) {
     uart_printf("%d\n", i);
-    for(j = 0; j < LAYER_4_W; j++)
-      for(k = 0; k < LAYER_3_NUM_KER; k++)
-        if(fp_data[i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] != fp_data[DATA_LAYER_4 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k), fp_data[i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_4 + i*LAYER_4_W*LAYER_3_NUM_KER + j*LAYER_3_NUM_KER + k] & 0xFFFF);  }
+    for(j = 0; j < LAYER_6_W; j++)
+      for(k = 0; k < LAYER_5_NUM_KER; k++)
+        if(fp_data[i*LAYER_6_W*LAYER_5_NUM_KER + j*LAYER_5_NUM_KER + k] != fp_data[DATA_LAYER_6 + i*LAYER_6_W*LAYER_5_NUM_KER + j*LAYER_5_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + i*LAYER_6_W*LAYER_5_NUM_KER + j*LAYER_5_NUM_KER + k), fp_data[i*LAYER_6_W*LAYER_5_NUM_KER + j*LAYER_5_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_6 + i*LAYER_6_W*LAYER_5_NUM_KER + j*LAYER_5_NUM_KER + k] & 0xFFFF);  }
 #endif
 
 /*
-  //layers 5 and 6
-  uart_printf("\nRunning layers 5 and 6...\n");
-  start = timer_time_us(TIMER_BASE);
-  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0, 0, LAYER_5_W_LEN, LAYER_5_MAXPOOL, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
-
   //layers 7 and 8
   uart_printf("\nRunning layers 7 and 8...\n");
   start = timer_time_us(TIMER_BASE);
