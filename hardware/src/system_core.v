@@ -38,7 +38,7 @@ module system
    input [2*1-1:0]	     m_axi_wready,
 
    //write response
-   input [2*1-1:0]	     m_axi_bid,
+   // input [2*1-1:0]	     m_axi_bid,
    input [2*2-1:0]	     m_axi_bresp,
    input [2*1-1:0]	     m_axi_bvalid,
    output [2*1-1:0]	     m_axi_bready,
@@ -57,8 +57,8 @@ module system
    input [2*1-1:0]	     m_axi_arready,
 
    //read
-   input [2*1-1:0]	     m_axi_rid,
-   input [2*`MIG_BUS_W-1:0]    m_axi_rdata,
+   // input [2*1-1:0]	     m_axi_rid,
+   input [2*`MIG_BUS_W-1:0]  m_axi_rdata,
    input [2*2-1:0]	     m_axi_rresp,
    input [2*1-1:0]	     m_axi_rlast, 
    input [2*1-1:0]	     m_axi_rvalid, 
@@ -85,7 +85,7 @@ module system
    input [1-1:0]	     m_axi_wready,
 
    //write response
-   input [1-1:0]	     m_axi_bid,
+   // input [1-1:0]	     m_axi_bid,
    input [2-1:0]	     m_axi_bresp,
    input [1-1:0]	     m_axi_bvalid,
    output [1-1:0]	     m_axi_bready,
@@ -104,7 +104,7 @@ module system
    input [1-1:0]	     m_axi_arready,
 
    //read
-   input [1-1:0]	     m_axi_rid,
+   // input [1-1:0]	     m_axi_rid,
    input [`MIG_BUS_W-1:0]    m_axi_rdata,
    input [2-1:0]	     m_axi_rresp,
    input [1-1:0]	     m_axi_rlast, 
@@ -344,7 +344,7 @@ module system
         .axi_wvalid(m_axi_wvalid), 
         .axi_wready(m_axi_wready), 
         //write response
-        .axi_bid(m_axi_bid), 
+        // .axi_bid(m_axi_bid), 
         .axi_bresp(m_axi_bresp), 
         .axi_bvalid(m_axi_bvalid), 
         .axi_bready(m_axi_bready), 
@@ -361,7 +361,7 @@ module system
         .axi_arvalid(m_axi_arvalid), 
         .axi_arready(m_axi_arready), 
         //read 
-        .axi_rid(m_axi_rid), 
+        // .axi_rid(m_axi_rid), 
         .axi_rdata(m_axi_rdata), 
         .axi_rresp(m_axi_rresp), 
         .axi_rlast(m_axi_rlast), 

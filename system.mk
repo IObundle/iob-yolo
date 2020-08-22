@@ -5,15 +5,22 @@ FIRM_ADDR_W:=16
 SRAM_ADDR_W:=16
 
 #DDR
-USE_DDR:=1
-RUN_DDR:=0
+ifeq ($(USE_DDR),)
+	USE_DDR:=1
+endif
+ifeq ($(RUN_DDR),)
+	RUN_DDR:=0
+endif
+
 DDR_ADDR_W:=30
 
 #ROM
 BOOTROM_ADDR_W:=12
 
 #Init memory (only works in simulation or FPGA not running DDR)
-INIT_MEM:=0
+ifeq ($(INIT_MEM),)
+	INIT_MEM:=0
+endif
 
 #Choose Firmware (in SW_DIR)
 TEST:=yolo_hw
@@ -31,14 +38,38 @@ VCD:=0
 #Peripheral list (must match respective submodule name)
 PERIPHERALS:=TIMER ETHERNET VERSAT #UART is implicit
 
-#SIMULATOR:=icarus
+SIM_LIST="SIMULATOR=icarus" "SIMULATOR=ncsim"
+# SIMULATOR:=icarus
 #SIMULATOR:=modelsim
 SIMULATOR:=ncsim
+LOCAL_SIM_LIST=icarus #leave space in the end
 
+ifeq ($(SIMULATOR),ncsim)
+	SIM_SERVER=$(MICRO)
+	SIM_USER=$(MICRO_USER)
+endif
+
+BOARD_LIST="BOARD=CYCLONEV-GT-DK" "BOARD=AES-KU040-DB-G"
 #FPGA board (associated with server below)
-FPGA_BOARD:=AES-KU040-DB-G
-#FPGA_BOARD:=CYCLONEV-GT-DK
-FPGA_COMPILE_SERVER=$(PUDIM)
+ifeq ($(BOARD),)
+	BOARD:=AES-KU040-DB-G
+	#FPGA_BOARD:=CYCLONEV-GT-DK
+endif
+
+ifeq ($(BOARD),AES-KU040-DB-G)
+	COMPILE_USER=$(USER)
+	COMPILE_SERVER=$(COMPILE_USER)@$(PUDIM)
+	COMPILE_OBJ=synth_system.bit
+	BOARD_USER=$(USER)
+	BOARD_SERVER=$(BOARD_USER)@$(BABA)
+else ifeq ($(BOARD),CYCLONEV-GT-DK)
+	COMPILE_USER=$(USER)
+	COMPILE_SERVER=$(COMPILE_USER)@$(PUDIM)
+	COMPILE_OBJ=output_files/top_system.sof
+	BOARD_USER=$(USER)
+	BOARD_SERVER=$(BOARD_USER)@$(PUDIM)
+endif
+
 
 #
 #DO NOT EDIT BEYOND THIS POINT
@@ -47,7 +78,7 @@ FPGA_COMPILE_SERVER=$(PUDIM)
 #object directories
 HW_DIR:=$(ROOT_DIR)/hardware
 SIM_DIR:=$(HW_DIR)/simulation/$(SIMULATOR)
-FPGA_DIR:=$(HW_DIR)/fpga/$(FPGA_BOARD)
+FPGA_DIR:=$(HW_DIR)/fpga/$(BOARD)
 
 SW_DIR:=$(ROOT_DIR)/software
 #submodule paths
@@ -80,28 +111,28 @@ AXI_MEM_DIR:=$(CACHE_DIR)/submodules/axi-mem
 MIG_BUS_W:=256
 
 #defines
-DEFINE+=$(define)BOOTROM_ADDR_W=$(BOOTROM_ADDR_W)
-DEFINE+=$(define)SRAM_ADDR_W=$(SRAM_ADDR_W)
-DEFINE+=$(define)FIRM_ADDR_W=$(FIRM_ADDR_W)
+DEFINE+=$(defmacro)BOOTROM_ADDR_W=$(BOOTROM_ADDR_W)
+DEFINE+=$(defmacro)SRAM_ADDR_W=$(SRAM_ADDR_W)
+DEFINE+=$(defmacro)FIRM_ADDR_W=$(FIRM_ADDR_W)
 ifeq ($(USE_DDR),1)
-DEFINE+=$(define)USE_DDR
-DEFINE+=$(define)DDR_ADDR_W=$(DDR_ADDR_W)
-DEFINE+=$(define)MIG_BUS_W=$(MIG_BUS_W)
+DEFINE+=$(defmacro)USE_DDR
+DEFINE+=$(defmacro)DDR_ADDR_W=$(DDR_ADDR_W)
+DEFINE+=$(defmacro)MIG_BUS_W=$(MIG_BUS_W)
 ifeq ($(RUN_DDR),1)
-DEFINE+=$(define)RUN_DDR
+DEFINE+=$(defmacro)RUN_DDR
 endif
 endif
 ifeq ($(INIT_MEM),1)
-DEFINE+=$(define)INIT_MEM 
+DEFINE+=$(defmacro)INIT_MEM 
 endif
 ifeq ($(USE_NEW_VERSAT),1)
-DEFINE+=$(define)USE_NEW_VERSAT
+DEFINE+=$(defmacro)USE_NEW_VERSAT
 endif
-DEFINE+=$(define)N_SLAVES=$(N_SLAVES) 
+DEFINE+=$(defmacro)N_SLAVES=$(N_SLAVES) 
 #address select bits: Extra memory (E), Peripherals (P), Boot controller (B)
-DEFINE+=$(define)E=31
-DEFINE+=$(define)P=30
-DEFINE+=$(define)B=29
+DEFINE+=$(defmacro)E=31
+DEFINE+=$(defmacro)P=30
+DEFINE+=$(defmacro)B=29
 ifeq ($(MAKECMDGOALS),)
 BAUD:=30000000
 else ifeq ($(MAKECMDGOALS),sim)
@@ -110,8 +141,8 @@ else
 BAUD:=115200
 endif
 
-DEFINE+=$(define)BAUD=$(BAUD)
-DEFINE+=$(define)FREQ=125000000
+DEFINE+=$(defmacro)BAUD=$(BAUD)
+DEFINE+=$(defmacro)FREQ=125000000
 dummy:= $(shell echo $(BAUD))
 
 #run target by default
@@ -122,23 +153,13 @@ all: run
 #UART - IOb-SoC submodule - slave 0
 UART_DIR:=$(SOC_SUBMODULES_DIR)/UART
 UART:=0
-DEFINE+=$(define)UART=$(UART)
+DEFINE+=$(defmacro)UART=$(UART)
 
 # IOb-SoC-yolo submodules
 N_SLAVES:=1
 dummy:=$(foreach p, $(PERIPHERALS), $(eval $p_DIR:=$(SUBMODULES_DIR)/$p))
 dummy:=$(foreach p, $(PERIPHERALS), $(eval $p=$(N_SLAVES)) $(eval N_SLAVES:=$(shell expr $(N_SLAVES) \+ 1)))
-dummy:=$(foreach p, $(PERIPHERALS), $(eval DEFINE+=$(define)$p=$($p)))
-
-ifeq ($(FPGA_BOARD),AES-KU040-DB-G)
-FPGA_BOARD_SERVER=$(BABA)
-else ifeq ($(FPGA_BOARD),CYCLONEV-GT-DK)
-FPGA_BOARD_SERVER=$(PUDIM)
-endif
-
-ifeq ($(SIMULATOR),ncsim)
-SIM_SERVER=$(MICRO)
-endif
+dummy:=$(foreach p, $(PERIPHERALS), $(eval DEFINE+=$(defmacro)$p=$($p)))
 
 #server list
 PUDIM:=pudim-flan.iobundle.com
@@ -147,7 +168,7 @@ MICRO:=micro7.lx.it.pt
 
 #user list
 MICRO_USER=user14
-MICRO_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
+SIM_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
 
 REMOTE_ROOT_DIR=./sandbox/pm-iob-soc-yolo
 

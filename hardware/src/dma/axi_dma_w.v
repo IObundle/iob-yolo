@@ -52,7 +52,7 @@ module axi_dma_w # (
 	input wire                     m_axi_wready,
 
 	// Master Interface Write Response
-	input wire [`AXI_ID_W-1:0]     m_axi_bid,
+	// input wire [`AXI_ID_W-1:0]     m_axi_bid,
 	input wire [`AXI_RESP_W-1:0]   m_axi_bresp,
 	input wire                     m_axi_bvalid,
 	output reg                     m_axi_bready

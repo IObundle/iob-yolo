@@ -70,7 +70,7 @@ module ext_mem
    output [2*1-1:0]		axi_wlast,
    output [2*1-1:0]		axi_wvalid, 
    input [2*1-1:0]		axi_wready,
-   input [2*1-1:0]		axi_bid,
+   // input [2*1-1:0]		axi_bid,
    input [2*2-1:0]		axi_bresp,
    input [2*1-1:0]		axi_bvalid,
    output [2*1-1:0]		axi_bready,
@@ -87,7 +87,7 @@ module ext_mem
    output [2*1-1:0]		axi_arvalid, 
    input [2*1-1:0]		axi_arready,
    //Read
-   input [2*1-1:0]		axi_rid,
+   // input [2*1-1:0]		axi_rid,
    input [2*`MIG_BUS_W-1:0] 	axi_rdata,
    input [2*2-1:0]		axi_rresp,
    input [2*1-1:0]		axi_rlast, 
@@ -114,7 +114,7 @@ module ext_mem
    output [1-1:0]		axi_wlast,
    output [1-1:0]		axi_wvalid, 
    input [1-1:0]		axi_wready,
-   input [1-1:0]		axi_bid,
+   // input [1-1:0]		axi_bid,
    input [2-1:0]		axi_bresp,
    input [1-1:0]		axi_bvalid,
    output [1-1:0]		axi_bready,
@@ -131,7 +131,7 @@ module ext_mem
    output [1-1:0]		axi_arvalid, 
    input [1-1:0]		axi_arready,
    //Read
-   input [1-1:0]		axi_rid,
+   // input [1-1:0]		axi_rid,
    input [`MIG_BUS_W-1:0] 	axi_rdata,
    input [2-1:0]		axi_rresp,
    input [1-1:0]		axi_rlast, 
@@ -221,7 +221,7 @@ module ext_mem
 
            // Front-end interface
            .valid (dcache_fe_req[`valid(0)]),
-           .addr  (dcache_fe_req[`address(0,`DDR_ADDR_W+1)-2]),
+           .addr  (dcache_fe_req[`address(0,`DDR_ADDR_W)-2]),
            .wdata (dcache_fe_req[`wdata(0)]),
            .wstrb (dcache_fe_req[`wstrb(0)]),
            .rdata (dcache_fe_resp[`rdata(0)]),
@@ -290,14 +290,14 @@ module ext_mem
             // Native interface
 	 `ifdef RUN_DDR_USE_SRAM
             .valid    (l2cache_req[`valid_MIG_BUS(0)]),
-            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
+            .addr     (l2cache_req[`address_MIG_BUS(0,`DDR_ADDR_W)-$clog2(`MIG_BUS_W/8)]),
             .wdata    (l2cache_req[`wdata_MIG_BUS(0)]),
    	    .wstrb    (l2cache_req[`wstrb_MIG_BUS(0)]),
             .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
             .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
 	 `else
             .valid    (dcache_be_req[`valid_MIG_BUS(0)]),
-            .addr     (dcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W+1)-$clog2(`MIG_BUS_W/8)]),
+            .addr     (dcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W)-$clog2(`MIG_BUS_W/8)]),
             .wdata    (dcache_be_req[`wdata_MIG_BUS(0)]),
    	    .wstrb    (dcache_be_req[`wstrb_MIG_BUS(0)]),
             .rdata    (dcache_be_resp[`rdata_MIG_BUS(0)]),
@@ -461,7 +461,7 @@ module ext_mem
 		    .m_axi_arvalid(axi_arvalid[0*1+:1]), 
 		    .m_axi_arready(axi_arready[0*1+:1]), 
 		    //read 
-		    .m_axi_rid(axi_rid[0*1+:1]), 
+		    // .m_axi_rid(axi_rid[0*1+:1]), 
 		    .m_axi_rdata(axi_rdata[0*`MIG_BUS_W+:`MIG_BUS_W]), 
 		    .m_axi_rresp(axi_rresp[0*2+:2]), 
 		    .m_axi_rlast(axi_rlast[0*1+:1]), 
@@ -502,7 +502,7 @@ module ext_mem
             .m_axi_wvalid(axi_wvalid[0*1+:1]), 
             .m_axi_wready(axi_wready[0*1+:1]), 
             //write response
-            .m_axi_bid(axi_bid[0*1+:1]), 
+            // .m_axi_bid(axi_bid[0*1+:1]), 
             .m_axi_bresp(axi_bresp[0*2+:2]), 
             .m_axi_bvalid(axi_bvalid[0*1+:1]), 
             .m_axi_bready(axi_bready[0*1+:1])

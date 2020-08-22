@@ -39,7 +39,7 @@ module axi_dma_r (
 	input wire                     m_axi_arready,
 
 	// Master Interface Read Data
-	input wire [`AXI_ID_W-1:0]     m_axi_rid,
+	// input wire [`AXI_ID_W-1:0]     m_axi_rid,
 	input wire [`MIG_BUS_W-1:0]    m_axi_rdata,
 	input wire [`AXI_RESP_W-1:0]   m_axi_rresp,
 	input wire                     m_axi_rlast,

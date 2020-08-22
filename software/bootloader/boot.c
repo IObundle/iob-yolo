@@ -26,6 +26,7 @@ int main() {
 
   //welcome message
   uart_puts ("\n\n\nIOb-SoC Bootloader:\n\n");
+  uart_printf ("USE_DDR=%d RUN_DDR=%d\n\n", USE_DDR_SW, RUN_DDR_SW);
 
   unsigned int file_size;
   //enter command loop

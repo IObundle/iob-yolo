@@ -1,6 +1,6 @@
 ROOT_DIR:=../../..
 
-define:=-define 
+defmacro:=-define 
 incdir:=-incdir 
 
 include ../simulation.mk
@@ -10,9 +10,11 @@ CFLAGS = -errormax 15 -status -update -linedebug -sv $(INCLUDE) $(DEFINE)
 EFLAGS = -errormax 15 -access +wc -status
 SFLAGS = -errormax 15 -status -CMDFILE $(ROOT_DIR)/hardware/testbench
 
+export VSRC CFLAGS EFLAGS SFLAGS 
+
 #simulate
-run: $(VSRC) $(VHDR) firmware.bin firmware.hex boot.hex periphs
-	VSRC="$(VSRC)" CFLAGS="$(CFLAGS)" EFLAGS="$(EFLAGS)" SFLAGS="$(SFLAGS)" ./run_ncsim.sh $(TEST)
+run: $(VSRC) $(VHDR) firmware boot.hex periphs
+	./run_ncsim.sh $(TEST)
 
 clean: hw-clean
 	@rm -rf xcelium.d xmsim.key *.log
