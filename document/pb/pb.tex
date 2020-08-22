@@ -1,0 +1,161 @@
+\documentclass[twocolumn]{iob_pb}
+
+%Params
+%\def\XILINX{1}
+%\def\INTEL{1}
+
+\usepackage{color,soul}
+%\usepackage{array}
+\usepackage{float}
+\usepackage{makecell}
+
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{calc}
+\graphicspath{{./}{./figures/}}
+
+%\usepackage[showframe]{geometry}% http://ctan.org/pkg/geometry
+%\usepackage{lipsum}% http://ctan.org/pkg/lipsum
+\usepackage{multicol}% http://ctan.org/pkg/multicols
+
+\definecolor{iob-green}{rgb}{0.0,1.0,0.80}
+\definecolor{iob-blue}{rgb}{0.90196,0.94902,1}
+
+\title{IOb-SoC-Yolo}
+\category{IObundle Tiny Yolo V3 Object Detector and Classifier}
+\confidential{}
+
+\usepackage{eso-pic}
+\newcommand\BackgroundPic{%
+\put(0,0){%
+\parbox[b][\paperheight]{\paperwidth}{%
+\vfill
+\centering
+\includegraphics[width=\paperwidth,height=\paperheight,%
+keepaspectratio]{bg.png}%
+\vfill
+}}}
+
+
+\begin{document}
+\AddToShipoutPicture*{\BackgroundPic}
+
+\section*{\textcolor[rgb]{0,0,0}{Overview}}
+
+The IOb-SoC-Yolo is an IP core for running the Tiny Yolo V3 object detection and
+classification software based on Convolutional Neural Networks (CNNs). The IP is
+currently supported in ASICs and FPGAs.
+
+\section*{\textcolor[rgb]{0,0,0}{Features}}
+\begin{itemize}
+\item Runs the Tiny Yolo V3 object detection software
+\item 1 CNN reconfigurable accelerator (Versat)
+\item 1024 Functional Unit (FU) matrix for massive parallelism
+\item FU perform the convolution and maxpool operations and the memory write operation
+\item 256-bit wide data memory accesses
+\item 64 additional memory read units
+\item Memory units equipped with internal and external memory Address Generation Units (AGUs)
+\item AGUs perform runtime computation of nested loop address affine expressions 
+\item 1 RISC-V control and reconfiguration CPU
+\item Instruction and data caches
+\item RS232 interfaces for viewing runtime messages
+\item 16-bit convolution data size
+\item 15 FPS execution speed (scalable upon availability of bandwidth and compute resources)
+\item 2-frame latency (from first pixel in to first classification set out)
+\item Frequency of operation at 125MHz
+\item Needs external DDR4 memory controller IP
+\end{itemize}
+
+\section*{\textcolor[rgb]{0,0,0}{Benefits}}
+\begin{itemize}
+\item Compact hardware implementation
+\item Can fit in low cost FPGAs
+\item Can fit in small ASICs 
+\item Very low power consumption
+\end{itemize}
+
+\section*{\textcolor[rgb]{0,0,0}{Block Diagrams}}
+
+\begin{figure}[H]
+  \begin{center}
+    \includegraphics[width=8cm]{IoB-SoC-Yolo_block_diagram.png}
+    \caption{IOb-SoC-Yolo high-level block diagram}
+    \label{fig:IOb-SoC-Yolo}
+  \end{center}
+\end{figure}
+
+
+\begin{figure}[H]
+  \begin{center}
+    \includegraphics[width=8cm]{xVersat_block_diagram.png}
+    \caption{Versat CNN accelerator high-level block diagram}
+    \label{fig:xVersat_block_diagram}
+  \end{center}
+\end{figure}
+
+\begin{figure*}[t]
+  \begin{center}
+    \includegraphics[width=16cm]{xVersat_detail.png}
+    \caption{Versat CNN accelerator detailed block diagram}
+    \label{fig:xVersat_detail}
+  \end{center}
+\end{figure*}
+
+
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
+
+
+\section*{FPGA Resources}
+\begin{table}[H]
+  \begin{center}
+    \begin{tabular}{|c|c|c|c|}
+      \hline
+
+      \rowcolor{iob-green}
+      \textbf{Resource}  & \textbf{Used} & \textbf{Available} & \textbf{Ratio}\\
+      \hline
+      \hline
+
+      LUTs & 17,256 & 56,484 & 31\%\\
+      \hline
+
+      \rowcolor{iob-blue}
+      FFs & 19,059  & 225,920 & 8\%\\
+      \hline
+
+      BRAM bits & 4,582,528 & 7,692 & 65\%\\
+      \hline
+
+      BRAM blocks & 570 & 686 & 83\%\\
+      \hline
+
+      \rowcolor{iob-blue}
+      DSPs & 16 & 156 & 10\%\\
+      \hline
+      
+    \end{tabular}
+    \caption{Implementation Resources for Xilinx Kintex Ultrascale Devices}
+    \label{tab:res}
+  \end{center}
+\end{table}
+
+
+\section*{\textcolor[rgb]{0,0,0}{Deliverables}}
+\begin{itemize}
+\item HDL netlist or source code optionally
+\item Software object or C++ source code optionally
+\item Simulation testbench
+\item Implementation constraints for map, place and route
+\item Demo files for commercial FPGA board with Ethernet connectivity
+\item User documentation for system integration
+\end{itemize}
+
+\vspace*{0.5cm}
+\noindent
+\begin{scriptsize}
+Disclaimer: IObundle reserves the right to modify the current
+technical spe-cifications without notice.
+\end{scriptsize}
+
+\end{document}
