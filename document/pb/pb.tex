@@ -49,12 +49,10 @@ currently supported in ASICs and FPGAs.
 \begin{itemize}
 \item Runs the Tiny Yolo V3 object detection software
 \item 1 CNN reconfigurable accelerator (Versat)
-\item 1024 Functional Unit (FU) matrix for massive parallelism
-\item FU perform the convolution and maxpool operations and the memory write operation
+\item 1024 Functional Units (FUs) in matrix organization for massive parallelism
+\item Each FU performs convolution, maxpool and memory writes
 \item 256-bit wide data memory accesses
 \item 64 additional memory read units
-\item Memory units equipped with internal and external memory Address Generation Units (AGUs)
-\item AGUs perform runtime computation of nested loop address affine expressions 
 \item 1 RISC-V control and reconfiguration CPU
 \item Instruction and data caches
 \item RS232 interfaces for viewing runtime messages

@@ -43,7 +43,7 @@
 \renewcommand{\footrulewidth}{.4pt}
 \fancyfoot{}
 %\fancyfoot[RO,LE]{
-\fancyfoot[L]{\copyright \the\year{} IObundle LDA All rights reserved}
+\fancyfoot[L]{\copyright \the\year{} IObundle Lda. All rights reserved}
 \fancyfoot[R]{\url{www.IObundle.com}}
 %\fancyfoot[RE,LO]{\@ifundefined{@confidential}{}{\textbf{Confidential}}}
 %\thepage
