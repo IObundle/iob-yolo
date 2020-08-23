@@ -32,6 +32,9 @@ class CYoloRead {
     void setOffset(int offset) {
       MEMSET(base, XYOLO_READ_CONF_OFFSET, offset);
     }
+    void setPingPong(int pp) {
+      MEMSET(base, XYOLO_READ_CONF_PP, pp);
+    }
     void setLen(int len) {
       MEMSET(base, XYOLO_READ_CONF_LEN, len);
     }
@@ -180,9 +183,6 @@ class CWrite {
     void setLen(int len) {
       MEMSET(base, VWRITE_CONF_LEN, len);
     }
-    void setSize(int size) {
-      MEMSET(base, VWRITE_CONF_SIZE, size);
-    }
     void setIntAddr(int intAddr) {
       MEMSET(base, VWRITE_CONF_INT_ADDR, intAddr);
     }
@@ -328,6 +328,7 @@ inline void versat_init(int base_addr) {
 
 inline void versat_end() {
   //last 2 runs
+  while(versat.done()==0);
   versat.run();
   while(versat.done()==0);
   versat.run();

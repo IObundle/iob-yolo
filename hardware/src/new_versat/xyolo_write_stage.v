@@ -18,7 +18,7 @@ module xyolo_write_stage #(
         // internal addrgen
         input                           vread_enB,
         input                           vwrite_enB,
-        input [`MEM_ADDR_W-1:0]         vread_addrB,
+        input [`PIXEL_ADDR_W-1:0]       vread_addrB,
         input [`VWRITE_ADDR_W-1:0]      vwrite_addrB,
 
         // load control
@@ -28,19 +28,19 @@ module xyolo_write_stage #(
 
         // vread config params
         input [`IO_ADDR_W-1:0]          vread_ext_addr,
-        input [`W_ADDR_W-1:0]         	vread_int_addr,
+        input [`PIXEL_W_ADDR_W-1:0]     vread_int_addr,
         input [`EXT_ADDR_W-1:0]         vread_iterA,
-        input [`EXT_PERIOD_W-1:0]       vread_perA,
+        input [`EXT_ADDR_W-1:0]       	vread_perA,
         input [`EXT_ADDR_W-1:0]         vread_shiftA,
         input [`EXT_ADDR_W-1:0]         vread_incrA,
 
         // vwrite config params
         input [`IO_ADDR_W-1:0]          vwrite_ext_addr,
         input [`VWRITE_ADDR_W-1:0]      vwrite_int_addr,
-        input [`MEM_ADDR_W-1:0]         vwrite_iterA,
-        input [`PERIOD_W-1:0]           vwrite_perA,
-        input [`MEM_ADDR_W-1:0]         vwrite_shiftA,
-        input [`MEM_ADDR_W-1:0]         vwrite_incrA,
+        input [`PIXEL_ADDR_W-1:0]       vwrite_iterA,
+        input [`PIXEL_ADDR_W-1:0]       vwrite_perA,
+        input [`PIXEL_ADDR_W-1:0]       vwrite_shiftA,
+        input [`PIXEL_ADDR_W-1:0]       vwrite_incrA,
         input                           vwrite_bypass,
 
         // xyolo config params
@@ -66,8 +66,8 @@ module xyolo_write_stage #(
    // external addrgen wires and regs
    wire					vread_enA, vread_we, vwrite_enA;
    reg					vread_enA_reg, vread_we_reg;
-   wire [`W_ADDR_W-1:0]			vread_addrA;
-   reg [`W_ADDR_W-1:0]			vread_addrA_reg;
+   wire [`PIXEL_W_ADDR_W-1:0]		vread_addrA;
+   reg [`PIXEL_W_ADDR_W-1:0]		vread_addrA_reg;
    wire [`VWRITE_ADDR_W-1:0]            vwrite_addrA;
    wire [DATABUS_W-1:0]      		vread_inA;
    reg [DATABUS_W-1:0]      		vread_inA_reg;
@@ -89,8 +89,8 @@ module xyolo_write_stage #(
    ext_addrgen #(
    	.DATA_W(DATABUS_W),
 	.EXT_ADDR_W(`EXT_ADDR_W),
-	.EXT_PERIOD_W(`EXT_PERIOD_W),
-	.MEM_ADDR_W(`W_ADDR_W)
+	.EXT_PERIOD_W(`EXT_ADDR_W),
+	.MEM_ADDR_W(`PIXEL_W_ADDR_W)
    ) vread_addrgenA (
       .clk(clk),
       .rst(rst),
@@ -108,7 +108,7 @@ module xyolo_write_stage #(
       .start(`EXT_ADDR_W'd0),
       .shift(vread_shiftA),
       .incr(vread_incrA),
-      .delay(`EXT_PERIOD_W'd0),
+      .delay(`EXT_ADDR_W'd0),
       // Databus interface
       .databus_ready(databus_ready[0]),
       .databus_valid(databus_valid[0]),
@@ -135,9 +135,9 @@ module xyolo_write_stage #(
    //internal memory
    iob_2p_assim_mem_w_big #(
       .W_DATA_W(DATABUS_W),
-      .W_ADDR_W(`W_ADDR_W),
+      .W_ADDR_W(`PIXEL_W_ADDR_W),
       .R_DATA_W(DATAPATH_W),
-      .R_ADDR_W(`MEM_ADDR_W),
+      .R_ADDR_W(`PIXEL_ADDR_W),
       .USE_RAM(1)
    ) vread_mem (
        .clk(clk),
@@ -163,6 +163,8 @@ module xyolo_write_stage #(
    //external address generator
    ext_addrgen #(
       .DATA_W(DATABUS_W),
+      .EXT_ADDR_W(`PIXEL_ADDR_W),
+      .EXT_PERIOD_W(`PIXEL_ADDR_W),
       .MEM_ADDR_W(`VWRITE_ADDR_W)
    ) vwrite_addrgenA (
       .clk(clk),
@@ -178,10 +180,10 @@ module xyolo_write_stage #(
       .iterations(vwrite_iterA),
       .period(vwrite_perA),
       .duty(vwrite_perA),
-      .start(`MEM_ADDR_W'd0),
+      .start(`PIXEL_ADDR_W'd0),
       .shift(vwrite_shiftA),
       .incr(vwrite_incrA),
-      .delay(`PERIOD_W'd0),
+      .delay(`PIXEL_ADDR_W'd0),
       // Databus interface
       .databus_ready(databus_ready[1]),
       .databus_valid(databus_valid[1]),

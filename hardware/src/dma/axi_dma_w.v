@@ -30,7 +30,6 @@ module axi_dma_w # (
 
 	// DMA configuration
 	input [`AXI_LEN_W-1:0]         len,
-	input [`AXI_SIZE_W-1:0]	       size,
    
 	// Master Interface Write Address
 	output wire [`AXI_ID_W-1:0]    m_axi_awid,
@@ -74,7 +73,7 @@ module axi_dma_w # (
    assign m_axi_awid = `AXI_ID_W'b0;
    assign m_axi_awaddr = addr;
    assign m_axi_awlen = len; //number of trasfers per burst
-   assign m_axi_awsize = size; //INCR interval
+   assign m_axi_awsize = $clog2(`MIG_BUS_W/8); //INCR interval
    assign m_axi_awburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_awlock = `AXI_LOCK_W'b0;
    assign m_axi_awcache = `AXI_CACHE_W'h2;

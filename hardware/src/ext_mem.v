@@ -50,7 +50,6 @@ module ext_mem
    input [3*`MIG_BUS_W/8-1:0] 	databus_wstrb,
 
    input [2*`AXI_LEN_W-1:0]     dma_len,
-   input [`AXI_SIZE_W-1:0]	dma_size,
 
    // AXI interface 
    // Address write
@@ -484,7 +483,6 @@ module ext_mem
 	    .ready    (databus_ready[2]),
 	    // DMA configurations
 	    .len	(dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W]),
-	    .size	(dma_size),
 	    // Address write
 	    .m_axi_awid(axi_awid[0*1+:1]), 
             .m_axi_awaddr(axi_awaddr[0*`DDR_ADDR_W+:`DDR_ADDR_W]), 

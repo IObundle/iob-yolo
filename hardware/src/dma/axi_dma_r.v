@@ -48,14 +48,18 @@ module axi_dma_r (
 	);
  
    // counter, state and error regs
-   reg [`AXI_LEN_W:0]                  counter_int, counter_int_nxt;
+   reg [`AXI_LEN_W-1:0]                counter_int, counter_int_nxt;
    reg [`R_STATES_W-1:0]               state, state_nxt;
    reg                                 error, error_nxt;
+
+   // register len and addr valid
+   reg [`AXI_LEN_W-1:0]		       len_r;
+   reg 				       m_axi_arvalid_int;
 
    // Address read constants
    assign m_axi_arid = `AXI_ID_W'b0;
    assign m_axi_araddr = addr;
-   assign m_axi_arlen = len; //number of trasfers per burst
+   assign m_axi_arlen = len_r; //number of trasfers per burst
    assign m_axi_arsize = $clog2(`MIG_BUS_W/8); //INCR interval
    assign m_axi_arburst = `AXI_BURST_W'b01; //INCR
    assign m_axi_arlock = `AXI_LOCK_W'b0;
@@ -66,17 +70,26 @@ module axi_dma_r (
    // Data read constant
    assign rdata = m_axi_rdata;
 
-   // Counter, error and state registers
+   // Counter, error, state and addr valid registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
        state <= `R_ADDR_HS;
        counter_int <= {`AXI_LEN_W{1'b0}};
        error <= 1'b0;
+       m_axi_arvalid <= 1'b0;
      end else begin
        state <= state_nxt;
        counter_int <= counter_int_nxt;
        error <= error_nxt;
+       m_axi_arvalid <= m_axi_arvalid_int;
      end
+
+   // register len
+   always @ (posedge clk, posedge rst)
+      if(rst)
+         len_r <= {`AXI_LEN_W{1'b0}};
+      else if(state == `R_ADDR_HS)
+         len_r <= len;
    
    // State machine
    always @ * begin
@@ -84,7 +97,7 @@ module axi_dma_r (
       error_nxt = error;
       counter_int_nxt = counter_int;
       ready = 1'b0;
-      m_axi_arvalid = 1'b0;
+      m_axi_arvalid_int = 1'b0;
       m_axi_rready = 1'b0;
       case (state)
 	    //addr handshake
@@ -94,14 +107,14 @@ module axi_dma_r (
 	          if (m_axi_arready == 1'b1) begin
 	             state_nxt = `R_DATA;
 		  end
-	          m_axi_arvalid = 1'b1;
+	          m_axi_arvalid_int = 1'b1;
 	       end
 	    end
 	    //data read
 	    `R_DATA: begin
 	       m_axi_rready = 1'b1;
 	       if (m_axi_rvalid == 1'b1) begin
-	          if (counter_int == len) begin
+	          if (counter_int == len_r) begin
 	             if (m_axi_rlast == 1'b1)
 		        error_nxt = 1'b0;
 	             else
