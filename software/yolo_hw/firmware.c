@@ -35,8 +35,8 @@
 
 //TILE sizes
 #define LAYER_1_TILE_W 208
-#define LAYER_3_TILE_W 52
-#define LAYER_5_TILE_W 26
+#define LAYER_3_TILE_W 104
+#define LAYER_5_TILE_W 52
 #define LAYER_7_TILE_W 26
 #define LAYER_9_TILE_W 2
 
@@ -272,6 +272,9 @@ void layer1() {
 // til_w -> width of tile
 // mp -> flag to indicate if perform stride 2 maxpool (1) or not (0) after convolution
 // w_start -> flag to indicate if weight mem starts writing from zero (0) or from given position (1) -> only for layer 3
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// STRATEGY -> Pixel reuse : apply all kernels to current FM tile before moving to next tile
+////////////////////////////////////////////////////////////////////////////////////////////////
 void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_start) {
 
   //local variables
