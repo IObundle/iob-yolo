@@ -182,6 +182,11 @@ module xyolo_write #(
    wire [`REQ_W-1:0]                    vread_s_req, vwrite_s_req;
    wire [`RESP_W-1:0]                   vread_s_resp, vwrite_s_resp;
 
+   // wires for vreads address comparison
+   wire [`nSTAGES-2:0] cond;
+   wire [`nSTAGES-2:0] databus_ready_w;
+   wire [(`nSTAGES-1)*DATABUS_W-1:0] databus_rdata_w;
+
    // update DMA length
    always @ (posedge clk, posedge rst)
       if(rst)
@@ -786,9 +791,9 @@ module xyolo_write #(
      for(i = 1; i < `nSTAGES; i=i+1)  begin : stages
 
         //check if asking for the same data as previous vread
-        wire cond = vread_m_req[`address((`nSTAGES-i), `IO_ADDR_W)] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)] && vread_m_req[`valid((`nSTAGES-i))] && vread_m_req[`valid((`nSTAGES-i-1))];
-	wire databus_ready_w = cond ? vread_m_resp[`ready((`nSTAGES-i))] : vread_m_resp[`ready((`nSTAGES-i-1))];
-	wire [DATABUS_W-1:0] databus_rdata_w = cond ? vread_m_resp[`rdata((`nSTAGES-i))] : vread_m_resp[`rdata((`nSTAGES-i-1))];
+        assign cond[i-1] = vread_m_req[`address((`nSTAGES-i), `IO_ADDR_W)] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)] && vread_m_req[`valid((`nSTAGES-i))] && vread_m_req[`valid((`nSTAGES-i-1))];
+	assign databus_ready_w[i-1] = cond[i-1] ? i == 1 ? vread_m_resp[`ready((`nSTAGES-i))] : databus_ready_w[i-2] : vread_m_resp[`ready((`nSTAGES-i-1))];
+	assign databus_rdata_w[DATABUS_W*(i-1) +: DATABUS_W] = cond[(i-1)] ? i == 1 ? vread_m_resp[`rdata((`nSTAGES-i))] : databus_rdata_w[DATABUS_W*(i-2) +: DATABUS_W] : vread_m_resp[`rdata((`nSTAGES-i-1))];
 
         //instantiate xyolo_write_stage
         xyolo_write_stage # (
@@ -831,10 +836,10 @@ module xyolo_write #(
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_shift(xyolo_shift_shadow),
       	   //databus interface
-      	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w}),
+      	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w[i-1]}),
            .databus_valid({vwrite_m_req[`valid((`nSTAGES-1-i))], vread_m_req[`valid((`nSTAGES-1-i))]}),
            .databus_addr({vwrite_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)], vread_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)]}),
-           .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1-i))], databus_rdata_w}),
+           .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1-i))], databus_rdata_w[DATABUS_W*(i-1) +: DATABUS_W]}),
            .databus_wdata({vwrite_m_req[`wdata((`nSTAGES-1-i))], vread_m_req[`wdata((`nSTAGES-1-i))]}),
            .databus_wstrb({vwrite_m_req[`wstrb((`nSTAGES-1-i))], vread_m_req[`wstrb((`nSTAGES-1-i))]}),
            //input data
