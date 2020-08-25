@@ -152,10 +152,10 @@ module xyolo_write #(
    wire                                 vread_enB, vwrite_enB;
    reg                                  vread_enB_reg, vwrite_enB_reg;
    wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB, vwrite_addrB_mux;
-   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg, vwrite_addrB_reg;
+   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg, vwrite_addrB_reg, vwrite_addrB_stage;
    wire                                 vread_doneB, vwrite_doneB;
    reg [$clog2(`nYOLOvect)+1:0] 	vwrite_enB_cnt; //+1 as maxpool is 2x2
-   reg [`nYOLOvect-1:0]			vwrite_enB_stage;
+   reg [`nYOLOvect-1:0]			vwrite_enB_stage, vwrite_enB_stage_reg;
    assign				vwrite_addrB_mux = xyolo_bypass_shadow ? vwrite_addrB_reg : vwrite_addrB;
 
    // done output
@@ -743,14 +743,26 @@ module xyolo_write #(
       end
    end
 
+   // register vwrite mem write inputs
+   always @ (posedge clk, posedge rst)
+      if(rst) begin
+	 vwrite_enB_reg <= 1'b0;
+         vwrite_enB_stage_reg <= `nYOLOvect'b0;
+         vwrite_addrB_reg <= `PIXEL_ADDR_W'b0;
+         vwrite_addrB_stage <= `PIXEL_ADDR_W'b0;
+      end else begin
+         vwrite_enB_reg <= vwrite_enB;
+         vwrite_enB_stage_reg <= vwrite_enB_stage;
+         vwrite_addrB_reg <= vwrite_addrB;
+         vwrite_addrB_stage <= vwrite_addrB_mux;
+      end
+
    //
    // stages
    //
 
    // register vread mem read inputs
    always @ (posedge clk) begin
-      vwrite_enB_reg <= vwrite_enB;
-      vwrite_addrB_reg <= vwrite_addrB;
       vread_enB_reg <= vread_enB;
       vread_addrB_reg <= vread_addrB;
    end
@@ -767,9 +779,9 @@ module xyolo_write #(
       .done(stages_done[0]),
       //internal addrgen
       .vread_enB(vread_enB_reg),
-      .vwrite_enB(vwrite_enB_stage),
+      .vwrite_enB(vwrite_enB_stage_reg),
       .vread_addrB(vread_addrB_reg),
-      .vwrite_addrB(vwrite_addrB_mux[`VWRITE_ADDR_W-1:0]),
+      .vwrite_addrB(vwrite_addrB_stage[`VWRITE_ADDR_W-1:0]),
       //load control
       .ld_acc(ld_acc0),
       .ld_mp(ld_mp),
@@ -827,9 +839,9 @@ module xyolo_write #(
            .done(stages_done[i]),
            //internal addrgen
            .vread_enB(vread_enB_reg),
-           .vwrite_enB(vwrite_enB_stage),
+           .vwrite_enB(vwrite_enB_stage_reg),
            .vread_addrB(vread_addrB_reg),
-           .vwrite_addrB(vwrite_addrB_mux[`VWRITE_ADDR_W-1:0]),
+           .vwrite_addrB(vwrite_addrB_stage[`VWRITE_ADDR_W-1:0]),
            //load control
            .ld_acc(ld_acc0),
            .ld_mp(ld_mp),

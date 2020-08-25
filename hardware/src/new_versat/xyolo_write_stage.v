@@ -71,6 +71,7 @@ module xyolo_write_stage #(
    wire [DATABUS_W-1:0]      		vread_inA;
    reg [DATABUS_W-1:0]      		vread_inA_reg;
    wire [`nYOLOvect*DATAPATH_W-1:0]	vwrite_inA, vwrite_inB;
+   reg [`nYOLOvect*DATAPATH_W-1:0]	vwrite_inB_reg;
 
    // done output
    wire					vread_doneA, vwrite_doneA;
@@ -198,6 +199,13 @@ module xyolo_write_stage #(
       .data_in(vwrite_inA)
    );
 
+   // register data between xyolos and vwrites
+   always @ (posedge clk, posedge rst)
+      if(rst)
+         vwrite_inB_reg <= {`nYOLOvect*DATAPATH_W{1'b0}};
+      else
+	 vwrite_inB_reg <= vwrite_inB;
+
    // instantiate vwrite internal memories and xyolo units
    genvar i;
    generate
@@ -217,7 +225,7 @@ module xyolo_write_stage #(
             // Writting port
             .w_en(vwrite_enB[i]),
             .w_addr(vwrite_addrB),
-            .data_in(vwrite_inB[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W])
+            .data_in(vwrite_inB_reg[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W])
          );
 
 	 //xyolo
