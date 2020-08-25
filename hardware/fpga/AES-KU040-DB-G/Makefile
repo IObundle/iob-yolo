@@ -6,7 +6,7 @@ include ../fpga.mk
 export RDI_VERBOSE = False
 
 clean: hw-clean
-	rm -rf .Xil/ *.map *. *~ synth_*.mmi synth_*.bit synth_system*.v *.vcd *_tb table.txt tab_*/ *webtalk* *.jou xelab.* xsim[._]* xvlog.* uart_loader *.ltx fsm_encoding.os *.log .log
+	rm -rf .Xil/ *.map *. *~ synth_*.mmi synth_*.bit synth_system*.v *.vcd *_tb table.txt tab_*/ *webtalk* *.jou xelab.* xsim[._]* xvlog.* uart_loader *.ltx fsm_encoding.os *.log .log *.txt
 
 clean-ip:
 	rm -rf ip
