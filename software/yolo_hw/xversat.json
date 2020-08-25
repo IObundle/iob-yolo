@@ -6,6 +6,6 @@
         "BIAS_ADDR_W":          3,
 	"WEIGHT_ADDR_W":	14,
 	"PIXEL_ADDR_W":		15,
-	"EXT_ADDR_W":		14,
+	"EXT_ADDR_W":		15,
         "VWRITE_ADDR_W":        8
 }
