@@ -43,7 +43,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_9*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_10*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -91,6 +91,10 @@ void reset_DDR() {
 
   //layer 9
   for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_9;
+
+  //layer 10
+  for(i = 0; i < DATA_LAYER_10; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_time_us(TIMER_BASE);
@@ -441,6 +445,17 @@ void conv2(int w, int c, int num_ker, int ker_size) {
   //pass first padding line and first 16 pixels of next line
   p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w+2)*num_ker + 16);
 
+  // extra run to make last computation
+  while(versat.done()==0);
+ #ifdef TIME_RUN
+  end = (unsigned int) timer_get_count(TIMER_BASE);
+  uart_printf("%d\n", (end - start)*8);
+ #endif
+  versat.run();
+ #ifdef TIME_RUN
+  start = (unsigned int) timer_get_count(TIMER_BASE);
+ #endif
+
   /////////////////////////////////////////////////////////////////////////
   //                          FIXED CONFIGURATIONS
   /////////////////////////////////////////////////////////////////////////
@@ -453,7 +468,7 @@ void conv2(int w, int c, int num_ker, int ker_size) {
   versat.yread.setExtIter(1);
   versat.yread.setPingPong(1);
 
-  // configure xyolo_write vread to read tile from input fm
+  // configure xyolo_write vread to read input fm
   versat.ywrite.read.setLen(c*(w+2)*(nSTAGES+2)/16-1);
   versat.ywrite.read.setOffset(2*((w+2)*c));
   versat.ywrite.read.setExtPer((c*(w+2)*ker_size)/16);
@@ -474,7 +489,7 @@ void conv2(int w, int c, int num_ker, int ker_size) {
   versat.ywrite.read.setIntPer2(w);
   versat.ywrite.read.setIntIter2(1);
 
-  // configure xyolo to perform convolution + maxpool
+  // configure xyolo to perform convolution
   versat.ywrite.yolo.setIter(w);
   versat.ywrite.yolo.setPer(ker_size*ker_size*c);
   versat.ywrite.yolo.setShift(10);
@@ -543,13 +558,111 @@ void conv2(int w, int c, int num_ker, int ker_size) {
   versat.clear();
 }
 
+//run maxpool layer in versat
+//input data is in format 16 channels per pixel
+//ouput data is converted back again to zxy format
+void maxpool(int w, int c) {
+
+  // extra run to make last computation
+  while(versat.done()==0);
+ #ifdef TIME_RUN
+  end = (unsigned int) timer_get_count(TIMER_BASE);
+  uart_printf("%d\n", (end - start)*8);
+ #endif
+  versat.run();
+ #ifdef TIME_RUN
+  start = (unsigned int) timer_get_count(TIMER_BASE);
+ #endif
+
+  //local variables
+  int l;
+  unsigned int p_in = DATA_BASE_ADDRESS + 2*(p_pos + (w+2)*c); //pass first padding line
+  unsigned int p_out;
+
+  //update initial positions
+  p_pos += (w+2)*(w+2)*c;
+  p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w/2+2+1)*c); //pass first padding line and column
+
+  /////////////////////////////////////////////////////////////////////////
+  //                          FIXED CONFIGURATIONS
+  /////////////////////////////////////////////////////////////////////////
+
+  // configure xyolo_write vread to read input fm
+  versat.ywrite.read.setLen(c*(w+2)*nSTAGES*2/16-1);
+  versat.ywrite.read.setOffset(2*(2*(w+2)*c)); //each vread reads 2 different lines
+  versat.ywrite.read.setExtPer((c*(w+2)*2)/16);
+  versat.ywrite.read.setExtIncr(16);
+  versat.ywrite.read.setExtIter(1);
+  versat.ywrite.read.setExtAddr(p_in);
+
+  // configure xyolo_write vread to write FM tile to xyolo
+  versat.ywrite.read.setIntPer(2);
+  versat.ywrite.read.setIntIncr(16);
+  versat.ywrite.read.setIntIter(2);
+  versat.ywrite.read.setIntShift((w+2)*c - 32); //+2 due to padding
+  versat.ywrite.read.setIntIncr2(1);
+  versat.ywrite.read.setIntPer2(16);
+  versat.ywrite.read.setIntIter2(c/16);
+  versat.ywrite.read.setIntShift2((w+2)*16 - 16);
+
+  // configure xyolo to perform maxpool
+  versat.ywrite.yolo.setIter(4*c);
+  versat.ywrite.yolo.setPer(1);
+  versat.ywrite.yolo.setMaxpool(1);
+  versat.ywrite.yolo.setBypass(1);
+
+  // configure xwrite to write convolution results
+  // hw internally has counter to adress each vwrite individually when bypass is enabled
+  versat.ywrite.write.setIntDuty(4*16);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_BYPASS_LAT - 2);
+  versat.ywrite.write.setIntPer(4*16);
+  versat.ywrite.write.setIntIter(c/16);
+  versat.ywrite.write.setIntShift(1);
+
+  // configure xyolo_write vwrite to write result back to DDR
+  versat.ywrite.write.setLen(c/16-1);
+  versat.ywrite.write.setOffset(2*((w/2+2)*c));
+  versat.ywrite.write.setExtPer(c/16);
+  versat.ywrite.write.setExtIter(1);
+  
+  // perform maxpool
+  for(l = 0; l < w/2; l++) {
+
+    // configure xyolo_write vread start
+    versat.ywrite.read.setIntStart(16 + 2*16*l);
+
+    // configure xyolo_write vwrite to write result back to DDR
+    versat.ywrite.write.setExtAddr(p_out + 2*c*l);
+
+    // wait until done
+    while(versat.done()==0);
+  #ifdef TIME_RUN
+    end = (unsigned int) timer_get_count(TIMER_BASE);
+    uart_printf("%d\n", (end - start)*8);
+    if(l == 0) uart_printf("\n");
+  #endif
+
+    // run configuration
+    versat.run();
+  #ifdef TIME_RUN
+    start = (unsigned int) timer_get_count(TIMER_BASE);
+  #endif
+
+    // stop xyolo_write vread reading from DDR
+    versat.ywrite.read.setExtIter(0);
+  }
+
+  // clear configs
+  versat.clear();
+}
+
 //send results back
 void send_data() {
 
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -583,7 +696,7 @@ int main(int argc, char **argv) {
   uart_init(UART_BASE,FREQ/BAUD);
 
   //send init message
-  uart_printf("\nNEW VERSAT TEST\n\n");
+  uart_printf("\nYOLO HW\n\n");
 
   //init VERSAT
   versat_init(VERSAT_BASE);
@@ -639,24 +752,10 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, LAYER_7_MAXPOOL, 0);
-  //one extra run as next layers uses results from last run
-  while(versat.done()==0);
- #ifdef TIME_RUN
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*8);
- #endif
-  versat.run();
- #ifdef TIME_RUN
-  start = (unsigned int) timer_get_count(TIMER_BASE);
- #else
+ #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
  #endif
-
-#else
-  w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7;
-  p_pos += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6;
-#endif
 
   //layer 9
  #ifndef TIME_RUN
@@ -664,6 +763,22 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE);
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Convolution done in %d us\n\n", end-start);
+ #endif
+
+#else
+  w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7;
+  p_pos += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
+#endif
+
+  //layer 10
+ #ifndef TIME_RUN
+  uart_printf("\nRunning layer 10...\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  maxpool(LAYER_9_W, LAYER_9_NUM_KER);
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
@@ -682,23 +797,23 @@ int main(int argc, char **argv) {
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
-  uart_printf("Convolution done in %d us\n\n", end-start);
+  uart_printf("Maxpool done in %d us\n\n", end-start);
  #endif
 
   //verify results
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
+  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9;
   int i, j, k;
   uart_printf("Verifying...\n\n");
-  uart_printf("1st line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + (LAYER_9_W+2)*LAYER_9_NUM_KER));
-  uart_printf("2nd line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + 2*(LAYER_9_W+2)*LAYER_9_NUM_KER));
-  for(i = 0; i < k_delta*nSTAGES+1; i++) {
+  uart_printf("1st line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + LAYER_10_W*LAYER_9_NUM_KER));
+  for(i = 0; i < LAYER_10_W; i++) {
     uart_printf("%d\n", i);
-    for(j = 0; j < (LAYER_9_W+2); j++)
+    for(j = 0; j < LAYER_10_W; j++)
       for(k = 0; k < LAYER_9_NUM_KER; k++)
-        if(fp_data[i*(LAYER_9_W+2)*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] != fp_data[DATA_LAYER_9 + i*(LAYER_9_W+2)*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + i*(LAYER_9_W+2)*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k), fp_data[i*(LAYER_9_W+2)*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_9 + i*(LAYER_9_W+2)*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF);  }
+        if(fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] != fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k), fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF);
+  }
 #endif
 
 #ifndef SIM

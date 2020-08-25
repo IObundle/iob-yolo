@@ -111,7 +111,6 @@ module xyolo_write #(
    reg [`PIXEL_ADDR_W-1:0]              vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
-   reg                                  vwrite_bypass_shadow; //used for maxpool and upsample
 
    // vread configuration parameters
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
@@ -151,10 +150,13 @@ module xyolo_write #(
 
    // internal addrgen wires and regs
    wire                                 vread_enB, vwrite_enB;
-   reg                                  vread_enB_reg;
-   wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB;
-   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg;
+   reg                                  vread_enB_reg, vwrite_enB_reg;
+   wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB, vwrite_addrB_mux;
+   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg, vwrite_addrB_reg;
    wire                                 vread_doneB, vwrite_doneB;
+   reg [$clog2(`nYOLOvect)+1:0] 	vwrite_enB_cnt; //+1 as maxpool is 2x2
+   reg [`nYOLOvect-1:0]			vwrite_enB_stage;
+   assign				vwrite_addrB_mux = xyolo_bypass_shadow ? vwrite_addrB_reg : vwrite_addrB;
 
    // done output
    wire [`nSTAGES-1:0]                  stages_done;
@@ -445,7 +447,6 @@ module xyolo_write #(
          vwrite_shiftB_pip <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_shadow <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_pip <= `PIXEL_ADDR_W'b0;
-         vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
 	 vread_len_shadow <= {`IO_ADDR_W/2{1'b0}};
@@ -533,7 +534,6 @@ module xyolo_write #(
 	 vwrite_shiftB_shadow <= vwrite_shiftB_pip;
 	 vwrite_incrB_pip <= vwrite_incrB;
 	 vwrite_incrB_shadow <= vwrite_incrB_pip;
-         vwrite_bypass_shadow <= xyolo_bypass_shadow;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 vread_len_shadow <= vread_len;
@@ -724,12 +724,33 @@ module xyolo_write #(
       .done(vwrite_doneB)
    );
 
+   // update vwrite enable counter
+   always @ (posedge clk, posedge rst)
+      if(rst || run_reg)
+         vwrite_enB_cnt <= {$clog2(`nYOLOvect)+2{1'b0}};
+      else if(vwrite_enB_reg)
+	 vwrite_enB_cnt <= vwrite_enB_cnt + 1'b1;
+
+   // enable vwrite decoder
+   always @ * begin
+      integer j;
+      vwrite_enB_stage = {`nYOLOvect{1'b0}};
+      for(j = 0; j < `nYOLOvect; j++) begin
+         if(xyolo_bypass_shadow)
+	    vwrite_enB_stage[j] = ((j*4+3) == vwrite_enB_cnt) ? vwrite_enB_reg : 1'b0;
+	 else
+	    vwrite_enB_stage[j] = vwrite_enB;
+      end
+   end
+
    //
    // stages
    //
 
    // register vread mem read inputs
    always @ (posedge clk) begin
+      vwrite_enB_reg <= vwrite_enB;
+      vwrite_addrB_reg <= vwrite_addrB;
       vread_enB_reg <= vread_enB;
       vread_addrB_reg <= vread_addrB;
    end
@@ -746,9 +767,9 @@ module xyolo_write #(
       .done(stages_done[0]),
       //internal addrgen
       .vread_enB(vread_enB_reg),
-      .vwrite_enB(vwrite_enB),
+      .vwrite_enB(vwrite_enB_stage),
       .vread_addrB(vread_addrB_reg),
-      .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
+      .vwrite_addrB(vwrite_addrB_mux[`VWRITE_ADDR_W-1:0]),
       //load control
       .ld_acc(ld_acc0),
       .ld_mp(ld_mp),
@@ -767,7 +788,6 @@ module xyolo_write #(
       .vwrite_perA(vwrite_perA_shadow),
       .vwrite_shiftA(vwrite_shiftA_shadow),
       .vwrite_incrA(vwrite_incrA_shadow),
-      .vwrite_bypass(vwrite_bypass_shadow),
       //xyolo config params
       .xyolo_bias(xyolo_bias_shadow),
       .xyolo_leaky(xyolo_leaky_shadow),
@@ -807,9 +827,9 @@ module xyolo_write #(
            .done(stages_done[i]),
            //internal addrgen
            .vread_enB(vread_enB_reg),
-           .vwrite_enB(vwrite_enB),
+           .vwrite_enB(vwrite_enB_stage),
            .vread_addrB(vread_addrB_reg),
-           .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
+           .vwrite_addrB(vwrite_addrB_mux[`VWRITE_ADDR_W-1:0]),
            //load control
            .ld_acc(ld_acc0),
            .ld_mp(ld_mp),
@@ -828,7 +848,6 @@ module xyolo_write #(
            .vwrite_perA(vwrite_perA_shadow),
            .vwrite_shiftA(vwrite_shiftA_shadow),
            .vwrite_incrA(vwrite_incrA_shadow),
-           .vwrite_bypass(vwrite_bypass_shadow),
            //xyolo config params
            .xyolo_bias(xyolo_bias_shadow),
            .xyolo_leaky(xyolo_leaky_shadow),
