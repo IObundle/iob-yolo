@@ -180,6 +180,7 @@ void layer1() {
   versat.ywrite.read.setOffset(2*(2*((LAYER_1_W+2)*LAYER_1_C+LAYER_1_P_OFF)));
   versat.ywrite.read.setExtPer((LAYER_1_C*(LAYER_1_W+2)+LAYER_1_P_OFF)*(LAYER_1_KER_SIZE+1)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
+  versat.ywrite.read.setPingPong(1);
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C);
@@ -320,6 +321,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
   versat.ywrite.read.setExtPer((c*(til_w+2))/16);
   versat.ywrite.read.setExtIncr(16);
   versat.ywrite.read.setExtShift(((w+2)*c) - (c*(til_w+2))); //+2 due to padding
+  versat.ywrite.read.setPingPong(1);
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(ker_size*ker_size*c);
@@ -481,6 +483,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride) {
   versat.ywrite.read.setOffset(2*((w+2)*c));
   versat.ywrite.read.setExtPer((c*(w+2)*ker_size)/16);
   versat.ywrite.read.setExtIncr(16);
+  versat.ywrite.read.setPingPong(1);
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(ker_size*ker_size*c);

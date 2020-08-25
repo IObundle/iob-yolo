@@ -126,6 +126,7 @@ void conv() {
   versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtPer((NTW_IN_C*(NTW_IN_W+2)+10)*(NTW_IN_KER_SIZE+1)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
+  versat.ywrite.read.setPingPong(1);
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 27

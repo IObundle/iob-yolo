@@ -65,6 +65,7 @@ module xyolo_write #(
    // vread configuration enables
    reg					vread_ext_addr_en;
    reg					vread_offset_en;
+   reg					vread_pp_en;
    reg					vread_len_en;
    reg					vread_int_addr_en;
    reg					vread_iterA_en;
@@ -116,6 +117,7 @@ module xyolo_write #(
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
+   reg 					vread_pp;
    reg [`IO_ADDR_W/2-1:0]		vread_len, vread_len_shadow;
    reg [`PIXEL_W_ADDR_W-1:0]		vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
@@ -230,6 +232,7 @@ module xyolo_write #(
       //vread
       vread_ext_addr_en = 1'b0;
       vread_offset_en = 1'b0;
+      vread_pp_en = 1'b0;
       vread_len_en = 1'b0;
       vread_int_addr_en = 1'b0;
       vread_iterA_en = 1'b0;
@@ -278,6 +281,7 @@ module xyolo_write #(
 	    //vread
 	    `VREAD_CONF_EXT_ADDR : vread_ext_addr_en = 1'b1;
 	    `VREAD_CONF_OFFSET : vread_offset_en = 1'b1;
+	    `VREAD_CONF_PP : vread_pp_en = 1'b1;
 	    `VREAD_CONF_LEN : vread_len_en = 1'b1;
 	    `VREAD_CONF_INT_ADDR : vread_int_addr_en = 1'b1;
             `VREAD_CONF_ITER_A : vread_iterA_en = 1'b1;
@@ -331,6 +335,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
+	 vread_pp <= 1'b0;
 	 vread_len <= {`IO_ADDR_W/2{1'b0}};
          vread_int_addr <= {`PIXEL_W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
@@ -379,6 +384,7 @@ module xyolo_write #(
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
+   	 if(vread_pp_en) vread_pp <= wdata[0];
    	 if(vread_len_en) vread_len <= wdata[`IO_ADDR_W/2-1:0];
          if(vread_int_addr_en) vread_int_addr <= wdata[`PIXEL_W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
@@ -538,12 +544,12 @@ module xyolo_write #(
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 vread_len_shadow <= vread_len;
 	 //XOR ensures ping-pong happens when acessing external mem
-	 vread_int_addr_shadow <= {vread_int_addr_shadow[`PIXEL_W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`PIXEL_W_ADDR_W-2:0]};
+	 vread_int_addr_shadow <= vread_pp ? {vread_int_addr_shadow[`PIXEL_W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`PIXEL_W_ADDR_W-2:0]} : vread_int_addr;
 	 vread_iterA_shadow <= vread_iterA;
 	 vread_perA_shadow <= vread_perA;
 	 vread_shiftA_shadow <= vread_shiftA;
 	 vread_incrA_shadow <= vread_incrA;
-	 vread_startB_pip <= {vread_startB_pip[`PIXEL_ADDR_W-1] ^ |vread_iterA, vread_startB[`PIXEL_ADDR_W-2:0]};
+	 vread_startB_pip <= vread_pp ? {vread_startB_pip[`PIXEL_ADDR_W-1] ^ |vread_iterA, vread_startB[`PIXEL_ADDR_W-2:0]} : vread_startB;
 	 vread_startB_shadow <= vread_startB_pip;
 	 vread_iterB_pip <= vread_iterB;
 	 vread_iterB_shadow <= vread_iterB_pip;
