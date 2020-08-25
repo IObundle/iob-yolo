@@ -43,7 +43,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_10*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_11*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -95,6 +95,10 @@ void reset_DDR() {
 
   //layer 10
   for(i = 0; i < DATA_LAYER_10; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_10;
+
+  //layer 11
+  for(i = 0; i < DATA_LAYER_11; i++) fp_data[pos + i] = 0x8000; //min value
 
   //measure final time
   end = timer_time_us(TIMER_BASE);
@@ -428,7 +432,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // STRATEGY -> Weight reuse : apply current kernel to all tiles before moving to next kernel
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void conv2(int w, int c, int num_ker, int ker_size) {
+void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride) {
 
   //local variables
   int k, l;
@@ -443,7 +447,7 @@ void conv2(int w, int c, int num_ker, int ker_size) {
   w_pos += num_ker*(1 + ker_size*ker_size*c);
   p_pos += (w+2)*(w+2)*c;
   //pass first padding line and first 16 pixels of next line
-  p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w+2)*num_ker + 16);
+  p_out = DATA_BASE_ADDRESS + 2*(p_pos + ((w+2)*num_ker + 16)*outpadd);
 
   // extra run to make last computation
   while(versat.done()==0);
@@ -505,7 +509,7 @@ void conv2(int w, int c, int num_ker, int ker_size) {
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setLen(w-1);
-  versat.ywrite.write.setOffset(2*((w+2)*num_ker));
+  versat.ywrite.write.setOffset(2*((w+2*outpadd+stride)*num_ker));
   versat.ywrite.write.setExtPer(w);
   versat.ywrite.write.setExtIter(1);
 
@@ -533,7 +537,7 @@ void conv2(int w, int c, int num_ker, int ker_size) {
       versat.yread.setBiasExtAddr(w_in + 2*l*nYOLOvect*(1+ker_size*ker_size*c));
 
       // configure xyolo_write vwrite to write result back to DDR
-      versat.ywrite.write.setExtAddr(p_out + 2*(k*(w+2)*num_ker*nSTAGES + l*(w+2)*16));
+      versat.ywrite.write.setExtAddr(p_out + 2*(k*(w+2*outpadd+stride)*num_ker*nSTAGES + l*(w+2*outpadd+stride)*16));
 
       // wait until done
       while(versat.done()==0);
@@ -662,7 +666,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -762,16 +766,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 9...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE);
+  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE);
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
  #endif
-
-#else
-  w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7;
-  p_pos += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8;
-#endif
 
   //layer 10
  #ifndef TIME_RUN
@@ -779,6 +778,21 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   maxpool(LAYER_9_W, LAYER_9_NUM_KER);
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Maxpool done in %d us\n\n", end-start);
+ #endif
+#else
+  w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9;
+  p_pos += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9;
+#endif
+
+  //layer 11
+ #ifndef TIME_RUN
+  uart_printf("\nRunning layer 11...\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE);
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
@@ -797,22 +811,22 @@ int main(int argc, char **argv) {
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
-  uart_printf("Maxpool done in %d us\n\n", end-start);
+  uart_printf("Convolution done in %d us\n\n", end-start);
  #endif
 
   //verify results
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9;
+  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10;
   int i, j, k;
   uart_printf("Verifying...\n\n");
-  uart_printf("1st line = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + LAYER_10_W*LAYER_9_NUM_KER));
-  for(i = 0; i < LAYER_10_W; i++) {
+  uart_printf("Initial address = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10));
+  for(i = 0; i < LAYER_11_W+1; i++) {
     uart_printf("%d\n", i);
-    for(j = 0; j < LAYER_10_W; j++)
-      for(k = 0; k < LAYER_9_NUM_KER; k++)
-        if(fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] != fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k), fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF);
+    for(j = 0; j < LAYER_11_W+1; j++)
+      for(k = 0; k < LAYER_11_NUM_KER; k++)
+        if(fp_data[i*(LAYER_11_W+1)*LAYER_11_NUM_KER + j*LAYER_11_NUM_KER + k] != fp_data[DATA_LAYER_11 + i*(LAYER_11_W+1)*LAYER_11_NUM_KER + j*LAYER_11_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + i*(LAYER_11_W+1)*LAYER_11_NUM_KER + j*LAYER_11_NUM_KER + k), fp_data[i*(LAYER_11_W+1)*LAYER_11_NUM_KER + j*LAYER_11_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_11 + i*(LAYER_11_W+1)*LAYER_11_NUM_KER + j*LAYER_11_NUM_KER + k] & 0xFFFF);
   }
 #endif
 
