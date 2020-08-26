@@ -17,7 +17,7 @@
 `define DATA_LAYER_11 (14*14*512)
 `define DATA_LAYER_12 (15*15*512)
 `define DATA_LAYER_13 (13*13*1024)
-`define TOTAL_FM (2*(`DATA_LAYER_1 + `DATA_LAYER_2 + `DATA_LAYER_4 + `DATA_LAYER_6 + `DATA_LAYER_8 + `DATA_LAYER_9 + `DATA_LAYER_10 + `DATA_LAYER_11 + `DATA_LAYER_12 + 2*`DATA_LAYER_13))
+`define TOTAL_FM (2*(`DATA_LAYER_12 + 2*`DATA_LAYER_13))
 
 //Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*(3*3*3+5)) //+5 to be 32 byte aligned

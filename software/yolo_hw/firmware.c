@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-//#define TIME_RUN
+#define TIME_RUN
 
 #ifdef SIM
   int k_delta;
@@ -814,7 +814,6 @@ int main(int argc, char **argv) {
 
 #else
   w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11;
-  p_pos += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11;
 #endif
 
   //layer 13
@@ -844,20 +843,20 @@ int main(int argc, char **argv) {
   uart_printf("Convolution done in %d us\n\n", end-start);
  #endif
 
-/*#ifdef SIM
+#ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12;
+  fp_data += DATA_LAYER_12;
   int i, j, k;
   uart_printf("Verifying...\n\n");
-  uart_printf("Initial address = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12));
+  uart_printf("Initial address = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_12));
   for(i = 0; i < LAYER_13_W; i++) {
     uart_printf("%d\n", i);
     for(j = 0; j < LAYER_13_W; j++)
       for(k = 0; k < LAYER_13_NUM_KER; k++)
         if(fp_data[i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] != fp_data[DATA_LAYER_13 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k), fp_data[i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_13 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF);
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_12 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k), fp_data[i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_13 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF);
   }
-#endif*/
+#endif
 
 #ifndef SIM
   send_data();
