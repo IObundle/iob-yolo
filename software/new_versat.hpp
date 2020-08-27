@@ -100,6 +100,9 @@ class CRead {
     void setOffset(int offset) {
       MEMSET(base, VREAD_CONF_OFFSET, offset);
     }
+    void setPingPong(int pp) {
+      MEMSET(base, VREAD_CONF_PP, pp);
+    }
     void setLen(int len) {
       MEMSET(base, VREAD_CONF_LEN, len);
     }

@@ -111,6 +111,7 @@ place_design -no_bufg_opt
 route_design
 
 report_utilization
+report_utilization -hierarchical -file utilization.txt
 
 report_timing
 

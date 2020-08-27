@@ -13,8 +13,13 @@
 `define DATA_LAYER_6 (54*54*64)
 `define DATA_LAYER_8 (28*28*128)
 `define DATA_LAYER_9 (28*28*256)
-`define TOTAL_FM (2*(`DATA_LAYER_1 + `DATA_LAYER_2 + `DATA_LAYER_4 + `DATA_LAYER_6 + 2*`DATA_LAYER_8))
-//`define TOTAL_FM (2*(`DATA_LAYER_1 + `DATA_LAYER_2 + `DATA_LAYER_4 + `DATA_LAYER_6 + `DATA_LAYER_8 + 2*`DATA_LAYER_9))
+`define DATA_LAYER_10 (15*15*256)
+`define DATA_LAYER_11 (14*14*512)
+`define DATA_LAYER_12 (15*15*512)
+`define DATA_LAYER_13 (13*13*1024)
+`define DATA_LAYER_14 (15*15*256)
+`define DATA_LAYER_15 (13*13*512)
+`define TOTAL_FM (2*(`DATA_LAYER_14 + 2*`DATA_LAYER_15))
 
 //Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*(3*3*3+5)) //+5 to be 32 byte aligned
@@ -22,7 +27,11 @@
 `define WEIGHTS_LAYER_5 (64 + 64*3*3*32)
 `define WEIGHTS_LAYER_7 (128 + 128*3*3*64)
 `define WEIGHTS_LAYER_9 (256 + 256*3*3*128)
-`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_1 + `WEIGHTS_LAYER_3 + `WEIGHTS_LAYER_5 + `WEIGHTS_LAYER_7 + `WEIGHTS_LAYER_9))
+`define WEIGHTS_LAYER_11 (512 + 512*3*3*256)
+`define WEIGHTS_LAYER_13 (1024 + 1024*3*3*512)
+`define WEIGHTS_LAYER_14 (256 + 256*1*1*1024)
+`define WEIGHTS_LAYER_15 (512 + 512*3*3*256)
+`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_1 + `WEIGHTS_LAYER_3 + `WEIGHTS_LAYER_5 + `WEIGHTS_LAYER_7 + `WEIGHTS_LAYER_9 + `WEIGHTS_LAYER_11 + `WEIGHTS_LAYER_13 + `WEIGHTS_LAYER_14 + `WEIGHTS_LAYER_15))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
@@ -52,7 +61,7 @@ module yolo_hw_tb;
    //tester uart
    reg       		  uart_valid;
    reg [`UART_ADDR_W-1:0] uart_addr;
-   reg [`DATA_W-1:0]      uart_wdata;
+   reg [`UART_WDATA_W-1:0] uart_wdata;
    reg                    uart_wstrb;
    reg [`DATA_W-1:0]      uart_rdata;
    wire                   uart_ready;

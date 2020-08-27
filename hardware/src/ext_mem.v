@@ -428,6 +428,8 @@ module ext_mem
       .N_MASTERS(2),
       .DATA_W(`MIG_BUS_W)
    ) vreads_merge (
+      .clk (clk),
+      .rst (rst),
       // masters
       .m_req  (vread_m_req),
       .m_resp (vread_m_resp),

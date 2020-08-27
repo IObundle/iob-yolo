@@ -65,6 +65,7 @@ module xyolo_write #(
    // vread configuration enables
    reg					vread_ext_addr_en;
    reg					vread_offset_en;
+   reg					vread_pp_en;
    reg					vread_len_en;
    reg					vread_int_addr_en;
    reg					vread_iterA_en;
@@ -111,12 +112,12 @@ module xyolo_write #(
    reg [`PIXEL_ADDR_W-1:0]              vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
-   reg                                  vwrite_bypass_shadow; //used for maxpool and upsample
 
    // vread configuration parameters
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
    reg [`nSTAGES*`IO_ADDR_W-1:0]	vread_ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0]		vread_offset;
+   reg 					vread_pp;
    reg [`IO_ADDR_W/2-1:0]		vread_len, vread_len_shadow;
    reg [`PIXEL_W_ADDR_W-1:0]		vread_int_addr, vread_int_addr_shadow;
    reg [`EXT_ADDR_W-1:0]		vread_iterA, vread_iterA_shadow;
@@ -151,10 +152,13 @@ module xyolo_write #(
 
    // internal addrgen wires and regs
    wire                                 vread_enB, vwrite_enB;
-   reg                                  vread_enB_reg;
-   wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB;
-   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg;
+   reg                                  vread_enB_reg, vwrite_enB_reg;
+   wire [`PIXEL_ADDR_W-1:0]             vread_addrB, vwrite_addrB, vwrite_addrB_mux;
+   reg [`PIXEL_ADDR_W-1:0]              vread_addrB_reg, vwrite_addrB_reg, vwrite_addrB_stage;
    wire                                 vread_doneB, vwrite_doneB;
+   reg [$clog2(`nYOLOvect)+1:0] 	vwrite_enB_cnt; //+1 as maxpool is 2x2
+   reg [`nYOLOvect-1:0]			vwrite_enB_stage, vwrite_enB_stage_reg;
+   assign				vwrite_addrB_mux = xyolo_bypass_shadow ? vwrite_addrB_reg : vwrite_addrB;
 
    // done output
    wire [`nSTAGES-1:0]                  stages_done;
@@ -181,6 +185,11 @@ module xyolo_write #(
    // merge slave interface
    wire [`REQ_W-1:0]                    vread_s_req, vwrite_s_req;
    wire [`RESP_W-1:0]                   vread_s_resp, vwrite_s_resp;
+
+   // wires for vreads address comparison
+   wire [`nSTAGES-2:0] cond;
+   wire [`nSTAGES-2:0] databus_ready_w;
+   wire [(`nSTAGES-1)*DATABUS_W-1:0] databus_rdata_w;
 
    // update DMA length
    always @ (posedge clk, posedge rst)
@@ -223,6 +232,7 @@ module xyolo_write #(
       //vread
       vread_ext_addr_en = 1'b0;
       vread_offset_en = 1'b0;
+      vread_pp_en = 1'b0;
       vread_len_en = 1'b0;
       vread_int_addr_en = 1'b0;
       vread_iterA_en = 1'b0;
@@ -271,6 +281,7 @@ module xyolo_write #(
 	    //vread
 	    `VREAD_CONF_EXT_ADDR : vread_ext_addr_en = 1'b1;
 	    `VREAD_CONF_OFFSET : vread_offset_en = 1'b1;
+	    `VREAD_CONF_PP : vread_pp_en = 1'b1;
 	    `VREAD_CONF_LEN : vread_len_en = 1'b1;
 	    `VREAD_CONF_INT_ADDR : vread_int_addr_en = 1'b1;
             `VREAD_CONF_ITER_A : vread_iterA_en = 1'b1;
@@ -324,6 +335,7 @@ module xyolo_write #(
 	 //vread
 	 vread_ext_addr <= `IO_ADDR_W'b0;
 	 vread_offset <= {`IO_ADDR_W/2{1'b0}};
+	 vread_pp <= 1'b0;
 	 vread_len <= {`IO_ADDR_W/2{1'b0}};
          vread_int_addr <= {`PIXEL_W_ADDR_W{1'b0}};
          vread_iterA <= `EXT_ADDR_W'b0;
@@ -372,6 +384,7 @@ module xyolo_write #(
 	 //vread
    	 if(vread_ext_addr_en) vread_ext_addr <= wdata[`IO_ADDR_W-1:0];
    	 if(vread_offset_en) vread_offset <= wdata[`IO_ADDR_W/2-1:0];
+   	 if(vread_pp_en) vread_pp <= wdata[0];
    	 if(vread_len_en) vread_len <= wdata[`IO_ADDR_W/2-1:0];
          if(vread_int_addr_en) vread_int_addr <= wdata[`PIXEL_W_ADDR_W-1:0];
    	 if(vread_iterA_en) vread_iterA <= wdata[`EXT_ADDR_W-1:0];
@@ -440,7 +453,6 @@ module xyolo_write #(
          vwrite_shiftB_pip <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_shadow <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_pip <= `PIXEL_ADDR_W'b0;
-         vwrite_bypass_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
 	 vread_len_shadow <= {`IO_ADDR_W/2{1'b0}};
@@ -528,17 +540,16 @@ module xyolo_write #(
 	 vwrite_shiftB_shadow <= vwrite_shiftB_pip;
 	 vwrite_incrB_pip <= vwrite_incrB;
 	 vwrite_incrB_shadow <= vwrite_incrB_pip;
-         vwrite_bypass_shadow <= xyolo_bypass_shadow;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 vread_len_shadow <= vread_len;
 	 //XOR ensures ping-pong happens when acessing external mem
-	 vread_int_addr_shadow <= {vread_int_addr_shadow[`PIXEL_W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`PIXEL_W_ADDR_W-2:0]};
+	 vread_int_addr_shadow <= vread_pp ? {vread_int_addr_shadow[`PIXEL_W_ADDR_W-1] ^ |vread_iterA, vread_int_addr[`PIXEL_W_ADDR_W-2:0]} : vread_int_addr;
 	 vread_iterA_shadow <= vread_iterA;
 	 vread_perA_shadow <= vread_perA;
 	 vread_shiftA_shadow <= vread_shiftA;
 	 vread_incrA_shadow <= vread_incrA;
-	 vread_startB_pip <= {vread_startB_pip[`PIXEL_ADDR_W-1] ^ |vread_iterA, vread_startB[`PIXEL_ADDR_W-2:0]};
+	 vread_startB_pip <= vread_pp ? {vread_startB_pip[`PIXEL_ADDR_W-1] ^ |vread_iterA, vread_startB[`PIXEL_ADDR_W-2:0]} : vread_startB;
 	 vread_startB_shadow <= vread_startB_pip;
 	 vread_iterB_pip <= vread_iterB;
 	 vread_iterB_shadow <= vread_iterB_pip;
@@ -719,6 +730,39 @@ module xyolo_write #(
       .done(vwrite_doneB)
    );
 
+   // update vwrite enable counter
+   always @ (posedge clk, posedge rst)
+      if(rst || run_reg)
+         vwrite_enB_cnt <= {$clog2(`nYOLOvect)+2{1'b0}};
+      else if(vwrite_enB_reg)
+	 vwrite_enB_cnt <= vwrite_enB_cnt + 1'b1;
+
+   // enable vwrite decoder
+   always @ * begin
+      integer j;
+      vwrite_enB_stage = {`nYOLOvect{1'b0}};
+      for(j = 0; j < `nYOLOvect; j++) begin
+         if(xyolo_bypass_shadow)
+	    vwrite_enB_stage[j] = ((j*4+3) == vwrite_enB_cnt) ? vwrite_enB_reg : 1'b0;
+	 else
+	    vwrite_enB_stage[j] = vwrite_enB;
+      end
+   end
+
+   // register vwrite mem write inputs
+   always @ (posedge clk, posedge rst)
+      if(rst) begin
+	 vwrite_enB_reg <= 1'b0;
+         vwrite_enB_stage_reg <= `nYOLOvect'b0;
+         vwrite_addrB_reg <= `PIXEL_ADDR_W'b0;
+         vwrite_addrB_stage <= `PIXEL_ADDR_W'b0;
+      end else begin
+         vwrite_enB_reg <= vwrite_enB;
+         vwrite_enB_stage_reg <= vwrite_enB_stage;
+         vwrite_addrB_reg <= vwrite_addrB;
+         vwrite_addrB_stage <= vwrite_addrB_mux;
+      end
+
    //
    // stages
    //
@@ -741,9 +785,9 @@ module xyolo_write #(
       .done(stages_done[0]),
       //internal addrgen
       .vread_enB(vread_enB_reg),
-      .vwrite_enB(vwrite_enB),
+      .vwrite_enB(vwrite_enB_stage_reg),
       .vread_addrB(vread_addrB_reg),
-      .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
+      .vwrite_addrB(vwrite_addrB_stage[`VWRITE_ADDR_W-1:0]),
       //load control
       .ld_acc(ld_acc0),
       .ld_mp(ld_mp),
@@ -762,7 +806,6 @@ module xyolo_write #(
       .vwrite_perA(vwrite_perA_shadow),
       .vwrite_shiftA(vwrite_shiftA_shadow),
       .vwrite_incrA(vwrite_incrA_shadow),
-      .vwrite_bypass(vwrite_bypass_shadow),
       //xyolo config params
       .xyolo_bias(xyolo_bias_shadow),
       .xyolo_leaky(xyolo_leaky_shadow),
@@ -786,9 +829,9 @@ module xyolo_write #(
      for(i = 1; i < `nSTAGES; i=i+1)  begin : stages
 
         //check if asking for the same data as previous vread
-        wire cond = vread_m_req[`address((`nSTAGES-i), `IO_ADDR_W)] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)] && vread_m_req[`valid((`nSTAGES-i))] && vread_m_req[`valid((`nSTAGES-i-1))];
-	wire databus_ready_w = cond ? vread_m_resp[`ready((`nSTAGES-i))] : vread_m_resp[`ready((`nSTAGES-i-1))];
-	wire [DATABUS_W-1:0] databus_rdata_w = cond ? vread_m_resp[`rdata((`nSTAGES-i))] : vread_m_resp[`rdata((`nSTAGES-i-1))];
+        assign cond[i-1] = vread_m_req[`address((`nSTAGES-i), `IO_ADDR_W)] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)] && vread_m_req[`valid((`nSTAGES-i))] && vread_m_req[`valid((`nSTAGES-i-1))];
+	assign databus_ready_w[i-1] = cond[i-1] ? i == 1 ? vread_m_resp[`ready((`nSTAGES-i))] : databus_ready_w[i-2] : vread_m_resp[`ready((`nSTAGES-i-1))];
+	assign databus_rdata_w[DATABUS_W*(i-1) +: DATABUS_W] = cond[(i-1)] ? i == 1 ? vread_m_resp[`rdata((`nSTAGES-i))] : databus_rdata_w[DATABUS_W*(i-2) +: DATABUS_W] : vread_m_resp[`rdata((`nSTAGES-i-1))];
 
         //instantiate xyolo_write_stage
         xyolo_write_stage # (
@@ -802,9 +845,9 @@ module xyolo_write #(
            .done(stages_done[i]),
            //internal addrgen
            .vread_enB(vread_enB_reg),
-           .vwrite_enB(vwrite_enB),
+           .vwrite_enB(vwrite_enB_stage_reg),
            .vread_addrB(vread_addrB_reg),
-           .vwrite_addrB(vwrite_addrB[`VWRITE_ADDR_W-1:0]),
+           .vwrite_addrB(vwrite_addrB_stage[`VWRITE_ADDR_W-1:0]),
            //load control
            .ld_acc(ld_acc0),
            .ld_mp(ld_mp),
@@ -823,7 +866,6 @@ module xyolo_write #(
            .vwrite_perA(vwrite_perA_shadow),
            .vwrite_shiftA(vwrite_shiftA_shadow),
            .vwrite_incrA(vwrite_incrA_shadow),
-           .vwrite_bypass(vwrite_bypass_shadow),
            //xyolo config params
            .xyolo_bias(xyolo_bias_shadow),
            .xyolo_leaky(xyolo_leaky_shadow),
@@ -831,10 +873,10 @@ module xyolo_write #(
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_shift(xyolo_shift_shadow),
       	   //databus interface
-      	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w}),
+      	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w[i-1]}),
            .databus_valid({vwrite_m_req[`valid((`nSTAGES-1-i))], vread_m_req[`valid((`nSTAGES-1-i))]}),
            .databus_addr({vwrite_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)], vread_m_req[`address((`nSTAGES-1-i), `IO_ADDR_W)]}),
-           .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1-i))], databus_rdata_w}),
+           .databus_rdata({vwrite_m_resp[`rdata((`nSTAGES-1-i))], databus_rdata_w[DATABUS_W*(i-1) +: DATABUS_W]}),
            .databus_wdata({vwrite_m_req[`wdata((`nSTAGES-1-i))], vread_m_req[`wdata((`nSTAGES-1-i))]}),
            .databus_wstrb({vwrite_m_req[`wstrb((`nSTAGES-1-i))], vread_m_req[`wstrb((`nSTAGES-1-i))]}),
            //input data
@@ -850,7 +892,7 @@ module xyolo_write #(
    //
 
    //instantiate merge
-   merge #(
+   vread_merge #(
       .N_MASTERS(`nSTAGES),
       .DATA_W(DATABUS_W),
       .ADDR_W(ADDR_W)
@@ -881,6 +923,8 @@ module xyolo_write #(
       .DATA_W(DATABUS_W),
       .ADDR_W(ADDR_W)
    ) vwrite_merge (
+      .clk (clk),
+      .rst (rst),
       //masters interface
       .m_req(vwrite_m_req),
       .m_resp(vwrite_m_resp),

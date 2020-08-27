@@ -34,7 +34,7 @@ module dma_w_test_tb;
    //tester uart
    reg       uart_valid;
    reg [`UART_ADDR_W-1:0] uart_addr;
-   reg [`DATA_W-1:0]      uart_wdata;
+   reg [`UART_WDATA_W-1:0] uart_wdata;
    reg                    uart_wstrb;
    reg [`DATA_W-1:0]      uart_rdata;
    wire                   uart_ready;
