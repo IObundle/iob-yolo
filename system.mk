@@ -23,7 +23,7 @@ ifeq ($(INIT_MEM),)
 endif
 
 #Choose Firmware (in SW_DIR)
-TEST:=yolo_hw
+TEST:=new_versat_test
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
@@ -62,7 +62,9 @@ ifeq ($(BOARD),AES-KU040-DB-G)
 	COMPILE_OBJ=synth_system.bit
 	BOARD_USER=$(USER)
 	BOARD_SERVER=$(BOARD_USER)@$(BABA)
-else ifeq ($(BOARD),CYCLONEV-GT-DK)
+else
+#default
+	BOARD=CYCLONEV-GT-DK
 	COMPILE_USER=$(USER)
 	COMPILE_SERVER=$(COMPILE_USER)@$(PUDIM)
 	COMPILE_OBJ=output_files/top_system.sof
@@ -71,9 +73,9 @@ else ifeq ($(BOARD),CYCLONEV-GT-DK)
 endif
 
 
-#
+#############################################################
 #DO NOT EDIT BEYOND THIS POINT
-#
+#############################################################
 
 #object directories
 HW_DIR:=$(ROOT_DIR)/hardware
@@ -129,21 +131,41 @@ ifeq ($(USE_NEW_VERSAT),1)
 DEFINE+=$(defmacro)USE_NEW_VERSAT
 endif
 DEFINE+=$(defmacro)N_SLAVES=$(N_SLAVES) 
-#address select bits: Extra memory (E), Peripherals (P), Boot controller (B)
-DEFINE+=$(defmacro)E=31
-DEFINE+=$(defmacro)P=30
-DEFINE+=$(defmacro)B=29
-ifeq ($(MAKECMDGOALS),)
-BAUD:=30000000
-else ifeq ($(MAKECMDGOALS),sim)
-BAUD:=30000000
+
+#address selection bits
+E:=31 #extra memory bit
+ifeq ($(USE_DDR),1)
+P:=30 #periphs
+B:=29 #boot controller
 else
-BAUD:=115200
+P:=31
+B:=30
+endif
+
+DEFINE+=$(defmacro)E=$E
+DEFINE+=$(defmacro)P=$P
+DEFINE+=$(defmacro)B=$B
+
+SIM_BAUD:=10000000
+HW_BAUD:=115200
+
+
+ifeq ($(MAKECMDGOALS),)
+BAUD:=$(SIM_BAUD)
+else ifeq ($(MAKECMDGOALS),sim)
+BAUD:=$(SIM_BAUD)
+else
+BAUD:=$(HW_BAUD)
 endif
 
 DEFINE+=$(defmacro)BAUD=$(BAUD)
+ifeq ($(FREQ),)
 DEFINE+=$(defmacro)FREQ=125000000
-dummy:= $(shell echo $(BAUD))
+else
+DEFINE+=$(defmacro)FREQ=$(FREQ)
+endif
+
+
 
 #run target by default
 all: run
@@ -170,6 +192,6 @@ MICRO:=micro7.lx.it.pt
 MICRO_USER=user14
 SIM_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
 
-REMOTE_ROOT_DIR=./sandbox/pm-iob-soc-yolo
+REMOTE_ROOT_DIR=./sandbox/iob-soc-yolo
 
 .PHONY: all

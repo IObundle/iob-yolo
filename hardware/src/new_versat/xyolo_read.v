@@ -501,7 +501,7 @@ module xyolo_read #(
    //
 
    //instantiate merge
-   merge # (
+   vread_merge # (
       .N_MASTERS(`nYOLOvect+1),
       .DATA_W(DATA_W),
       .ADDR_W(ADDR_W)

@@ -5,6 +5,7 @@ include $(ROOT_DIR)/system.mk
 #submodules
 include $(INTERCON_DIR)/software/software.mk
 
+#software directory
 SW_DIR:=$(ROOT_DIR)/software
 
 #include
@@ -38,9 +39,6 @@ else #Compile for riscv
   BOOT_SRC:=$(SRC)
   BOOT_INCLUDE:=$(INCLUDE)
 
-  # Other peripherals 
-  dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
-
   #Define SIM
 ifeq ($(SIM),1)
 DEFINE+=$(defmacro)SIM
@@ -49,5 +47,5 @@ endif
 endif
 
 $(SW_DIR)/periphs.h:
-	$(shell echo "#define UART_BASE (1<<P) |(UART<<(ADDR_W-2-N_SLAVES_W))" >> ../periphs.h)
-	$(foreach p, $(PERIPHERALS), $(shell echo "#define $p_BASE (1<<P) |($p<<(ADDR_W-2-N_SLAVES_W))" >> ../periphs.h) )
+	$(shell echo "#define UART_BASE (1<<$P) |(UART<<($P-N_SLAVES_W))" >> ../periphs.h)
+	$(foreach p, $(PERIPHERALS), $(shell echo "#define $p_BASE (1<<$P) |($p<<($P-N_SLAVES_W))" >> ../periphs.h) )

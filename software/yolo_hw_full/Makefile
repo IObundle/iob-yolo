@@ -1,6 +1,10 @@
 ROOT_DIR:=../..
 include ../software.mk
 
+#include peripherals
+dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
+
+
 #local sources
 HDR+=$(SW_DIR)/periphs.h
 INCLUDE+=-I$(SW_DIR)/$(TEST)
@@ -10,13 +14,13 @@ SRC+= firmware.c
 else
 SRC+= firmware.S firmware.c
 #local flags
-CFLAGS+=-Wl,-Bstatic,-T,../template.lds,-Map,firmware.map,--strip-debug
+CFLAGS+=--specs=nano.specs -Wl,-Bstatic,-T,../template.lds,-Map,firmware.map,--strip-debug
 endif
 
 run: versat firmware.elf
 
 firmware.elf: ../template.lds $(HDR) $(SRC)
-	$(TOOLCHAIN_PREFIX)g++ -o $@ $(CFLAGS) $(DEFINE) $(INCLUDE) $(SRC) -lm -lgcc -lc
+	$(TOOLCHAIN_PREFIX)g++ -o $@ $(CFLAGS) $(DEFINE) $(INCLUDE) $(SRC) -lm -lgcc -lc -lnosys
 	$(TOOLCHAIN_PREFIX)objcopy -O binary firmware.elf firmware.bin
 
 pcsim: $(HDR) $(SRC)

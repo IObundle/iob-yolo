@@ -550,6 +550,7 @@ void send_data() {
   int i, j;
   count_bytes = 0;
   char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8);
+
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer

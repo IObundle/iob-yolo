@@ -88,6 +88,8 @@ module xversat # (
       .DATA_W(DATA_W),
       .ADDR_W(ADDR_W)
    ) split (
+      .clk (clk),
+      .rst (rst),
       //master interface
       .m_req(m_req),
       .m_resp(),
