@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-#define TIME_RUN
+//#define TIME_RUN
 
 //define peripheral base addresses
 // set pointer to DDR base
@@ -180,7 +180,7 @@ void conv() {
 
   #ifdef SIM
     for(k = 0; k < k_delta; k++) {
-       //uart_printf("%d\n", k);
+       uart_printf("%d\n", k);
   #else
     for(k = 0; k < NTW_IN_W/(2*nSTAGES); k++) { //2 due to maxpool
   #endif
@@ -304,53 +304,64 @@ int main(int argc, char **argv) {
   //test config params of xyolo_read
   versat.yread.setExtAddr(1);
   versat.yread.setOffset(2);
-  versat.yread.setIntAddr(3);
-  versat.yread.setExtIter(4);
-  versat.yread.setExtPer(5);
-  versat.yread.setExtShift(6);
-  versat.yread.setExtIncr(7);
-  versat.yread.setIntIter(8);
-  versat.yread.setIntPer(9);
-  versat.yread.setIntStart(10);
-  versat.yread.setIntShift(11);
-  versat.yread.setIntIncr(12);
+  versat.yread.setPingPong(1);
+  versat.yread.setLen(3);
+  versat.yread.setIntAddr(4);
+  versat.yread.setExtIter(5);
+  versat.yread.setExtPer(6);
+  versat.yread.setExtShift(7);
+  versat.yread.setExtIncr(8);
+  versat.yread.setIntIter(9);
+  versat.yread.setIntPer(10);
+  versat.yread.setIntStart(11);
+  versat.yread.setIntShift(12);
+  versat.yread.setIntIncr(13);
+  versat.yread.setBiasExtAddr(14);
+  versat.yread.setBiasIntAddr(1);
+  versat.yread.setBiasIntStart(2);
 
   // test config params of xyolo_write
   // vwrite
   versat.ywrite.write.setExtAddr(1);
   versat.ywrite.write.setOffset(2);
-  versat.ywrite.write.setIntAddr(3);
-  versat.ywrite.write.setExtIter(4);
-  versat.ywrite.write.setExtPer(5);
-  versat.ywrite.write.setExtShift(6);
-  versat.ywrite.write.setExtIncr(7);
-  versat.ywrite.write.setIntStart(8);
-  versat.ywrite.write.setIntDuty(9);
-  versat.ywrite.write.setIntDelay(10);
-  versat.ywrite.write.setIntIter(11);
-  versat.ywrite.write.setIntPer(12);
-  versat.ywrite.write.setIntShift(13);
-  versat.ywrite.write.setIntIncr(14);
+  versat.ywrite.write.setLen(3);
+  versat.ywrite.write.setIntAddr(4);
+  versat.ywrite.write.setExtIter(5);
+  versat.ywrite.write.setExtPer(6);
+  versat.ywrite.write.setExtShift(7);
+  versat.ywrite.write.setExtIncr(8);
+  versat.ywrite.write.setIntStart(9);
+  versat.ywrite.write.setIntDuty(10);
+  versat.ywrite.write.setIntDelay(11);
+  versat.ywrite.write.setIntIter(12);
+  versat.ywrite.write.setIntPer(13);
+  versat.ywrite.write.setIntShift(14);
+  versat.ywrite.write.setIntIncr(15);
   // vread
-  versat.ywrite.read.setExtAddr(15);
-  versat.ywrite.read.setOffset(16);
-  versat.ywrite.read.setIntAddr(17);
-  versat.ywrite.read.setExtIter(18);
-  versat.ywrite.read.setExtPer(19);
-  versat.ywrite.read.setExtShift(20);
-  versat.ywrite.read.setExtIncr(21);
-  versat.ywrite.read.setIntStart(22);
-  versat.ywrite.read.setIntIter(23);
-  versat.ywrite.read.setIntPer(24);
-  versat.ywrite.read.setIntShift(25);
-  versat.ywrite.read.setIntIncr(26);
-  versat.ywrite.read.setIntIter2(27);
-  versat.ywrite.read.setIntPer2(28);
-  versat.ywrite.read.setIntShift2(29);
-  versat.ywrite.read.setIntIncr2(30);
+  versat.ywrite.read.setExtAddr(16);
+  versat.ywrite.read.setOffset(17);
+  versat.ywrite.read.setLen(18);
+  versat.ywrite.read.setIntAddr(19);
+  versat.ywrite.read.setExtIter(20);
+  versat.ywrite.read.setExtPer(21);
+  versat.ywrite.read.setExtShift(22);
+  versat.ywrite.read.setExtIncr(23);
+  versat.ywrite.read.setIntStart(24);
+  versat.ywrite.read.setIntIter(25);
+  versat.ywrite.read.setIntPer(26);
+  versat.ywrite.read.setIntShift(27);
+  versat.ywrite.read.setIntIncr(28);
+  versat.ywrite.read.setIntIter2(29);
+  versat.ywrite.read.setIntPer2(30);
+  versat.ywrite.read.setIntShift2(31);
+  versat.ywrite.read.setIntIncr2(32);
+  versat.ywrite.read.setIntIter3(33);
+  versat.ywrite.read.setIntPer3(34);
+  versat.ywrite.read.setIntShift3(35);
+  versat.ywrite.read.setIntIncr3(36);
   // xyolo
-  versat.ywrite.yolo.setIter(31);
-  versat.ywrite.yolo.setPer(32);
+  versat.ywrite.yolo.setIter(37);
+  versat.ywrite.yolo.setPer(38);
   versat.ywrite.yolo.setShift(10);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);

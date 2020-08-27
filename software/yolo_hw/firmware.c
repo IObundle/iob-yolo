@@ -909,5 +909,6 @@ int main(int argc, char **argv) {
 
   //finish
   uart_putc(ETX);
+  uart_txwait();
   return 0;
 }

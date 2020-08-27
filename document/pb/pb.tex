@@ -49,10 +49,13 @@ currently supported in ASICs and FPGAs.
 \begin{itemize}
 \item Runs the Tiny Yolo V3 object detection software
 \item 1 CNN reconfigurable accelerator (Versat)
-\item 1024 Functional Units (FUs) in matrix organization for massive parallelism
+\item 832 MACC units embedded in the vectorized Functional Units (FUs)
+\item 13x16 FU matrix organization for massive parallelism
 \item Each FU performs convolution, maxpool and memory writes
 \item 256-bit wide data memory accesses
-\item 64 additional memory read units
+\item 30 parallel memory read units
+\item 208 parallel memory write units
+\item 1 DMA unit for wide and fast DDR4 access 
 \item 1 RISC-V control and reconfiguration CPU
 \item Instruction and data caches
 \item RS232 interfaces for viewing runtime messages
@@ -105,39 +108,27 @@ currently supported in ASICs and FPGAs.
 
 
 \section*{FPGA Resources}
+
+
+\ifnum\XILINX=1
 \begin{table}[H]
   \begin{center}
     \begin{tabular}{|c|c|c|c|}
       \hline
 
       \rowcolor{iob-green}
-      \textbf{Resource}  & \textbf{Used} & \textbf{Available} & \textbf{Ratio}\\
+      \textbf{Resource}  & \textbf{Used}\\
       \hline
       \hline
 
-      LUTs & 17,256 & 56,484 & 31\%\\
-      \hline
-
-      \rowcolor{iob-blue}
-      FFs & 19,059  & 225,920 & 8\%\\
-      \hline
-
-      BRAM bits & 4,582,528 & 7,692 & 65\%\\
-      \hline
-
-      BRAM blocks & 570 & 686 & 83\%\\
-      \hline
-
-      \rowcolor{iob-blue}
-      DSPs & 16 & 156 & 10\%\\
-      \hline
+  \input xil_results.tex
       
     \end{tabular}
     \caption{Implementation Resources for Xilinx Kintex Ultrascale Devices}
     \label{tab:res}
   \end{center}
 \end{table}
-
+\fi
 
 \section*{\textcolor[rgb]{0,0,0}{Deliverables}}
 \begin{itemize}

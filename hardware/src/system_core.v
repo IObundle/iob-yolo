@@ -174,13 +174,16 @@ module system
    // INSTRUCTION BUS
    split #(
 `ifdef RUN_DDR_USE_SRAM
-           .N_SLAVES(2)
+           .N_SLAVES(2),
 `else
-           .N_SLAVES(1)
+           .N_SLAVES(1),
 `endif
+	   .P_SLAVES(`E_BIT)
            )
    ibus_split
      (
+      .clk (clk),
+      .rst (reset),
       // master interface
       .m_req  (cpu_i_req),
       .m_resp (cpu_i_resp),
@@ -215,15 +218,16 @@ module system
    split 
      #(
 `ifdef USE_DDR
-       .N_SLAVES(3),
-       .P_SLAVES(`E_BIT)
+       .N_SLAVES(3), //E,P,I
 `else
        .N_SLAVES(2),
-       .P_SLAVES(`P_BIT)
 `endif
+       .P_SLAVES(`E_BIT)
        )
    dbus_split    
      (
+      .clk (clk),
+      .rst (reset),
       // master interface
       .m_req  (cpu_d_req),
       .m_resp (cpu_d_resp),
@@ -254,6 +258,8 @@ module system
        )
    pbus_split
      (
+      .clk (clk),
+      .rst (reset),
       // master interface
       .m_req(pbus_req),
       .m_resp(pbus_resp),
