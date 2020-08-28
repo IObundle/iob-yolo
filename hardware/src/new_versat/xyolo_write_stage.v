@@ -45,6 +45,8 @@ module xyolo_write_stage #(
         // xyolo config params
 	input                           xyolo_bias,
 	input                           xyolo_leaky,
+	input                           xyolo_sigmoid,
+	input [`nYOLOvect-1:0]          xyolo_sig_mask,
 	input                           xyolo_maxpool,
 	input                           xyolo_bypass,
 	input [`SHIFT_W-1:0]            xyolo_shift,
@@ -241,6 +243,7 @@ module xyolo_write_stage #(
 	    //configuration
 	    .bias(xyolo_bias),
 	    .leaky(xyolo_leaky),
+	    .sigmoid(xyolo_sigmoid & xyolo_sig_mask[i]),
 	    .maxpool(xyolo_maxpool),
 	    .bypass(xyolo_bypass),
 	    .shift(xyolo_shift),

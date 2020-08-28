@@ -529,10 +529,11 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.ywrite.yolo.setShift(10);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(leaky);
+  versat.ywrite.yolo.setSigmoid(1-leaky);
 
   // configure xwrite to write convolution results
   versat.ywrite.write.setIntDuty(1);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2 + (1-leaky));
   versat.ywrite.write.setIntPer(ker_size*ker_size*c);
   versat.ywrite.write.setIntIncr(1);
   versat.ywrite.write.setIntIter(w);
@@ -559,6 +560,12 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 
     // run convolution
     for(l = 0; l < num_ker/nYOLOvect; l++) {
+
+      // set sigmoid mask
+      if(l == 0) versat.ywrite.yolo.setSigMask(65523);  	// 1111111111110011
+      else if(l == 5) versat.ywrite.yolo.setSigMask(65151);  	// 1111111001111111
+      else if(l == 10) versat.ywrite.yolo.setSigMask(53247); 	// 1100111111111111
+      else versat.ywrite.yolo.setSigMask(65535);        	// 1111111111111111
 
       // read weights
       versat.yread.setExtAddr(w_in + 2*(nYOLOvect + l*nYOLOvect*(1+ker_size*ker_size*c)));

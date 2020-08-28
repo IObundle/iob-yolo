@@ -55,8 +55,10 @@
 `define XYOLO_CONF_SHIFT   	39
 `define XYOLO_CONF_BIAS   	40
 `define XYOLO_CONF_LEAKY   	41
-`define XYOLO_CONF_MAXPOOL   	42
-`define XYOLO_CONF_BYPASS   	43
+`define XYOLO_CONF_SIGMOID   	42
+`define XYOLO_CONF_SIG_MASK   	43
+`define XYOLO_CONF_MAXPOOL   	44
+`define XYOLO_CONF_BYPASS   	45
 
 // Address
 `define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS+1))
