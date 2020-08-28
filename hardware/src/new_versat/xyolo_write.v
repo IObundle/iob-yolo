@@ -92,6 +92,8 @@ module xyolo_write #(
    reg					xyolo_shift_en;
    reg					xyolo_bias_en;
    reg					xyolo_leaky_en;
+   reg					xyolo_sigmoid_en;
+   reg					xyolo_sig_mask_en;
    reg					xyolo_maxpool_en;
    reg					xyolo_bypass_en;
 
@@ -144,6 +146,8 @@ module xyolo_write #(
    reg [`SHIFT_W-1:0]			xyolo_shift, xyolo_shift_pip, xyolo_shift_shadow;
    reg 					xyolo_bias, xyolo_bias_pip, xyolo_bias_shadow;
    reg					xyolo_leaky, xyolo_leaky_pip, xyolo_leaky_shadow;
+   reg					xyolo_sigmoid, xyolo_sigmoid_pip, xyolo_sigmoid_shadow;
+   reg [`nYOLOvect-1:0]			xyolo_sig_mask, xyolo_sig_mask_pip, xyolo_sig_mask_shadow;
    reg					xyolo_maxpool, xyolo_maxpool_pip, xyolo_maxpool_shadow;
    reg					xyolo_bypass, xyolo_bypass_pip, xyolo_bypass_shadow;
 
@@ -258,6 +262,8 @@ module xyolo_write #(
       xyolo_shift_en = 1'b0;
       xyolo_bias_en = 1'b0;
       xyolo_leaky_en = 1'b0;
+      xyolo_sigmoid_en = 1'b0;
+      xyolo_sig_mask_en = 1'b0;
       xyolo_maxpool_en = 1'b0;
       xyolo_bypass_en = 1'b0;
       if(valid & wstrb)
@@ -307,6 +313,8 @@ module xyolo_write #(
 	    `XYOLO_CONF_SHIFT : xyolo_shift_en = 1'b1;
 	    `XYOLO_CONF_BIAS : xyolo_bias_en = 1'b1;
 	    `XYOLO_CONF_LEAKY : xyolo_leaky_en = 1'b1;
+	    `XYOLO_CONF_SIGMOID : xyolo_sigmoid_en = 1'b1;
+	    `XYOLO_CONF_SIG_MASK : xyolo_sig_mask_en = 1'b1;
             `XYOLO_CONF_MAXPOOL : xyolo_maxpool_en = 1'b1;
 	    `XYOLO_CONF_BYPASS : xyolo_bypass_en = 1'b1;
             default : ;
@@ -361,6 +369,8 @@ module xyolo_write #(
 	 xyolo_shift <= {`SHIFT_W{1'b0}};
 	 xyolo_bias <= 1'b0;
 	 xyolo_leaky <= 1'b0;
+	 xyolo_sigmoid <= 1'b0;
+	 xyolo_sig_mask <= {`nYOLOvect{1'b0}};
 	 xyolo_maxpool <= 1'b0;
 	 xyolo_bypass <= 1'b0;
       end else begin
@@ -410,6 +420,8 @@ module xyolo_write #(
 	 if(xyolo_shift_en) xyolo_shift <= wdata[`SHIFT_W-1:0];
 	 if(xyolo_bias_en) xyolo_bias <= wdata[0];
 	 if(xyolo_leaky_en) xyolo_leaky <= wdata[0];
+	 if(xyolo_sigmoid_en) xyolo_sigmoid <= wdata[0];
+	 if(xyolo_sig_mask_en) xyolo_sig_mask <= wdata[`nYOLOvect-1:0];
 	 if(xyolo_maxpool_en) xyolo_maxpool <= wdata[0];
 	 if(xyolo_bypass_en) xyolo_bypass <= wdata[0];
       end
@@ -498,6 +510,10 @@ module xyolo_write #(
 	 xyolo_bias_pip <= 1'b0;
 	 xyolo_leaky_shadow <= 1'b0;
 	 xyolo_leaky_pip <= 1'b0;
+	 xyolo_sigmoid_shadow <= 1'b0;
+	 xyolo_sigmoid_pip <= 1'b0;
+	 xyolo_sig_mask_shadow <= {`nYOLOvect{1'b0}};
+	 xyolo_sig_mask_pip <= {`nYOLOvect{1'b0}};
 	 xyolo_maxpool_shadow <= 1'b0;
 	 xyolo_maxpool_pip <= 1'b0;
 	 xyolo_bypass_shadow <= 1'b0;
@@ -586,6 +602,10 @@ module xyolo_write #(
 	 xyolo_bias_shadow <= xyolo_bias_pip;
 	 xyolo_leaky_pip <= xyolo_leaky;
 	 xyolo_leaky_shadow <= xyolo_leaky_pip;
+	 xyolo_sigmoid_pip <= xyolo_sigmoid;
+	 xyolo_sigmoid_shadow <= xyolo_sigmoid_pip;
+	 xyolo_sig_mask_pip <= xyolo_sig_mask;
+	 xyolo_sig_mask_shadow <= xyolo_sig_mask_pip;
 	 xyolo_maxpool_pip <= xyolo_maxpool;
 	 xyolo_maxpool_shadow <= xyolo_maxpool_pip;
 	 xyolo_bypass_pip <= xyolo_bypass;
@@ -687,7 +707,7 @@ module xyolo_write #(
    //compute xyolo load wires
    assign ld_acc = (xyolo_addr == {`PIXEL_ADDR_W{1'd0}});
    assign ld_mp = |mp_cnt;
-   assign ld_res = ld_acc1 || xyolo_bypass_shadow;
+   assign ld_res = ld_acc1 || xyolo_bypass_shadow || ~xyolo_maxpool_shadow;
 
    //update xyolo registers
    always @ (posedge clk, posedge rst)
@@ -809,6 +829,8 @@ module xyolo_write #(
       //xyolo config params
       .xyolo_bias(xyolo_bias_shadow),
       .xyolo_leaky(xyolo_leaky_shadow),
+      .xyolo_sigmoid(xyolo_sigmoid_shadow),
+      .xyolo_sig_mask(xyolo_sig_mask_shadow),
       .xyolo_maxpool(xyolo_maxpool_shadow),
       .xyolo_bypass(xyolo_bypass_shadow),
       .xyolo_shift(xyolo_shift_shadow),
@@ -869,6 +891,8 @@ module xyolo_write #(
            //xyolo config params
            .xyolo_bias(xyolo_bias_shadow),
            .xyolo_leaky(xyolo_leaky_shadow),
+           .xyolo_sigmoid(xyolo_sigmoid_shadow),
+      	   .xyolo_sig_mask(xyolo_sig_mask_shadow),
            .xyolo_maxpool(xyolo_maxpool_shadow),
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_shift(xyolo_shift_shadow),

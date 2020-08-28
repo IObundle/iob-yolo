@@ -254,6 +254,12 @@ class CYolo {
     void setLeaky(int leaky) {
       MEMSET(base, XYOLO_CONF_LEAKY, leaky);
     }
+    void setSigmoid(int sigmoid) {
+      MEMSET(base, XYOLO_CONF_SIGMOID, sigmoid);
+    }
+    void setSigMask(int mask) {
+      MEMSET(base, XYOLO_CONF_SIG_MASK, mask);
+    }
     void setMaxpool(int maxpool) {
       MEMSET(base, XYOLO_CONF_MAXPOOL, maxpool);
     }
