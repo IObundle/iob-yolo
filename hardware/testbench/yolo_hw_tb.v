@@ -20,7 +20,7 @@
 `define DATA_LAYER_14 (15*15*256)
 `define DATA_LAYER_15 (13*13*512)
 `define DATA_LAYER_16 (13*13*256)
-`define DATA_LAYER_19 (13*13*128)
+`define DATA_LAYER_19 (28*28*128)
 `define TOTAL_FM (2*(`DATA_LAYER_14 + 2*`DATA_LAYER_19))
 
 //Weight constants
