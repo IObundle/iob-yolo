@@ -303,7 +303,8 @@ module xyolo_read #(
 
          //instantiate 4-stage multiplier
          mul_4stage # (
-            .DATA_W(`IO_ADDR_W/2)
+            .DATA_W(`IO_ADDR_W/2),
+	    .SIGNED(0)
          ) mul (
             //control
             .clk(clk),
