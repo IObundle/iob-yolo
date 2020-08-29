@@ -107,6 +107,10 @@ void reset_DDR() {
 
   //layer 14
   for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
+  pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16;
+
+  //layer 19/20
+  for(i = 0; i < DATA_LAYER_19; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_time_us(TIMER_BASE);
@@ -458,7 +462,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   p_pos += (w+2*inpadd)*(w+2*inpadd)*c;
   //pass first padding line and first 16 pixels of next line
   if(outpos == 0) p_out = DATA_BASE_ADDRESS + 2*(p_pos + ((w+2)*num_ker + 16)*outpadd);
-  else p_out = DATA_BASE_ADDRESS + 2*outpos;
+  else p_out = DATA_BASE_ADDRESS + 2*(outpos + ((w*(1+upsample)+2)*num_ker + 16)*outpadd);
 
   // extra run to make last computation
   if(!upsample) {
@@ -495,7 +499,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(ker_size*ker_size*c);
   versat.yread.setIntIncr(1);
-  versat.yread.setIntIter(w);
+  versat.yread.setIntIter(w*(1+upsample));
   versat.yread.setIntShift(-ker_size*ker_size*c);
 
   // configure xyolo_write vread to write FM tile to xyolo
@@ -512,13 +516,13 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
     versat.ywrite.read.setIntPer(16);
     versat.ywrite.read.setIntIter(c/16);
     versat.ywrite.read.setIntShift((w+2*inpadd+2*ignorepadd)*16 - 16);
+    versat.ywrite.read.setIntIncr2(16);
     if(ker_size == 1) {
-      versat.ywrite.read.setIntIncr2(16);
       versat.ywrite.read.setIntPer2(w);
-      versat.ywrite.read.setIntIter2(1);
+      versat.ywrite.read.setIntIter2(1*(1+upsample));
+      versat.ywrite.read.setIntShift2(-16*w);
     } else {
       versat.ywrite.read.setIntPer2(ker_size);
-      versat.ywrite.read.setIntIncr2(16);
       versat.ywrite.read.setIntIter2(ker_size);
       versat.ywrite.read.setIntShift2((w+2*inpadd)*c - 16*ker_size);
       versat.ywrite.read.setIntIncr3(16);
@@ -528,7 +532,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   }
 
   // configure xyolo to perform convolution
-  versat.ywrite.yolo.setIter(w);
+  versat.ywrite.yolo.setIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
   versat.ywrite.yolo.setPer(ker_size*ker_size*c);
   versat.ywrite.yolo.setShift(10);
   versat.ywrite.yolo.setBias(1);
@@ -536,17 +540,18 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.ywrite.yolo.setSigmoid(1-leaky);
 
   // configure xwrite to write convolution results
-  versat.ywrite.write.setIntDuty(1);
+  versat.ywrite.write.setIntDuty(1+upsample);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2 + (1-leaky));
   versat.ywrite.write.setIntPer(ker_size*ker_size*c);
   versat.ywrite.write.setIntIncr(1);
-  versat.ywrite.write.setIntIter(w);
+  versat.ywrite.write.setIntIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(w-1);
-  versat.ywrite.write.setOffset(2*((w+2*outpadd+stride)*num_ker));
-  versat.ywrite.write.setExtPer(w);
-  versat.ywrite.write.setExtIter(1);
+  versat.ywrite.write.setLen((1+upsample)*w-1);
+  versat.ywrite.write.setOffset(2*((1+upsample)*(w*(1+upsample)+2*outpadd+stride)*num_ker));
+  versat.ywrite.write.setExtPer(w*(1+upsample));
+  versat.ywrite.write.setExtIter(1+upsample);
+  versat.ywrite.write.setExtShift((w*(1+upsample)+2*outpadd+stride)*num_ker);
 
   /////////////////////////////////////////////////////////////////////////
   //                      VARIABLE CONFIGURATIONS
@@ -578,7 +583,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
       versat.yread.setBiasExtAddr(w_in + 2*l*nYOLOvect*(1+ker_size*ker_size*c));
 
       // configure xyolo_write vwrite to write result back to DDR
-      versat.ywrite.write.setExtAddr(p_out + 2*(k*(w+2*outpadd+stride)*num_ker*nSTAGES + l*(w+2*outpadd+stride)*16));
+      versat.ywrite.write.setExtAddr(p_out + 2*(k*(w+2*outpadd+stride)*num_ker*nSTAGES + l*(w*(1+upsample)+2*outpadd+stride)*16));
 
       // wait until done
       while(versat.done()==0);
@@ -909,13 +914,13 @@ int main(int argc, char **argv) {
   w_pos += WEIGHTS_LAYER_1 + WEIGHTS_LAYER_3 + WEIGHTS_LAYER_5 + WEIGHTS_LAYER_7 + WEIGHTS_LAYER_9 + WEIGHTS_LAYER_11 + WEIGHTS_LAYER_13 + WEIGHTS_LAYER_14 + WEIGHTS_LAYER_15 + WEIGHTS_LAYER_16;
 #endif
 
-  //layer 19
+  //layers 19 and 20
  #ifndef TIME_RUN
-  uart_printf("\nRunning layer 19...\n");
+  uart_printf("\nRunning layers 19 and 20...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
   p_pos = data_pos_layer14;
-  //ping-pong(0), inpadd(0), zxy(0), leaky(1), upsample(1)
+  //ping-pong(1), inpadd(0), zxy(0), leaky(1), upsample(1)
   conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, 1, 0, 0, 1, LAYER_19_IGNOREPAD, data_pos_layer19, 1);
   // end versat
  #ifdef TIME_RUN
@@ -935,7 +940,7 @@ int main(int argc, char **argv) {
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
-  uart_printf("Convolution done in %d us\n\n", end-start);
+  uart_printf("Convolution + upsample done in %d us\n\n", end-start);
  #endif
 
 #ifdef SIM
@@ -944,12 +949,12 @@ int main(int argc, char **argv) {
   int i, j, k;
   uart_printf("Verifying...\n\n");
   uart_printf("Initial address = %x\n", DATA_BASE_ADDRESS + 2*DATA_LAYER_14);
-  for(i = 0; i < LAYER_19_W; i++) {
+  for(i = 0; i < (2*LAYER_19_W+2); i++) {
     uart_printf("%d\n", i);
-    for(j = 0; j < LAYER_19_W; j++)
+    for(j = 0; j < (2*LAYER_19_W+2); j++)
       for(k = 0; k < LAYER_19_NUM_KER; k++)
-        if(fp_data[i*LAYER_19_W*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] != fp_data[DATA_LAYER_19 + i*LAYER_19_W*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_14 + i*LAYER_19_W*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k), fp_data[i*LAYER_19_W*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_19 + i*LAYER_19_W*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] & 0xFFFF);
+        if(fp_data[i*(2*LAYER_19_W+2)*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] != fp_data[DATA_LAYER_19 + i*(2*LAYER_19_W+2)*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_14 + i*(2*LAYER_19_W+2)*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k), fp_data[i*(2*LAYER_19_W+2)*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_19 + i*(2*LAYER_19_W+2)*LAYER_19_NUM_KER + j*LAYER_19_NUM_KER + k] & 0xFFFF);
   }
 #endif
 

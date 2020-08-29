@@ -707,7 +707,7 @@ module xyolo_write #(
    //compute xyolo load wires
    assign ld_acc = (xyolo_addr == {`PIXEL_ADDR_W{1'd0}});
    assign ld_mp = |mp_cnt;
-   assign ld_res = ld_acc1 || xyolo_bypass_shadow || ~xyolo_maxpool_shadow;
+   assign ld_res = ld_acc1 || xyolo_bypass_shadow || ~xyolo_leaky_shadow;
 
    //update xyolo registers
    always @ (posedge clk, posedge rst)
