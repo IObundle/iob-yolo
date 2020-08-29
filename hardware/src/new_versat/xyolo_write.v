@@ -621,7 +621,8 @@ module xyolo_write #(
 
          //instantiate vread 4-stage multiplier
          mul_4stage # (
-            .DATA_W(`IO_ADDR_W/2)
+            .DATA_W(`IO_ADDR_W/2),
+	    .SIGNED(0)
          ) vread_mul (
             //control
             .clk(clk),
@@ -635,7 +636,8 @@ module xyolo_write #(
 
          //instantiate vwrite 4-stage multiplier
          mul_4stage # (
-            .DATA_W(`IO_ADDR_W/2)
+            .DATA_W(`IO_ADDR_W/2),
+	    .SIGNED(0)
          ) vwrite_mul (
             //control
             .clk(clk),
