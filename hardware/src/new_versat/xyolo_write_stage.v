@@ -8,58 +8,58 @@ module xyolo_write_stage #(
     	parameter                       DATAPATH_W = 32,
         parameter			DATABUS_W = 256
     ) (
-    	input                           clk,
-    	input                           rst,
+    	input 					     clk,
+    	input 					     rst,
 
 	// control
-    	input                           global_run,
-    	output                          done,
+    	input 					     global_run,
+    	output 					     done,
 
         // internal addrgen
-        input                           vread_enB,
-        input [`nYOLOvect-1:0]          vwrite_enB,
-        input [`PIXEL_ADDR_W-1:0]       vread_addrB,
-        input [`VWRITE_ADDR_W-1:0]      vwrite_addrB,
+        input 					     vread_enB,
+        input [`nYOLOvect-1:0] 			     vwrite_enB,
+        input [`PIXEL_INT_ADDR_W-1:0] 		     vread_addrB,
+        input [`VWRITE_ADDR_W-1:0] 		     vwrite_addrB,
 
         // load control
-        input                           ld_acc,
-        input                           ld_mp,
-        input                           ld_res,
+        input 					     ld_acc,
+        input 					     ld_mp,
+        input 					     ld_res,
 
         // vread config params
-        input [`IO_ADDR_W-1:0]          vread_ext_addr,
-        input [`PIXEL_W_ADDR_W-1:0]     vread_int_addr,
-        input [`EXT_ADDR_W-1:0]         vread_iterA,
-        input [`EXT_ADDR_W-1:0]       	vread_perA,
-        input [`EXT_ADDR_W-1:0]         vread_shiftA,
-        input [`EXT_ADDR_W-1:0]         vread_incrA,
+        input [`IO_ADDR_W-1:0] 			     vread_ext_addr,
+        input [`PIXEL_W_ADDR_W-1:0] 		     vread_int_addr,
+        input [`EXT_ADDR_W-1:0] 		     vread_iterA,
+        input [`EXT_ADDR_W-1:0] 		     vread_perA,
+        input [`EXT_ADDR_W-1:0] 		     vread_shiftA,
+        input [`EXT_ADDR_W-1:0] 		     vread_incrA,
 
         // vwrite config params
-        input [`IO_ADDR_W-1:0]          vwrite_ext_addr,
-        input [`VWRITE_ADDR_W-1:0]      vwrite_int_addr,
-        input [`PIXEL_ADDR_W-1:0]       vwrite_iterA,
-        input [`PIXEL_ADDR_W-1:0]       vwrite_perA,
-        input [`PIXEL_ADDR_W-1:0]       vwrite_shiftA,
-        input [`PIXEL_ADDR_W-1:0]       vwrite_incrA,
+        input [`IO_ADDR_W-1:0] 			     vwrite_ext_addr,
+        input [`VWRITE_ADDR_W-1:0] 		     vwrite_int_addr,
+        input [`PIXEL_ADDR_W-1:0] 		     vwrite_iterA,
+        input [`PIXEL_ADDR_W-1:0] 		     vwrite_perA,
+        input [`PIXEL_ADDR_W-1:0] 		     vwrite_shiftA,
+        input [`PIXEL_ADDR_W-1:0] 		     vwrite_incrA,
 
         // xyolo config params
-	input                           xyolo_bias,
-	input                           xyolo_leaky,
-	input                           xyolo_maxpool,
-	input                           xyolo_bypass,
-	input [`SHIFT_W-1:0]            xyolo_shift,
+	input 					     xyolo_bias,
+	input 					     xyolo_leaky,
+	input 					     xyolo_maxpool,
+	input 					     xyolo_bypass,
+	input [`SHIFT_W-1:0] 			     xyolo_shift,
 
     	// databus interface (1 vread + 1 vwrite)
-    	input [1:0]                    	databus_ready,
-    	output [1:0]                   	databus_valid,
-    	output [2*`IO_ADDR_W-1:0]       databus_addr,
-    	input [2*DATABUS_W-1:0]         databus_rdata,
-    	output [2*DATABUS_W-1:0]        databus_wdata,
-    	output [2*DATABUS_W/8-1:0]      databus_wstrb,
+    	input [1:0] 				     databus_ready,
+    	output [1:0] 				     databus_valid,
+    	output [2*`IO_ADDR_W-1:0] 		     databus_addr,
+    	input [2*DATABUS_W-1:0] 		     databus_rdata,
+    	output [2*DATABUS_W-1:0] 		     databus_wdata,
+    	output [2*DATABUS_W/8-1:0] 		     databus_wstrb,
 
     	// input data
-    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_bias,
-    	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_weight
+    	input [`nYOLOvect*DATAPATH_W-1:0] 	     flow_in_bias,
+	input [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0] flow_in_weight
     );
 
    // external addrgen wires and regs
@@ -78,8 +78,8 @@ module xyolo_write_stage #(
    assign                               done = &{vread_doneA, vwrite_doneA};
 
    // vread output
-   wire	[DATAPATH_W-1:0]		pixel, vread_out;
-   reg	[DATAPATH_W-1:0]		vread_out_reg;
+   wire [`nYOLOmacs*DATAPATH_W-1:0] 	pixel, vread_out;
+   reg [`nYOLOmacs*DATAPATH_W-1:0] 	vread_out_reg;
 
    //
    // global vread
@@ -136,8 +136,8 @@ module xyolo_write_stage #(
    iob_2p_assim_mem_w_big #(
       .W_DATA_W(DATABUS_W),
       .W_ADDR_W(`PIXEL_W_ADDR_W),
-      .R_DATA_W(DATAPATH_W),
-      .R_ADDR_W(`PIXEL_ADDR_W),
+      .R_DATA_W(`nYOLOmacs*DATAPATH_W),
+      .R_ADDR_W(`PIXEL_INT_ADDR_W),
       .USE_RAM(1)
    ) vread_mem (
        .clk(clk),
@@ -180,10 +180,10 @@ module xyolo_write_stage #(
       .iterations(vwrite_iterA),
       .period(vwrite_perA),
       .duty(vwrite_perA),
-      .start(`PIXEL_ADDR_W'd0),
+      .start({`PIXEL_ADDR_W{1'd0}}),
       .shift(vwrite_shiftA),
       .incr(vwrite_incrA),
-      .delay(`PIXEL_ADDR_W'd0),
+      .delay({`PIXEL_ADDR_W{1'd0}}),
       // Databus interface
       .databus_ready(databus_ready[1]),
       .databus_valid(databus_valid[1]),
@@ -230,7 +230,8 @@ module xyolo_write_stage #(
 
 	 //xyolo
 	 xyolo #(
-	    .DATAPATH_W(DATAPATH_W)
+	    .DATAPATH_W(DATAPATH_W),
+	    .N_MACS(`nYOLOmacs)
 	 ) xyolo (
 	    .clk(clk),
 	    .rst(global_run),
@@ -246,7 +247,7 @@ module xyolo_write_stage #(
 	    .shift(xyolo_shift),
 	    //data interface
 	    .flow_in_pixel(pixel),
-	    .flow_in_weight(flow_in_weight[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W]),
+	    .flow_in_weight(flow_in_weight[`nYOLOvect*`nYOLOmacs*DATAPATH_W-`nYOLOmacs*DATAPATH_W*i-1 -: `nYOLOmacs*DATAPATH_W]),
 	    .flow_in_bias(flow_in_bias[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W]),
 	    .flow_out(vwrite_inB[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W])
 	 );
