@@ -43,7 +43,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_22*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -760,7 +760,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9 + DATA_LAYER_22);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -974,8 +974,6 @@ int main(int argc, char **argv) {
   uart_printf("Convolution + upsample done in %d us\n\n", end-start);
  #endif
 
-#endif
-
   //layer 22
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 22...\n");
@@ -983,6 +981,20 @@ int main(int argc, char **argv) {
  #endif
   //ping-pong(0), zxy(0), leaky(1), outpos(0), upsample(0)
   conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, 0, LAYER_19_OUTPADD, 0, 1, LAYER_22_IGNOREPAD, 0, 0);
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Convolution done in %d us\n\n", end-start);
+ #endif
+
+#endif
+
+  //layers 23 and 24
+ #ifndef TIME_RUN
+  uart_printf("\nRunning layers 23 and 24...\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  //ping-pong(1), zxy(0), leaky(0), outpos(0), upsample(0)
+  conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, 1, LAYER_22_OUTPADD, 0, 0, LAYER_23_IGNOREPAD, 0, 0);
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
@@ -1001,20 +1013,20 @@ int main(int argc, char **argv) {
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
-  uart_printf("Convolution done in %d us\n\n", end-start);
+  uart_printf("Convolution + yolo done in %d us\n\n", end-start);
  #endif
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_19 + DATA_LAYER_9;
+  fp_data += DATA_LAYER_22;
   int i, j, k;
   uart_printf("\nVerifying...\n");
-  for(i = 0; i < LAYER_22_W; i++) {
-    uart_printf("Line %d base addr = %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_19 + DATA_LAYER_9 + i*LAYER_22_W*LAYER_22_NUM_KER));
-    for(j = 0; j < LAYER_22_W; j++)
-      for(k = 0; k < LAYER_22_NUM_KER; k++)
-        if(fp_data[i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] != fp_data[DATA_LAYER_22 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_19 + DATA_LAYER_9 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k), fp_data[i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_22 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] & 0xFFFF);
+  for(i = 0; i < LAYER_23_W; i++) {
+    uart_printf("Line %d base addr = %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_22 + i*LAYER_23_W*LAYER_23_NUM_KER));
+    for(j = 0; j < LAYER_23_W; j++)
+      for(k = 0; k < LAYER_23_NUM_KER; k++)
+        if(fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] != fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_22 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k), fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF);
   }
 #endif
 
