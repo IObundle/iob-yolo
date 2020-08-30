@@ -20,6 +20,9 @@
   int k_delta;
 #endif
 
+//obj and prob score threshold
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+
 //define peripheral base addresses
 #ifndef PCSIM
   //USE_DDR==1 to run yolo anyways
@@ -748,6 +751,44 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.clear();
 }
 
+//print detected objects and corresponding probability scores
+void print_results(int w, unsigned int pos) {
+
+  //local variable
+  int i, j, k, m;
+  int16_t arr[256], val_16;
+  const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};
+  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + pos;
+  int32_t val_32;
+
+  //print detections
+  for(i = 0; i < w; i++) {
+    for(j = 0; j < w; j++) {
+
+      //fill array
+      for(k = 0; k < 16; k++)
+        for(m = 0; m < 16; m++)
+          arr[k*16 + m] = fp_data[i*w*256 + j*16 + k*w*16 + m];
+
+      //check if obj score is higher than threshold
+      for(k = 0; k < 255; k+=85) {
+        if(arr[k+4] > threshold) {
+          //check if prob score is higher than threshold
+          for(m = 0; m < 80; m++) {
+            val_32 = (int32_t)((int32_t)arr[k+5+m]*(int32_t)arr[k+4]<<6); //Q8.8 * Q2.14 = Q10.22
+            val_16 = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
+	    if(val_16 > (threshold << 6)) {
+	      val_32 = (uint32_t)((uint32_t)val_16*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
+	      if((val_32&0x3FFF) > 0x2000) uart_printf("%s: %d%%\n", class_names[m], (val_32>>14)+1);
+	      else uart_printf("%s: %d%%\n", class_names[m], (val_32>>14));
+            }
+	  }
+        } 
+      }
+    }
+  }
+}
+
 //send results back
 void send_data() {
 
@@ -1017,6 +1058,14 @@ int main(int argc, char **argv) {
   total_time += end-start;
   uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
  #endif
+
+#ifndef SIM
+  //print detected objects and corresponding probability scores
+  uart_printf("\nResults of first yolo layer:\n");
+  print_results(LAYER_16_W, data_pos_layer19-DATA_LAYER_16);
+  uart_printf("\nResults of second yolo layer:\n");
+  print_results(LAYER_23_W, p_pos);
+#endif
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
