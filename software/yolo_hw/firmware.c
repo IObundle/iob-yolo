@@ -287,17 +287,16 @@ void layer1() {
 // num_ker -> number of kernels
 // ker_size -> width of kernel (same as height)
 // til_w -> width of tile
-// mp -> flag to indicate if perform stride 2 maxpool (1) or not (0) after convolution
 // w_start -> flag to indicate if weight mem starts writing from zero (0) or from given position (1) -> only for layer 3
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // STRATEGY -> Pixel reuse : apply all kernels to current FM tile before moving to next tile
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_start) {
+void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
 
   //local variables
   int j, k, l;
 #ifdef SIM
-  k_delta = w/((1+mp)*nSTAGES);
+  k_delta = w/(2*nSTAGES);
 #endif
   unsigned int w_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int p_in = DATA_BASE_ADDRESS + 2*p_pos;
@@ -306,7 +305,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
   //update initial positions
   w_pos += num_ker*(1 + ker_size*ker_size*c);
   p_pos += (w+2)*(w+2)*c;
-  p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w/(1+mp)+2+1)*num_ker); //pass first padding line and column
+  p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w/2+2+1)*num_ker); //pass first padding line and column
 
   /////////////////////////////////////////////////////////////////////////
   //                          FIXED CONFIGURATIONS
@@ -321,7 +320,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
 
   // configure xyolo_write vread to read tile from input fm
   versat.ywrite.read.setLen((c*(til_w+2))/16-1);
-  versat.ywrite.read.setOffset(2*((1+mp)*((w+2)*c)));
+  versat.ywrite.read.setOffset(2*(2*((w+2)*c)));
   versat.ywrite.read.setExtPer((c*(til_w+2))/16);
   versat.ywrite.read.setExtIncr(16);
   versat.ywrite.read.setExtShift(((w+2)*c) - (c*(til_w+2))); //+2 due to padding
@@ -330,7 +329,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
   versat.yread.setIntPer(ker_size*ker_size*c);
   versat.yread.setIntIncr(1);
-  versat.yread.setIntIter((1+mp)*til_w);
+  versat.yread.setIntIter(2*til_w);
   versat.yread.setIntShift(-ker_size*ker_size*c);
 
   // configure xyolo_write vread to write FM tile to xyolo
@@ -339,36 +338,31 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
   versat.ywrite.read.setIntIter(ker_size);
   versat.ywrite.read.setIntShift((til_w+2)*c - ker_size*c); //+2 due to padding
   versat.ywrite.read.setIntIncr2(c);
-  if(mp) {
-    versat.ywrite.read.setIntPer2(2);
-    versat.ywrite.read.setIntIter2(2);
-    versat.ywrite.read.setIntShift2((til_w+2)*c - 2*c); //+2 due to padding
-    versat.ywrite.read.setIntPer3(til_w/2); // /2 due to maxpool
-    versat.ywrite.read.setIntIncr3(2*c);
-    versat.ywrite.read.setIntIter3(1);
-  } else if(til_w != 1) {
-    versat.ywrite.read.setIntPer2(til_w);
-    versat.ywrite.read.setIntIter2(1);
-  }
+  versat.ywrite.read.setIntPer2(2);
+  versat.ywrite.read.setIntIter2(2);
+  versat.ywrite.read.setIntShift2((til_w+2)*c - 2*c); //+2 due to padding
+  versat.ywrite.read.setIntPer3(til_w/2); // /2 due to maxpool
+  versat.ywrite.read.setIntIncr3(2*c);
+  versat.ywrite.read.setIntIter3(1);
 
   // configure xyolo to perform convolution + maxpool
-  versat.ywrite.yolo.setIter((1+mp)*til_w);
+  versat.ywrite.yolo.setIter(2*til_w);
   versat.ywrite.yolo.setPer(ker_size*ker_size*c);
   versat.ywrite.yolo.setShift(10);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);
-  versat.ywrite.yolo.setMaxpool(mp);
+  versat.ywrite.yolo.setMaxpool(1);
 
   // configure xwrite to write convolution results
   versat.ywrite.write.setIntDuty(1);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
-  versat.ywrite.write.setIntPer((1+3*mp)*ker_size*ker_size*c);
+  versat.ywrite.write.setIntPer(4*ker_size*ker_size*c);
   versat.ywrite.write.setIntIncr(num_ker/nYOLOvect);
-  versat.ywrite.write.setIntIter(til_w/(1+mp));
+  versat.ywrite.write.setIntIter(til_w/2);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(((til_w/(1+mp))*(num_ker/nYOLOvect))-1);
-  versat.ywrite.write.setOffset(2*((w/(1+mp)+2)*num_ker));
+  versat.ywrite.write.setLen(((til_w/2)*(num_ker/nYOLOvect))-1);
+  versat.ywrite.write.setOffset(2*((w/2+2)*num_ker));
   versat.ywrite.write.setExtPer(1);
 
   /////////////////////////////////////////////////////////////////////////
@@ -378,13 +372,13 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
 #ifdef SIM
   for(k = 0; k < k_delta; k++) {
 #else
-  for(k = 0; k < w/((1+mp)*nSTAGES); k++) {
+  for(k = 0; k < w/(2*nSTAGES); k++) {
 #endif
     for(j = 0; j < w/til_w; j++) {
 
       // configure xyolo_write vread to read tile from input fm
-      versat.ywrite.read.setExtIter(ker_size+mp);
-      versat.ywrite.read.setExtAddr(p_in + 2*(k*(1+mp)*((w+2)*c)*nSTAGES + j*til_w*c));
+      versat.ywrite.read.setExtIter(ker_size+1);
+      versat.ywrite.read.setExtAddr(p_in + 2*(k*2*((w+2)*c)*nSTAGES + j*til_w*c));
 
       // simulate for first yolo layer
       for(l = 0; l < num_ker/nYOLOvect; l++) {
@@ -404,8 +398,8 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int mp, int w_star
 
         // configure xyolo_write vwrite to write result back to DDR
         if(l == num_ker/nYOLOvect-1) {
-          versat.ywrite.write.setExtAddr(p_out + 2*(k*(w/(1+mp)+2)*num_ker*nSTAGES + j*(til_w/(1+mp)*num_ker)));
-  	  versat.ywrite.write.setExtIter(((til_w/(1+mp))*(num_ker/nYOLOvect)));
+          versat.ywrite.write.setExtAddr(p_out + 2*(k*(w/2+2)*num_ker*nSTAGES + j*(til_w/2*num_ker)));
+  	  versat.ywrite.write.setExtIter(((til_w/2)*(num_ker/nYOLOvect)));
         } else versat.ywrite.write.setExtIter(0);
 
         // wait until done
@@ -825,6 +819,7 @@ int main(int argc, char **argv) {
 
   //layers 1 and 2
  #ifndef TIME_RUN
+  unsigned int total_time;
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
@@ -832,6 +827,7 @@ int main(int argc, char **argv) {
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+  total_time = end-start;
  #endif
 
   //layers 3 and 4
@@ -839,10 +835,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 3 and 4...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, LAYER_3_MAXPOOL, 1);
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 1); //w_start(1)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layers 5 and 6
@@ -850,10 +847,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 5 and 6...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, LAYER_5_MAXPOOL, 0);
+  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0); //w_start(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layers 7 and 8
@@ -861,10 +859,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 7 and 8...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, LAYER_7_MAXPOOL, 0);
+  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0); //w_start(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 9
@@ -872,11 +871,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 9...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(1), zxy(1), leaky(1), upsample(0)
-  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE, 1, LAYER_7_OUTPADD, 1, 1, LAYER_9_IGNOREPAD, data_pos_layer9, 0);
+  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_9_PINGPONG, LAYER_7_OUTPADD, LAYER_9_ZXY, LAYER_9_LEAKY, LAYER_9_IGNOREPAD, data_pos_layer9, LAYER_9_UPSAMPLE);
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 10
@@ -888,6 +887,7 @@ int main(int argc, char **argv) {
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 11
@@ -895,11 +895,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 11...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(1), leaky(1), outpos(0), upsample(0)
-  conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE, 0, 1, 1, 1, LAYER_11_IGNOREPAD, 0, 0);
+  conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE, LAYER_11_PINGPONG, LAYER_10_OUTPADD, LAYER_11_ZXY, LAYER_11_LEAKY, LAYER_11_IGNOREPAD, 0, LAYER_11_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 12
@@ -907,10 +907,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 12...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  maxpool(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0);
+  maxpool(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 13
@@ -918,11 +919,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 13...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(1), leaky(1), outpos(0), upsample(0)
-  conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, 0, 1, 1, 1, LAYER_13_IGNOREPAD, 0, 0);
+  conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, LAYER_13_PINGPONG, LAYER_12_OUTPADD, LAYER_13_ZXY, LAYER_13_LEAKY, LAYER_13_IGNOREPAD, 0, LAYER_13_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 14
@@ -930,11 +931,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 14...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(0), leaky(1), outpos(0), upsample(0)
-  conv2(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_OUTPADD, LAYER_14_STRIDE, 0, LAYER_13_OUTPADD, 0, 1, LAYER_14_IGNOREPAD, 0, 0);
+  conv2(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_14_PINGPONG, LAYER_13_OUTPADD, LAYER_14_ZXY, LAYER_14_LEAKY, LAYER_14_IGNOREPAD, 0, LAYER_14_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 15
@@ -942,11 +943,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 15...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(0), leaky(1), outpos(0), upsample(0)
-  conv2(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_OUTPADD, LAYER_15_STRIDE, 0, LAYER_14_OUTPADD, 0, 1, LAYER_15_IGNOREPAD, 0, 0);
+  conv2(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_15_PINGPONG, LAYER_14_OUTPADD, LAYER_15_ZXY, LAYER_15_LEAKY, LAYER_15_IGNOREPAD, 0, LAYER_15_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 16 and 17
@@ -954,11 +955,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 16 and 17...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(0), leaky(0), outpos(0), upsample(0)
-  conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, 0, LAYER_15_OUTPADD, 0, 0, LAYER_16_IGNOREPAD, 0, 0);
+  conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_16_PINGPONG, LAYER_15_OUTPADD, LAYER_16_ZXY, LAYER_16_LEAKY, LAYER_16_IGNOREPAD, 0, LAYER_16_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layers 19 and 20
@@ -967,11 +968,11 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   p_pos = data_pos_layer14;
-  //ping-pong(1), inpadd(0), zxy(0), leaky(1), upsample(1)
-  conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, 1, 0, 0, 1, LAYER_19_IGNOREPAD, data_pos_layer19, 1);
+  conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, LAYER_19_PINGPONG, 0, LAYER_19_ZXY, LAYER_19_LEAKY, LAYER_19_IGNOREPAD, data_pos_layer19, LAYER_19_UPSAMPLE); //inpadd(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + upsample done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
   //layer 22
@@ -979,11 +980,11 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 22...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(0), zxy(0), leaky(1), outpos(0), upsample(0)
-  conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, 0, LAYER_19_OUTPADD, 0, 1, LAYER_22_IGNOREPAD, 0, 0);
+  conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, LAYER_22_PINGPONG, LAYER_19_OUTPADD, LAYER_22_ZXY, LAYER_22_LEAKY, LAYER_22_IGNOREPAD, 0, LAYER_22_UPSAMPLE); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
 #endif
@@ -993,8 +994,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 23 and 24...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  //ping-pong(1), zxy(0), leaky(0), outpos(0), upsample(0)
-  conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, 1, LAYER_22_OUTPADD, 0, 0, LAYER_23_IGNOREPAD, 0, 0);
+  conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_23_PINGPONG, LAYER_22_OUTPADD, LAYER_23_ZXY, LAYER_23_LEAKY, LAYER_23_IGNOREPAD, 0, LAYER_23_UPSAMPLE); //outpos(0)
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
@@ -1014,6 +1014,8 @@ int main(int argc, char **argv) {
   versat_end();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
+  total_time += end-start;
+  uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
  #endif
 
 #ifdef SIM
