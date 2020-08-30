@@ -43,7 +43,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_19*2) //16 bits
+#define OUTPUT_FILE_SIZE ((DATA_LAYER_9+DATA_LAYER_19)*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -89,10 +89,6 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_8; i++) fp_data[pos + i] = 0;
   pos += DATA_LAYER_8;
 
-  //layer 9
-  for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
-  pos += DATA_LAYER_9;
-
   //layer 10
   for(i = 0; i < DATA_LAYER_10; i++) fp_data[pos + i] = 0;
   pos += DATA_LAYER_10;
@@ -109,8 +105,8 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_14; i++) fp_data[pos + i] = 0;
   pos += DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16;
 
-  //layer 19/20
-  for(i = 0; i < DATA_LAYER_19; i++) fp_data[pos + i] = 0;
+  //layer 19/20 and 9
+  for(i = 0; i < DATA_LAYER_19 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
   end = timer_time_us(TIMER_BASE);
@@ -459,11 +455,15 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 
   //update initial positions
   w_pos += num_ker*(1 + ker_size*ker_size*c);
-  p_pos += (w+2*inpadd)*(w+2*inpadd)*c;
   //pass first padding line and first 16 pixels of next line
-  if(outpos == 0) p_out = DATA_BASE_ADDRESS + 2*(p_pos + ((w+2)*num_ker + 16)*outpadd);
+  if(outpos == 0) { 
+    p_pos += (w+2*inpadd)*(w+2*inpadd)*c;
+    p_out = DATA_BASE_ADDRESS + 2*(p_pos + ((w+2)*num_ker + 16)*outpadd);
   //else only for layers 9 and 14, whose output is later on joined for layer 22
-  else p_out = DATA_BASE_ADDRESS + 2*(outpos + (LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + 16);
+  } else {
+    p_pos = outpos;
+    p_out = DATA_BASE_ADDRESS + 2*(outpos + (LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + 16);
+  }
 
   // extra run to make last computation
   if(!upsample) {
@@ -614,7 +614,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 //run maxpool layer in versat
 //input data is in format 16 channels per pixel
 //ouput data is converted back again to zxy format
-void maxpool(int w, int c, int inpadd, int stride) {
+void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
 
   // extra run to make last computation
   while(versat.done()==0);
@@ -629,11 +629,13 @@ void maxpool(int w, int c, int inpadd, int stride) {
 
   //local variables
   int l;
-  unsigned int p_in = DATA_BASE_ADDRESS + 2*(p_pos + (w+2)*c*inpadd); //pass first padding line
-  unsigned int p_out;
+  unsigned int p_in, p_out;
+  if(outpos == 0) p_in = DATA_BASE_ADDRESS + 2*(p_pos + (w+2)*c*inpadd); //pass first padding line
+  else p_in = DATA_BASE_ADDRESS + 2*(p_pos + (LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER));
 
   //update initial positions
-  p_pos += (w+2*inpadd+stride)*(w+2*inpadd+stride)*c;
+  if(outpos == 0) p_pos += (w+2*inpadd+stride)*(w+2*inpadd+stride)*c;
+  else p_pos = outpos;
   p_out = DATA_BASE_ADDRESS + 2*(p_pos + (w/(1+inpadd)+2+1)*c); //pass first padding line and column
 
   /////////////////////////////////////////////////////////////////////////
@@ -641,11 +643,19 @@ void maxpool(int w, int c, int inpadd, int stride) {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_write vread to read input fm
-  versat.ywrite.read.setLen(c*(w+2*inpadd+stride)*(nSTAGES*(1+inpadd)+stride)/16-1);
-  versat.ywrite.read.setOffset(2*((1+inpadd)*(w+2*inpadd+stride)*c)); 
-  versat.ywrite.read.setExtPer((c*(w+2*inpadd+stride)*2)/16); //each vread reads 2 lines
+  if(outpos == 0) {
+    versat.ywrite.read.setLen(c*(w+2*inpadd+stride)*(nSTAGES*(1+inpadd)+stride)/16-1);
+    versat.ywrite.read.setOffset(2*((1+inpadd)*(w+2*inpadd+stride)*c)); 
+    versat.ywrite.read.setExtPer((c*(w+2*inpadd+stride)*2)/16); //each vread reads 2 lines
+    versat.ywrite.read.setExtIter(1);
+  } else {
+    versat.ywrite.read.setLen(c*(w+2*inpadd+stride)/16-1);
+    versat.ywrite.read.setOffset(2*((1+inpadd)*(w+2*inpadd+stride)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER)));
+    versat.ywrite.read.setExtPer(c*(w+2*inpadd+stride)/16); //each vread reads 2 lines
+    versat.ywrite.read.setExtIter(2);
+    versat.ywrite.read.setExtShift((w+2*inpadd+stride)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) - c*(w+2*inpadd+stride));
+  }
   versat.ywrite.read.setExtIncr(16);
-  versat.ywrite.read.setExtIter(1);
   versat.ywrite.read.setExtAddr(p_in);
 
   // configure xyolo_write vread to write FM tile to xyolo
@@ -715,7 +725,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_9 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -847,7 +857,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 10...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  maxpool(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE);
+  maxpool(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
@@ -870,7 +880,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 12...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  maxpool(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE);
+  maxpool(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0);
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
