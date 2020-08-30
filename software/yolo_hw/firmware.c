@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-#define TIME_RUN
+//#define TIME_RUN
 
 #ifdef SIM
   int k_delta;
@@ -43,7 +43,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE ((DATA_LAYER_9+DATA_LAYER_19)*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_22*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -565,6 +565,41 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   for(k = 0; k < w/nSTAGES; k++) {
 #endif
 
+    // reset run for second tile of layer 22 (each tile fits in the whole memory)
+    if(c == LAYER_9_NUM_KER+LAYER_19_NUM_KER && k != 0) {
+
+      //stop reading weights and computation
+      versat.yread.setExtIter(0);
+      versat.yread.setIntIter(0);
+      versat.ywrite.read.setIntIter(0);
+      versat.ywrite.read.setIntIter2(0);
+      versat.ywrite.read.setIntIter3(0);
+      versat.ywrite.yolo.setIter(0);
+      versat.ywrite.write.setIntIter(0);
+      versat.ywrite.write.setExtIter(0);
+
+      //extra run (otherwise mems must be bigger for layer 22)
+      while(versat.done()==0);
+    #ifdef TIME_RUN
+      end = (unsigned int) timer_get_count(TIMER_BASE);
+      uart_printf("%d\n", (end - start)*8);
+    #endif
+      versat.run();
+    #ifdef TIME_RUN
+      start = (unsigned int) timer_get_count(TIMER_BASE);
+    #endif
+
+      //recover former configs
+      versat.yread.setExtIter(1);
+      versat.yread.setIntIter(w*(1+upsample));
+      versat.ywrite.read.setIntIter(c/16);
+      versat.ywrite.read.setIntIter2(ker_size);
+      versat.ywrite.read.setIntIter3(1);
+      versat.ywrite.yolo.setIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
+      versat.ywrite.write.setIntIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
+      versat.ywrite.write.setExtIter(1+upsample);
+    }
+
     // configure xyolo_write vread to read tile from input fm
     versat.ywrite.read.setExtIter(1);
     versat.ywrite.read.setExtAddr(p_in + 2*(k*(w+2*inpadd)*c*nSTAGES));
@@ -725,7 +760,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -832,10 +867,6 @@ int main(int argc, char **argv) {
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
  #endif
 
-#endif
-
-
-
   //layer 9
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 9...\n");
@@ -847,10 +878,6 @@ int main(int argc, char **argv) {
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
  #endif
-
-
-
-#ifndef SIM
 
   //layer 10
  #ifndef TIME_RUN
@@ -934,8 +961,6 @@ int main(int argc, char **argv) {
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
  #endif
 
-#endif
-
   //layers 19 and 20
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 19 and 20...\n");
@@ -944,6 +969,20 @@ int main(int argc, char **argv) {
   p_pos = data_pos_layer14;
   //ping-pong(1), inpadd(0), zxy(0), leaky(1), upsample(1)
   conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, 1, 0, 0, 1, LAYER_19_IGNOREPAD, data_pos_layer19, 1);
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Convolution + upsample done in %d us\n\n", end-start);
+ #endif
+
+#endif
+
+  //layer 22
+ #ifndef TIME_RUN
+  uart_printf("\nRunning layer 22...\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  //ping-pong(0), zxy(0), leaky(1), outpos(0), upsample(0)
+  conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, 0, LAYER_19_OUTPADD, 0, 1, LAYER_22_IGNOREPAD, 0, 0);
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
@@ -962,20 +1001,20 @@ int main(int argc, char **argv) {
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
-  uart_printf("Convolution + upsample done in %d us\n\n", end-start);
+  uart_printf("Convolution done in %d us\n\n", end-start);
  #endif
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_8 + DATA_LAYER_14;
+  fp_data += DATA_LAYER_19 + DATA_LAYER_9;
   int i, j, k;
   uart_printf("\nVerifying...\n");
-  for(i = 0; i < (LAYER_22_W+2); i++) {
-    uart_printf("Line %d base addr = %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_8 + DATA_LAYER_14 + i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER)));
-    for(j = 0; j < (LAYER_22_W+2); j++)
-      for(k = 0; k < (LAYER_9_NUM_KER+LAYER_19_NUM_KER); k++)
-        if(fp_data[i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + j*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + k] != fp_data[DATA_LAYER_9 + DATA_LAYER_19 + i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + j*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_8 + DATA_LAYER_14 + i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + j*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + k), fp_data[i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + j*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + k] & 0xFFFF, fp_data[DATA_LAYER_9 + DATA_LAYER_19 + i*(LAYER_22_W+2)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + j*(LAYER_9_NUM_KER+LAYER_19_NUM_KER) + k] & 0xFFFF);
+  for(i = 0; i < LAYER_22_W; i++) {
+    uart_printf("Line %d base addr = %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_19 + DATA_LAYER_9 + i*LAYER_22_W*LAYER_22_NUM_KER));
+    for(j = 0; j < LAYER_22_W; j++)
+      for(k = 0; k < LAYER_22_NUM_KER; k++)
+        if(fp_data[i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] != fp_data[DATA_LAYER_22 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_19 + DATA_LAYER_9 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k), fp_data[i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_22 + i*LAYER_22_W*LAYER_22_NUM_KER + j*LAYER_22_NUM_KER + k] & 0xFFFF);
   }
 #endif
 
