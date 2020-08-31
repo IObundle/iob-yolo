@@ -3,6 +3,7 @@
 
 //define vread mem write address width
 `define WEIGHT_W_ADDR_W		    (`WEIGHT_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
+`define WEIGHT_INT_ADDR_W           (`WEIGHT_ADDR_W-$clog2(`nYOLOmacs))
 
 // Configuration offsets
 `define XYOLO_READ_CONF_EXT_ADDR    0

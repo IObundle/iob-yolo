@@ -5,25 +5,25 @@ module xaddrgen # (
 		 parameter				MEM_ADDR_W = 10,
 		 parameter				PERIOD_W = 10
 		) (
-		 input                         		clk,
-		 input                         		rst,
-		 input                         		init,
-		 input                        		run,
-		 input 					pause,      
+		 input 				 clk,
+		 input 				 rst,
+		 input 				 init,
+		 input 				 run,
+		 input 				 pause, 
 
 		 //configurations 
-		 input [MEM_ADDR_W - 1:0]        	iterations,
-		 input [PERIOD_W - 1:0]       		period,
-		 input [PERIOD_W - 1:0]       		duty,
-		 input [PERIOD_W - 1:0]       		delay,
-		 input [MEM_ADDR_W - 1:0]        	start,
-		 input signed [MEM_ADDR_W - 1:0] 	shift,
-		 input signed [MEM_ADDR_W - 1:0] 	incr,
+		 input [PERIOD_W - 1:0] 	 iterations,
+		 input [PERIOD_W - 1:0] 	 period,
+		 input [PERIOD_W - 1:0] 	 duty,
+		 input [PERIOD_W - 1:0] 	 delay,
+		 input [MEM_ADDR_W - 1:0] 	 start,
+		 input signed [MEM_ADDR_W - 1:0] shift,
+		 input signed [MEM_ADDR_W - 1:0] incr,
 
 		 //outputs 
-		 output reg [MEM_ADDR_W - 1:0]   	addr,
-		 output reg                    		mem_en,
-		 output reg                    		done
+		 output reg [MEM_ADDR_W - 1:0] 	 addr,
+		 output reg 			 mem_en,
+		 output reg 			 done
 		 );
 
    reg signed [PERIOD_W :0]                   		per_cnt, per_cnt_nxt; //period count
@@ -31,7 +31,7 @@ module xaddrgen # (
    
    reg [MEM_ADDR_W - 1:0]                        	addr_nxt, addr_r0, addr_r1;
    
-   reg [MEM_ADDR_W - 1:0]                        	iter, iter_nxt; //iterations count 
+   reg [PERIOD_W - 1:0] 				iter, iter_nxt; //iterations count 
 
    reg 					       		mem_en_nxt;
    reg 					       		done_nxt;
@@ -61,7 +61,7 @@ module xaddrgen # (
 	 if (init) begin 
 	    per_cnt_nxt = -{{1'b0}, delay}+1'b1;
 	    addr_nxt = start;
-	    iter_nxt = {{MEM_ADDR_W-1{1'b0}}, 1'b1};
+	    iter_nxt = {{PERIOD_W-1{1'b0}}, 1'b1};
 	 end 
 
 	 if(run) begin
@@ -118,7 +118,7 @@ module xaddrgen # (
 	       done_nxt = 1'b0;
 	    if(run) begin
 	      addr_nxt = start;
-	      iter_nxt = {{MEM_ADDR_W-1{1'b0}}, 1'b1};
+	      iter_nxt = {{PERIOD_W-1{1'b0}}, 1'b1};
 	      mem_en_nxt = 1'b1;
 	      run_nxt = 1'b1;
 	    end else state_nxt = IDLE;
@@ -138,7 +138,7 @@ module xaddrgen # (
 	addr_r0 <= {MEM_ADDR_W{1'b0}};
 	addr_r1 <= {MEM_ADDR_W{1'b0}};
 	per_cnt <= {PERIOD_W{1'b0}};
-	iter <= {MEM_ADDR_W{1'b0}};
+	iter <= {PERIOD_W{1'b0}};
         run_reg <= 1'b0;
 	rep <= 1'b1;
      end else begin 

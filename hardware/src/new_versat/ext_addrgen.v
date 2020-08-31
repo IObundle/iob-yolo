@@ -16,40 +16,40 @@ module ext_addrgen #(
     parameter			     EXT_PERIOD_W = 10,
     parameter                        MEM_ADDR_W = 10
     ) (
-    input                            clk,
-    input                            rst,
+    input 			    clk,
+    input 			    rst,
 
     // Control I/F
-    input                            run,
-    input			     int_cnt_en,
-    output reg                       done,
+    input 			    run,
+    input 			    int_cnt_en,
+    output reg 			    done,
 
     // Configuration
-    input [`IO_ADDR_W-1:0]           ext_addr,
-    input [MEM_ADDR_W-1:0]           int_addr,
-    input [1:0]                      direction,
-    input [EXT_ADDR_W - 1:0]         iterations,
-    input [EXT_PERIOD_W - 1:0]       period,
-    input [EXT_PERIOD_W - 1:0]       duty,
-    input [EXT_PERIOD_W - 1:0]       delay,
-    input [EXT_ADDR_W - 1:0]         start,
-    input signed [EXT_ADDR_W - 1:0]  shift,
-    input signed [EXT_ADDR_W - 1:0]  incr,
+    input [`IO_ADDR_W-1:0] 	    ext_addr,
+    input [MEM_ADDR_W-1:0] 	    int_addr,
+    input [1:0] 		    direction,
+    input [EXT_PERIOD_W - 1:0] 	    iterations,
+    input [EXT_PERIOD_W - 1:0] 	    period,
+    input [EXT_PERIOD_W - 1:0] 	    duty,
+    input [EXT_PERIOD_W - 1:0] 	    delay,
+    input [EXT_ADDR_W - 1:0] 	    start,
+    input signed [EXT_ADDR_W - 1:0] shift,
+    input signed [EXT_ADDR_W - 1:0] incr,
 
     // Databus interface
-    input                            databus_ready,
-    output reg                       databus_valid,
-    output [`IO_ADDR_W-1:0]          databus_addr,
-    input [DATA_W-1:0]               databus_rdata,
-    output [DATA_W-1:0]              databus_wdata,
-    output reg [DATA_W/8-1:0]        databus_wstrb,
+    input 			    databus_ready,
+    output reg 			    databus_valid,
+    output [`IO_ADDR_W-1:0] 	    databus_addr,
+    input [DATA_W-1:0] 		    databus_rdata,
+    output [DATA_W-1:0] 	    databus_wdata,
+    output reg [DATA_W/8-1:0] 	    databus_wstrb,
 
     // internal memory interface
-    output reg                       valid,
-    output reg                       we,
-    output [MEM_ADDR_W-1:0]          addr,
-    output [DATA_W-1:0]              data_out,
-    input [DATA_W-1:0]               data_in
+    output reg 			    valid,
+    output reg 			    we,
+    output [MEM_ADDR_W-1:0] 	    addr,
+    output [DATA_W-1:0] 	    data_out,
+    input [DATA_W-1:0] 		    data_in
    );
 
    // addr gen wires

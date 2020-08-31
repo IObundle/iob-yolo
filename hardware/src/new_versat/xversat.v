@@ -52,7 +52,9 @@ module xversat # (
    wire                                 global_run = run_r0 & ~run_r1; //ensure is high only one clock cycle
 
    // data flow between FUs
-   wire [`nYOLOvect*`DATAPATH_W-1:0]	flow_bias, flow_weight;
+   wire [`nYOLOvect*`DATAPATH_W-1:0]	flow_bias;
+   wire [`nYOLOvect*`nYOLOmacs*`DATAPATH_W-1:0] flow_weight;
+   
 
    // select DMA len
    wire [`AXI_LEN_W-1:0] 		read_dma_len, write_dma_len;

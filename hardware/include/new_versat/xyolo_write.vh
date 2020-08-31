@@ -1,9 +1,10 @@
 // Latency
-`define XYOLO_WRITE_LAT        	5
+`define XYOLO_WRITE_LAT        	6
 `define XYOLO_WRITE_BYPASS_LAT  2
 
 //define vread mem write address width
 `define PIXEL_W_ADDR_W         (`PIXEL_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
+`define PIXEL_INT_ADDR_W       (`PIXEL_ADDR_W-$clog2(`nYOLOmacs))
 
 // xyolo shift width
 `define SHIFT_W                 ($clog2(DATAPATH_W)+1)
