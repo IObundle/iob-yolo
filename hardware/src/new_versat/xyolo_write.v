@@ -739,7 +739,7 @@ module xyolo_write #(
          ld_acc1 <= ld_acc0;
 	 ld_acc2 <= ld_acc1;
 	 if(ld_res) mp_cnt <= mp_cnt + 1;
-	 if(ld_acc2) nmac_cnt <= nmac_cnt + 1; 
+	 if(ld_acc1 && ~ld_acc0) nmac_cnt <= nmac_cnt + 1; 
       end
 
    //vwrite internal address generator
