@@ -27,7 +27,7 @@ s.bind((interface, 0))
 
 #Open input file
 print("\nStarting input file transmission...")
-input_filename = "../yolo_hw_in.bin"
+input_filename = "../yolo_hw_in_x4.bin"
 f_input = open(input_filename, 'rb')
 
 #Frame parameters

@@ -2,12 +2,18 @@
 
 `include "system.vh"
 `include "iob_uart.vh"
+`include "xversat.vh"
 
 //DDR initial constants
 `define OFFSET (2**`FIRM_ADDR_W)
 
+//Offset for first layer
+`define LAYER_1_C (3+(`nYOLOmacs!=1))
+`define LAYER_1_P_OFF (10 + (-2*(`nYOLOmacs!=1))) //10 for nMAC=1, 8 for nMAC=2/4
+`define LAYER_1_W_OFF (5 + ((`nYOLOmacs!=1)*7)) //5 for NMAC=1, 12 for nMAC=2/4
+
 //FM constants
-`define DATA_LAYER_1 (418*(418*3+10)) //+10 to be 32 byte aligned
+`define DATA_LAYER_1 (418*(418*`LAYER_1_C+`LAYER_1_P_OFF)) //+LAYER_1_P_OFF to be 32 byte aligned
 `define DATA_LAYER_2 (210*210*16)
 `define DATA_LAYER_4 (106*106*32)
 `define DATA_LAYER_6 (54*54*64)
@@ -23,10 +29,11 @@
 `define DATA_LAYER_19 (28*28*128)
 `define DATA_LAYER_22 (26*26*256)
 `define DATA_LAYER_23 (26*26*256)
-`define TOTAL_FM (2*(`DATA_LAYER_22 + 2*`DATA_LAYER_23)) 
+//`define TOTAL_FM (2*(`DATA_LAYER_22 + 2*`DATA_LAYER_23)) 
+`define TOTAL_FM (2*(`DATA_LAYER_1 + 2*`DATA_LAYER_2)) 
 
 //Weight constants
-`define WEIGHTS_LAYER_1 (16 + 16*(3*3*3+5)) //+5 to be 32 byte aligned
+`define WEIGHTS_LAYER_1 (16 + 16*(3*3*`LAYER_1_C+`LAYER_1_W_OFF)) //+LAYER_1_W_OFF to be 32 byte aligned
 `define WEIGHTS_LAYER_3 (32 + 32*3*3*16)
 `define WEIGHTS_LAYER_5 (64 + 64*3*3*32)
 `define WEIGHTS_LAYER_7 (128 + 128*3*3*64)
@@ -39,7 +46,8 @@
 `define WEIGHTS_LAYER_19 (128 + 128*1*1*256)
 `define WEIGHTS_LAYER_22 (256 + 256*3*3*384)
 `define WEIGHTS_LAYER_23 (256 + 256*1*1*256)
-`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_23))
+//`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_23))
+`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_1))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
@@ -92,9 +100,8 @@ module yolo_hw_tb;
    integer                i;
 
    //define parameters
-   parameter file_ddr = {"../../../../yolo_hw_", `STRINGIFY(`MIG_BUS_W), ".hex"};
+   parameter file_ddr = {"../../../../yolo_hw_", `STRINGIFY(`MIG_BUS_W), "_x", `STRINGIFY(`nYOLOmacs), ".hex"};
    parameter file_size = `FILE_SIZE;
-   
 
    /////////////////////////////////////////////
    // TEST PROCEDURE
