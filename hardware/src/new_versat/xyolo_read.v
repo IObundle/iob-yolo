@@ -73,7 +73,7 @@ module xyolo_read #(
    reg [`WEIGHT_ADDR_W-1:0] 		perA, perA_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		shiftA, shiftA_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		incrA, incrA_shadow;
-   reg [`WEIGHT_INT_ADDR_W-1:0] 	iterB, iterB_pip, iterB_shadow;
+   reg [`WEIGHT_ADDR_W-1:0] 		iterB, iterB_pip, iterB_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		perB, perB_pip, perB_shadow;
    reg [`WEIGHT_INT_ADDR_W-1:0] 	startB, startB_pip, startB_shadow;
    reg [`WEIGHT_INT_ADDR_W-1:0] 	shiftB, shiftB_pip, shiftB_shadow;
@@ -210,7 +210,7 @@ module xyolo_read #(
 	 perA <= `WEIGHT_ADDR_W'b0;
 	 shiftA <= `WEIGHT_ADDR_W'b0;
 	 incrA <= `WEIGHT_ADDR_W'b0;
-	 iterB <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 iterB <= {`WEIGHT_ADDR_W{1'b0}};
 	 perB <= `WEIGHT_ADDR_W'b0;
 	 startB <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 shiftB <= {`WEIGHT_INT_ADDR_W{1'b0}};
@@ -229,7 +229,7 @@ module xyolo_read #(
          if(perA_en) perA <= wdata[`WEIGHT_ADDR_W-1:0];
          if(shiftA_en) shiftA <= wdata[`WEIGHT_ADDR_W-1:0];
          if(incrA_en) incrA <= wdata[`WEIGHT_ADDR_W-1:0];
-         if(iterB_en) iterB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
+         if(iterB_en) iterB <= wdata[`WEIGHT_ADDR_W-1:0];
          if(perB_en) perB <= wdata[`WEIGHT_ADDR_W-1:0];
          if(startB_en) startB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
          if(shiftB_en) shiftB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
@@ -250,8 +250,8 @@ module xyolo_read #(
 	 perA_shadow <= `WEIGHT_ADDR_W'b0;
 	 shiftA_shadow <= `WEIGHT_ADDR_W'b0;
 	 incrA_shadow <= `WEIGHT_ADDR_W'b0;
-	 iterB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};
-	 iterB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 iterB_shadow <= {`WEIGHT_ADDR_W{1'b0}};
+	 iterB_pip <= {`WEIGHT_ADDR_W{1'b0}};
 	 perB_shadow <= `WEIGHT_ADDR_W'b0;
 	 perB_pip <= `WEIGHT_ADDR_W'b0;
 	 startB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};

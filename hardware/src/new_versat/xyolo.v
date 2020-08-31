@@ -101,20 +101,20 @@ module xyolo # (
    	     end
    	end
    	2 : begin
-   	   wire signed [(N_MACS-1)*2*DATAPATH_W-1:0] part_sum;
+   	   wire signed [2*DATAPATH_W-1:0] part_sum;
 	   
    	   // level 0
-   	   assign part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W];
+   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W];
    	   // register result
    	   always @ (posedge clk, posedge rst)
    	     if (rst) begin
    		conv_res <= {2*DATAPATH_W{1'b0}};
    	     end else begin
-   		conv_res <= part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W];
+   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
    	     end
    	end
    	4: begin
-   	   wire signed [(N_MACS-1)*2*DATAPATH_W-1:0] part_sum;
+   	   wire signed [2*DATAPATH_W-1:0] part_sum;
 
    	   // level 1
    	   // assign part_sum[(N_MACS-3)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W];
@@ -122,14 +122,14 @@ module xyolo # (
    	   // level 0
    	   // assign part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = part_sum[(N_MACS-3)*2*DATAPATH_W -: 2*DATAPATH_W] + part_sum[(N_MACS-2)*2*DATAPATH_W -: 2*DATAPATH_W];
 
-   	   assign part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W];
+   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W];
 
    	   // register result
    	   always @ (posedge clk, posedge rst)
    	     if (rst) begin
    		conv_res <= {2*DATAPATH_W{1'b0}};
    	     end else begin
-   		conv_res <= part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W];
+   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
    	     end
    	end
    	default : begin

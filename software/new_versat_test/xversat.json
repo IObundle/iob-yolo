@@ -1,7 +1,7 @@
 {
 	"nYOLOvect":		16,
 	"nSTAGES":		13,
-        "nYOLOmacs":             2,
+        "nYOLOmacs":             4,
 	"IO_ADDR_W":		32,
 	"DATAPATH_W":		16,
         "BIAS_ADDR_W":          2,

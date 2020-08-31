@@ -23,19 +23,19 @@ module xaddrgen3 # (
 		 input [MEM_ADDR_W - 1:0]              	start,
 
 		 //loops 1-2
-		 input [MEM_ADDR_W - 1:0]              	iterations,
+		 input [PERIOD_W - 1:0]              	iterations,
 		 input [PERIOD_W - 1:0]                	period,
 		 input signed [MEM_ADDR_W - 1:0]       	shift,
 		 input signed [MEM_ADDR_W - 1:0]       	incr,
 
 		 //loops 3-4 
-		 input [MEM_ADDR_W - 1:0]              	iterations2,
+		 input [PERIOD_W - 1:0]              	iterations2,
 		 input [PERIOD_W - 1:0]                	period2,
 		 input signed [MEM_ADDR_W - 1:0]       	shift2,
 		 input signed [MEM_ADDR_W - 1:0]       	incr2,
 
 		 //loops 5-6
-		 input [MEM_ADDR_W - 1:0]              	iterations3,
+		 input [PERIOD_W - 1:0]              	iterations3,
 		 input [PERIOD_W - 1:0]                	period3,
 		 input signed [MEM_ADDR_W - 1:0]       	shift3,
 		 input signed [MEM_ADDR_W - 1:0]       	incr3,
