@@ -30,7 +30,7 @@
 `define DATA_LAYER_22 (26*26*256)
 `define DATA_LAYER_23 (26*26*256)
 //`define TOTAL_FM (2*(`DATA_LAYER_22 + 2*`DATA_LAYER_23)) 
-`define TOTAL_FM (2*(`DATA_LAYER_8 + 2*`DATA_LAYER_10 + (`DATA_LAYER_19 + `DATA_LAYER_9))) 
+`define TOTAL_FM (2*(`DATA_LAYER_12 + 2*`DATA_LAYER_13)) 
 
 //Weight constants
 `define WEIGHTS_LAYER_1 (16 + 16*(3*3*`LAYER_1_C+`LAYER_1_W_OFF)) //+LAYER_1_W_OFF to be 32 byte aligned
@@ -47,7 +47,7 @@
 `define WEIGHTS_LAYER_22 (256 + 256*3*3*384)
 `define WEIGHTS_LAYER_23 (256 + 256*1*1*256)
 //`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_23))
-`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_9))
+`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_13))
 
 //Total constants
 `define STRINGIFY(x) `"x`"

@@ -47,7 +47,7 @@
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 //#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits
-#define OUTPUT_FILE_SIZE (DATA_LAYER_10*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_13*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -445,7 +445,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   //local variables
   int k, l;
 #ifdef SIM
-  k_delta = 1; //w/nSTAGES;
+  k_delta = w/nSTAGES;
 #endif
   unsigned int w_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int p_in = DATA_BASE_ADDRESS + 2*(p_pos + ignorepadd*(w+2)*c);
@@ -799,7 +799,7 @@ void send_data() {
   int i, j;
   count_bytes = 0;
   //char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9 + DATA_LAYER_22);
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -927,8 +927,6 @@ int main(int argc, char **argv) {
   total_time += end-start;
  #endif
 
-#endif
-
   //layer 10
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 10...\n");
@@ -938,7 +936,7 @@ int main(int argc, char **argv) {
   p_pos = DATA_LAYER_8 + 2*DATA_LAYER_10 + (LAYER_19_W*2+2)*LAYER_19_NUM_KER;
  #endif
   maxpool(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
-/* #ifndef TIME_RUN
+ #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
   total_time += end-start;
@@ -968,13 +966,15 @@ int main(int argc, char **argv) {
   total_time += end-start;
  #endif
 
+#endif
+
   //layer 13
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 13...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, LAYER_13_PINGPONG, LAYER_12_OUTPADD, LAYER_13_ZXY, LAYER_13_LEAKY, LAYER_13_IGNOREPAD, 0, LAYER_13_UPSAMPLE); //outpos(0)
- #ifndef TIME_RUN
+/* #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
@@ -1072,15 +1072,15 @@ int main(int argc, char **argv) {
 
 #ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_8;
+  fp_data += DATA_LAYER_12;
   int i, j, k;
   uart_printf("Verifying...\n\n");
-  for(i = 0; i < LAYER_10_W; i++) {
-    uart_printf("Line %d: %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_8 + i*LAYER_10_W*LAYER_9_NUM_KER));
-    for(j = 0; j < LAYER_10_W; j++)
-      for(k = 0; k < LAYER_9_NUM_KER; k++)
-        if(fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] != fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_8 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k), fp_data[i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_10 + i*LAYER_10_W*LAYER_9_NUM_KER + j*LAYER_9_NUM_KER + k] & 0xFFFF);
+  for(i = 0; i < LAYER_13_W; i++) {
+    uart_printf("Line %d: %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_12 + i*LAYER_13_W*LAYER_13_NUM_KER));
+    for(j = 0; j < LAYER_13_W; j++)
+      for(k = 0; k < LAYER_13_NUM_KER; k++)
+        if(fp_data[i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] != fp_data[DATA_LAYER_13 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k])
+          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_12 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k), fp_data[i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_13 + i*LAYER_13_W*LAYER_13_NUM_KER + j*LAYER_13_NUM_KER + k] & 0xFFFF);
   }
 #endif
 
