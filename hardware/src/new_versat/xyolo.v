@@ -4,7 +4,8 @@
 
 module xyolo # (
 		parameter		DATAPATH_W = 32,
-		parameter               N_MACS = 1
+		parameter               N_MACS = 1,
+		parameter               N_MACS_W = $clog2(N_MACS)+($clog2(N_MACS)==0)
 	) (
                 input 			      clk,
                 input 			      rst,
@@ -13,7 +14,8 @@ module xyolo # (
 		input 			      ld_acc,
 		input 			      ld_mp,
 		input 			      ld_res,
-
+		input [N_MACS_W-1:0] 	      ld_nmac,
+	   
 		//configuration
 		input 			      bias,
                 input 			      leaky,
@@ -32,14 +34,23 @@ module xyolo # (
    wire [2*DATAPATH_W-1:0]              shifted, adder;
    wire signed [DATAPATH_W-1:0]         act_fnc, shifted_half, mp_w, bypass_w;
    reg signed [DATAPATH_W-1:0]          bias_reg, result;
-   reg signed [N_MACS*DATAPATH_W-1:0] 	op_a_bypass;
-   wire [DATAPATH_W-1:0]                result_w;
-   
+   reg signed [DATAPATH_W-1:0] 		op_a_bypass;
+   wire [DATAPATH_W-1:0] 		result_w;
+   reg [DATAPATH_W-1:0] 		op_a_bypass_nmac;
 
    //multiplier wires and regs
    wire signed [N_MACS*2*DATAPATH_W-1:0] dsp_out, adder_w;
    reg signed [2*DATAPATH_W-1:0] conv_res;
-   
+
+   // Mux to select pixel for bypass
+   integer 			 k;
+   always @* begin
+      op_a_bypass_nmac = flow_in_pixel[0 +: DATAPATH_W];
+      for (k=0;k<N_MACS;k=k+1)
+	if (k == ld_nmac)
+	  op_a_bypass_nmac = flow_in_pixel[k*DATAPATH_W +: DATAPATH_W];
+   end
+      
    //update registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
@@ -48,7 +59,7 @@ module xyolo # (
        result <= {DATAPATH_W{1'b0}};
      end else begin
 	bias_reg <= flow_in_bias;
-	op_a_bypass <= flow_in_pixel;
+	op_a_bypass <= op_a_bypass_nmac;
 	if(ld_res) result <= result_w;
      end
 
@@ -81,9 +92,6 @@ module xyolo # (
 			      );	 
       end
    endgenerate
-
-   // always @ (posedge clk)
-   //   conv_res <= dsp_out;
    
    // Adder tree
    generate
@@ -116,12 +124,6 @@ module xyolo # (
    	4: begin
    	   wire signed [2*DATAPATH_W-1:0] part_sum;
 
-   	   // level 1
-   	   // assign part_sum[(N_MACS-3)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W];
-   	   // assign part_sum[(N_MACS-2)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W];
-   	   // level 0
-   	   // assign part_sum[(N_MACS-1)*2*DATAPATH_W-1 -: 2*DATAPATH_W] = part_sum[(N_MACS-3)*2*DATAPATH_W -: 2*DATAPATH_W] + part_sum[(N_MACS-2)*2*DATAPATH_W -: 2*DATAPATH_W];
-
    	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W];
 
    	   // register result
@@ -133,7 +135,7 @@ module xyolo # (
    	     end
    	end
    	default : begin
-   	   wire signed [(N_MACS-1)*2*DATAPATH_W-1:0] part_sum;
+   	   wire signed [2*DATAPATH_W-1:0] part_sum;
 
    	   // nothing to add
    	   assign part_sum = dsp_out[0 +: 2*DATAPATH_W];
@@ -147,28 +149,6 @@ module xyolo # (
    	end
       endcase
    endgenerate
-
-
-
-
-
-   
-   // //4-stage multiplier (DSP48E2 template)
-   // mul_4stage # (
-   //   .DATA_W(DATAPATH_W)
-   // ) mul (
-   //   //control
-   //   .clk(clk),
-   //   .ld_acc(ld_acc),
-   //   //data
-   //   .inA(flow_in_pixel),
-   //   .inB(flow_in_weight),
-   //   .inC(adder_w),
-   //   .out(dsp_out)
-   // );
-
-   // //select accumulation initial value
-   // assign adder_w = bias ? adder << shift : {2*DATAPATH_W{1'b0}};
 
    //activation function
    assign shifted = conv_res >> shift;

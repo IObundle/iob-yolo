@@ -38,6 +38,9 @@ module xyolo_write #(
 	output [2*`AXI_LEN_W-1:0]       dma_len
     );
 
+   // size of nYOLOmacs counter
+   localparam N_MACS_W = $clog2(`nYOLOmacs)+($clog2(`nYOLOmacs)==0);
+   
    // vread latency
    localparam [`PIXEL_ADDR_W-1:0]       vread_lat = `XYOLO_READ_LAT;
 
@@ -179,6 +182,7 @@ module xyolo_write #(
    wire                                 ld_acc, ld_mp, ld_res;
    reg                                  ld_acc0, ld_acc1, ld_acc2;
    reg [1:0]                            mp_cnt;
+   reg [N_MACS_W-1:0] 			nmac_cnt; 			
 
    // merge master interface
    wire [`nSTAGES*`REQ_W-1:0]           vread_m_req, vwrite_m_req;
@@ -698,10 +702,12 @@ module xyolo_write #(
          ld_acc1 <= 1'b0;
 	 ld_acc2 <= 1'b0;
 	 mp_cnt <= 2'b0;
+	 nmac_cnt <= {N_MACS_W{1'b0}};
       end else if(run_reg) begin
          ld_acc0 <= 1'b0;
          ld_acc1 <= 1'b0;
 	 ld_acc2 <= 1'b0;
+	 nmac_cnt <= {N_MACS_W{1'b0}};
          if(xyolo_bypass_shadow)
 	   mp_cnt <= 2'd0;
          else
@@ -711,6 +717,7 @@ module xyolo_write #(
          ld_acc1 <= ld_acc0;
 	 ld_acc2 <= ld_acc1;
 	 if(ld_res) mp_cnt <= mp_cnt + 1;
+	 if(ld_acc2) nmac_cnt <= nmac_cnt + 1; 
       end
 
    //vwrite internal address generator
@@ -797,6 +804,7 @@ module xyolo_write #(
       .ld_acc(ld_acc0),
       .ld_mp(ld_mp),
       .ld_res(ld_res),
+      .ld_nmac(nmac_cnt),
       //vread config params
       .vread_ext_addr(vread_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-1 -: `IO_ADDR_W]),
       .vread_int_addr(vread_int_addr_shadow),
@@ -857,6 +865,7 @@ module xyolo_write #(
            .ld_acc(ld_acc0),
            .ld_mp(ld_mp),
            .ld_res(ld_res),
+	   .ld_nmac(nmac_cnt),	 
            //vread config params
            .vread_ext_addr(vread_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
            .vread_int_addr(vread_int_addr_shadow),

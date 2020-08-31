@@ -6,7 +6,9 @@
 
 module xyolo_write_stage #(
     	parameter                       DATAPATH_W = 32,
-        parameter			DATABUS_W = 256
+        parameter			DATABUS_W = 256,
+        parameter                       N_MACS = `nYOLOmacs,
+        parameter                       N_MACS_W = $clog2(N_MACS)+($clog2(N_MACS)==0)
     ) (
     	input 					     clk,
     	input 					     rst,
@@ -25,7 +27,8 @@ module xyolo_write_stage #(
         input 					     ld_acc,
         input 					     ld_mp,
         input 					     ld_res,
-
+	input [N_MACS_W-1:0] 			     ld_nmac,
+       
         // vread config params
         input [`IO_ADDR_W-1:0] 			     vread_ext_addr,
         input [`PIXEL_W_ADDR_W-1:0] 		     vread_int_addr,
@@ -239,6 +242,7 @@ module xyolo_write_stage #(
 	    .ld_acc(ld_acc),
 	    .ld_mp(ld_mp),
 	    .ld_res(ld_res),
+	    .ld_nmac(ld_nmac),
 	    //configuration
 	    .bias(xyolo_bias),
 	    .leaky(xyolo_leaky),
