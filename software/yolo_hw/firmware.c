@@ -867,7 +867,6 @@ int main(int argc, char **argv) {
 
   //layers 1 and 2
  #ifndef TIME_RUN
-  unsigned int total_time;
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
  #endif

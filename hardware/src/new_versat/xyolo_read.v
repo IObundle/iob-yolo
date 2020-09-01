@@ -5,8 +5,8 @@
 `include "axi_dma.vh"
 
 module xyolo_read #(
-    	parameter                      	DATAPATH_W = 32,
-	parameter			DATABUS_W = 256
+    	parameter                      		      DATAPATH_W = 32,
+	parameter				      DATABUS_W = 256
    ) (
     	input 					      clk,
     	input 					      rst,
@@ -334,7 +334,6 @@ module xyolo_read #(
 	.rst(rst),
         // Control
 	.run(run_reg),
-	.int_cnt_en(1'b1),
         .done(bias_done),
         // Configuration
 	.ext_addr(bias_ext_addr_shadow),
@@ -418,7 +417,6 @@ module xyolo_read #(
 	    .rst(rst),
             // Control
 	    .run(run_reg),
-	    .int_cnt_en(1'b1),
             .done(vread_done[i]),
             // Configuration
 	    .ext_addr(ext_addr_shadow[`nYOLOvect*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),

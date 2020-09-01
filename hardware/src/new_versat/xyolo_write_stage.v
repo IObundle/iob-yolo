@@ -101,7 +101,6 @@ module xyolo_write_stage #(
       .rst(rst),
       // Control
       .run(global_run),
-      .int_cnt_en(1'b1),
       .done(vread_doneA),
       // Configuration
       .ext_addr(vread_ext_addr),
@@ -176,7 +175,6 @@ module xyolo_write_stage #(
       .rst(rst),
       // Control
       .run(global_run),
-      .int_cnt_en(1'b1),
       .done(vwrite_doneA),
       // Configuration
       .ext_addr(vwrite_ext_addr),
