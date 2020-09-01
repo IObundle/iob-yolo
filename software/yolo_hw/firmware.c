@@ -299,7 +299,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
   //local variables
   int j, k, l;
 #ifdef SIM
-  k_delta = 1; //w/(2*nSTAGES);
+  k_delta = w/(2*nSTAGES);
 #endif
   unsigned int w_in = WEIGHTS_BASE_ADDRESS + 2*w_pos;
   unsigned int p_in = DATA_BASE_ADDRESS + 2*p_pos;
@@ -867,6 +867,7 @@ int main(int argc, char **argv) {
 
   //layers 1 and 2
  #ifndef TIME_RUN
+  unsigned int total_time;
   uart_printf("\nRunning layers 1 and 2...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
@@ -929,9 +930,6 @@ int main(int argc, char **argv) {
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 10...\n");
   start = timer_time_us(TIMER_BASE);
- #endif
- #ifdef SIM
-  p_pos = DATA_LAYER_8 + 2*DATA_LAYER_10 + (LAYER_19_W*2+2)*LAYER_19_NUM_KER;
  #endif
   maxpool(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
  #ifndef TIME_RUN
