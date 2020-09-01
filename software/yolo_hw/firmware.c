@@ -46,8 +46,7 @@
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + DATA_LAYER_1)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-//#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits
-#define OUTPUT_FILE_SIZE (DATA_LAYER_16*2) //16 bits
+#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -798,8 +797,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  //char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9 + DATA_LAYER_22);
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15);
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9 + DATA_LAYER_22);
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -1002,15 +1000,13 @@ int main(int argc, char **argv) {
   total_time += end-start;
  #endif
 
-#endif
-
   //layer 16 and 17
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 16 and 17...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_16_PINGPONG, LAYER_15_OUTPADD, LAYER_16_ZXY, LAYER_16_LEAKY, LAYER_16_IGNOREPAD, 0, LAYER_16_UPSAMPLE); //outpos(0)
-/* #ifndef TIME_RUN
+ #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
   total_time += end-start;
@@ -1041,13 +1037,15 @@ int main(int argc, char **argv) {
   total_time += end-start;
  #endif
 
+#endif
+
   //layers 23 and 24
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 23 and 24...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_23_PINGPONG, LAYER_22_OUTPADD, LAYER_23_ZXY, LAYER_23_LEAKY, LAYER_23_IGNOREPAD, 0, LAYER_23_UPSAMPLE); //outpos(0)
-*/  // end versat
+  // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
   end = (unsigned int) timer_get_count(TIMER_BASE);
@@ -1070,21 +1068,7 @@ int main(int argc, char **argv) {
   uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
  #endif
 
-#ifdef SIM
-  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  fp_data += DATA_LAYER_15;
-  int i, j, k;
-  uart_printf("Verifying...\n\n");
-  for(i = 0; i < LAYER_16_W; i++) {
-    uart_printf("Line %d: %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_15 + i*LAYER_16_W*LAYER_16_NUM_KER));
-    for(j = 0; j < LAYER_16_W; j++)
-      for(k = 0; k < LAYER_16_NUM_KER; k++)
-        if(fp_data[i*LAYER_16_W*LAYER_16_NUM_KER + j*LAYER_16_NUM_KER + k] != fp_data[DATA_LAYER_16 + i*LAYER_16_W*LAYER_16_NUM_KER + j*LAYER_16_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_15 + i*LAYER_16_W*LAYER_16_NUM_KER + j*LAYER_16_NUM_KER + k), fp_data[i*LAYER_16_W*LAYER_16_NUM_KER + j*LAYER_16_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_16 + i*LAYER_16_W*LAYER_16_NUM_KER + j*LAYER_16_NUM_KER + k] & 0xFFFF);
-  }
-#endif
-
-/*#ifndef SIM
+#ifndef SIM
   //print detected objects and corresponding probability scores
   uart_printf("\nResults of first yolo layer:\n");
   print_results(LAYER_16_W, data_pos_layer19-DATA_LAYER_16);
@@ -1104,7 +1088,7 @@ int main(int argc, char **argv) {
         if(fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] != fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k])
           uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_22 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k), fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF);
   }
-#endif*/
+#endif
 
 #ifndef SIM
   send_data();
