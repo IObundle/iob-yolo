@@ -49,7 +49,7 @@ module xyolo # (
 
    //activation function wires
    wire signed [DATAPATH_W-1:0]		sig_in, sig_out, sig_adder;
-   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t2, sig_out_r, shift_r;
+   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r, shift_r, shift_r2;
    wire signed [DATAPATH_W-1:0]		leaky_out;
 
    //multiplier wires and regs
@@ -73,12 +73,18 @@ module xyolo # (
        result <= {DATAPATH_W{1'b0}};
        sig_out_r <= {DATAPATH_W{1'b0}};
        shift_r <= {DATAPATH_W{1'b0}};
+       shift_r2 <= {DATAPATH_W{1'b0}};
+       sig_t1_r <= {DATAPATH_W{1'b0}};
+       sig_t2_r <= {DATAPATH_W{1'b0}};
      end else begin
        bias_reg <= flow_in_bias;
        op_a_bypass <= op_a_bypass_nmac;
        if(ld_res) result <= result_w;
        sig_out_r <= sig_out;
        shift_r <= shifted_half;
+       shift_r2 <= shift_r;
+       sig_t1_r <= sig_t1;
+       sig_t2_r <= sig_t2;
      end
 
    //double-precision bias
@@ -192,11 +198,11 @@ module xyolo # (
          sig_t2 = sig_in >> 2;
       end
    end
-   assign sig_adder = sig_t1 + sig_t2;
-   assign sig_out = shifted_half[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
+   assign sig_adder = sig_t1_r + sig_t2_r;
+   assign sig_out = shift_r[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
 
    //choose activation function
-   assign act_fnc = leaky ? leaky_out : sigmoid ? sig_out_r : shift_r;
+   assign act_fnc = leaky ? leaky_out : sigmoid ? sig_out_r : shift_r2;
 
    //maxpooling
    assign bypass_w = bypass ? op_a_bypass : act_fnc;
