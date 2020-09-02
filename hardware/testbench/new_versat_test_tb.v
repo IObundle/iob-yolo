@@ -7,15 +7,15 @@
 //constants
 `define STRINGIFY(x) `"x`"
 `define OFFSET (2**`FIRM_ADDR_W)
-`define NTW_IN_C (3 + (`nYOLOmacs!=1))
+`define NTW_IN_C (3 + (`nYOLOmacs!=1) + (4*(`nYOLOmacs==8)))
 // `define NTW_IN_C (3+1)
 
 `define NTW_IN_W 416
 `define NTW_IN_KER_SIZE 3
 `define NTW_IN_NUM_KER 16
 
-`define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + (5 + ((`nYOLOmacs!=1)*7)))) //+5 so each filter is 32 byte aligned
-`define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+ (10 + (-2*(`nYOLOmacs!=1))) )) //+10 so each line is 32 byte aligned
+`define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + (5 + ((`nYOLOmacs!=1)*7)) -(4*(`nYOLOmacs==8)) )) //+5 so each filter is 32 byte aligned
+`define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+ (10 + (-2*(`nYOLOmacs!=1)))*(`nYOLOmacs!=8) )) //+10 so each line is 32 byte aligned
 // `define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + 12)) //+5 so each filter is 32 byte aligned
 // `define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+8)) //+10 so each line is 32 byte aligned
 

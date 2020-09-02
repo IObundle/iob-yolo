@@ -69,7 +69,7 @@ module xyolo # (
    always @ (posedge clk, posedge rst)
      if (rst) begin
        bias_reg <= {DATAPATH_W{1'b0}};
-       op_a_bypass <= {N_MACS*DATAPATH_W{1'b0}};
+       op_a_bypass <= {DATAPATH_W{1'b0}};
        result <= {DATAPATH_W{1'b0}};
        sig_out_r <= {DATAPATH_W{1'b0}};
        shift_r <= {DATAPATH_W{1'b0}};
@@ -152,6 +152,19 @@ module xyolo # (
    		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
    	     end
    	end
+	8: begin
+	   wire signed [2*DATAPATH_W-1:0] part_sum;
+
+   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[4*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[5*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[6*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[7*2*DATAPATH_W +: 2*DATAPATH_W];
+
+   	   // register result
+   	   always @ (posedge clk, posedge rst)
+   	     if (rst) begin
+   		conv_res <= {2*DATAPATH_W{1'b0}};
+   	     end else begin
+   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
+   	     end
+	end
    	default : begin
    	   wire signed [2*DATAPATH_W-1:0] part_sum;
 
