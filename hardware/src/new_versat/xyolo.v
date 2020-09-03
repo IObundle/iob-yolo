@@ -54,7 +54,7 @@ module xyolo # (
 
    //multiplier wires and regs
    wire signed [N_MACS*2*DATAPATH_W-1:0] dsp_out, adder_w;
-   reg signed [2*DATAPATH_W-1:0] 	conv_res;
+   wire signed [2*DATAPATH_W-1:0] 	 conv_res;
 
    // Mux to select pixel for bypass
    integer 			 k;
@@ -116,77 +116,20 @@ module xyolo # (
 			      );	 
       end
    endgenerate
+
+   // add dsp outputs
+   adder_N # (
+	      .DATA_W(2*DATAPATH_W),
+	      .N_INPUTS(N_MACS)
+	      ) dsp_adder (
+			   .clk(clk),
+			   .rst(rst),
+			   // data
+			   .data_in(dsp_out),
+			   .data_out(conv_res)
+			   );
+
    
-   // Adder tree
-   generate
-      case(N_MACS)
-   	1 : begin
-   	   wire signed [2*DATAPATH_W-1:0] part_sum;
-   	   // nothing to add
-   	   assign part_sum = dsp_out[0 +: 2*DATAPATH_W];
-   	   // register result
-   	   always @ (posedge clk, posedge rst)
-   	     if (rst) begin
-   		conv_res <= {2*DATAPATH_W{1'b0}};
-   	     end else begin
-   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
-   	     end
-   	end
-   	2 : begin
-   	   wire signed [2*DATAPATH_W-1:0] part_sum;
-	   
-   	   // level 0
-   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W];
-   	   // register result
-   	   always @ (posedge clk, posedge rst)
-   	     if (rst) begin
-   		conv_res <= {2*DATAPATH_W{1'b0}};
-   	     end else begin
-   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
-   	     end
-   	end
-   	4: begin
-   	   wire signed [2*DATAPATH_W-1:0] part_sum;
-
-   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W];
-
-   	   // register result
-   	   always @ (posedge clk, posedge rst)
-   	     if (rst) begin
-   		conv_res <= {2*DATAPATH_W{1'b0}};
-   	     end else begin
-   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
-   	     end
-   	end
-	8: begin
-	   wire signed [2*DATAPATH_W-1:0] part_sum;
-
-   	   assign part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W] = dsp_out[0*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[1*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[2*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[3*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[4*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[5*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[6*2*DATAPATH_W +: 2*DATAPATH_W] + dsp_out[7*2*DATAPATH_W +: 2*DATAPATH_W];
-
-   	   // register result
-   	   always @ (posedge clk, posedge rst)
-   	     if (rst) begin
-   		conv_res <= {2*DATAPATH_W{1'b0}};
-   	     end else begin
-   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
-   	     end
-	end
-   	default : begin
-   	   wire signed [2*DATAPATH_W-1:0] part_sum;
-
-   	   // nothing to add
-   	   assign part_sum = dsp_out[0 +: 2*DATAPATH_W];
-   	   // register result
-   	   always @ (posedge clk, posedge rst)
-   	     if (rst) begin
-   		conv_res <= {2*DATAPATH_W{1'b0}};
-   	     end else begin
-   		conv_res <= part_sum[2*DATAPATH_W-1 -: 2*DATAPATH_W];
-   	     end
-   	end
-      endcase
-   endgenerate
-
    //apply shift to half precision
    assign shifted = conv_res >> shift;
    assign shifted_half = shifted[DATAPATH_W-1:0];

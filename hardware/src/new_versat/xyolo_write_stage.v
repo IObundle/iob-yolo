@@ -64,7 +64,7 @@ module xyolo_write_stage #(
 
     	// input data
     	input [`nYOLOvect*DATAPATH_W-1:0] 	     flow_in_bias,
-	input [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0] flow_in_weight
+	input [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_in_weight
     );
 
    // external addrgen wires and regs
@@ -83,8 +83,8 @@ module xyolo_write_stage #(
    assign                               done = &{vread_doneA, vwrite_doneA};
 
    // vread output
-   wire [`nYOLOmacs*DATAPATH_W-1:0] 	pixel, vread_out;
-   reg [`nYOLOmacs*DATAPATH_W-1:0] 	vread_out_reg;
+   wire [N_MACS*DATAPATH_W-1:0] 	pixel, vread_out;
+   reg [N_MACS*DATAPATH_W-1:0] 	vread_out_reg;
 
    //
    // global vread
@@ -140,7 +140,7 @@ module xyolo_write_stage #(
    iob_2p_assim_mem_w_big #(
       .W_DATA_W(DATABUS_W),
       .W_ADDR_W(`PIXEL_W_ADDR_W),
-      .R_DATA_W(`nYOLOmacs*DATAPATH_W),
+      .R_DATA_W(N_MACS*DATAPATH_W),
       .R_ADDR_W(`PIXEL_INT_ADDR_W),
       .USE_RAM(1)
    ) vread_mem (
@@ -234,7 +234,7 @@ module xyolo_write_stage #(
 	 //xyolo
 	 xyolo #(
 	    .DATAPATH_W(DATAPATH_W),
-	    .N_MACS(`nYOLOmacs)
+	    .N_MACS(N_MACS)
 	 ) xyolo (
 	    .clk(clk),
 	    .rst(global_run),
@@ -252,7 +252,7 @@ module xyolo_write_stage #(
 	    .shift(xyolo_shift),
 	    //data interface
 	    .flow_in_pixel(pixel),
-	    .flow_in_weight(flow_in_weight[`nYOLOvect*`nYOLOmacs*DATAPATH_W-`nYOLOmacs*DATAPATH_W*i-1 -: `nYOLOmacs*DATAPATH_W]),
+	    .flow_in_weight(flow_in_weight[`nYOLOvect*N_MACS*DATAPATH_W-N_MACS*DATAPATH_W*i-1 -: N_MACS*DATAPATH_W]),
 	    .flow_in_bias(flow_in_bias[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W]),
 	    .flow_out(vwrite_inB[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W])
 	 );

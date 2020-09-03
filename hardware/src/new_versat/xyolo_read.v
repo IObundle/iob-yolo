@@ -6,7 +6,8 @@
 
 module xyolo_read #(
     	parameter                      		      DATAPATH_W = 32,
-	parameter				      DATABUS_W = 256
+	parameter				      DATABUS_W = 256,
+	parameter                                     N_MACS = `nYOLOmacs
    ) (
     	input 					      clk,
     	input 					      rst,
@@ -32,7 +33,7 @@ module xyolo_read #(
 
     	// output data
     	output [`nYOLOvect*DATAPATH_W-1:0] 	      flow_out_bias,
-	output [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0] flow_out_weight,
+	output [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_out_weight,
 
 	// DMA - number of tranfers per burst
 	output [`AXI_LEN_W-1:0] 		      dma_len
@@ -107,8 +108,8 @@ module xyolo_read #(
    reg [DATABUS_W-1:0]			bias_inA_rvs;
 
    // data output
-   wire [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0]     weights;
-   reg [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0]      weights_reg;
+   wire [`nYOLOvect*N_MACS*DATAPATH_W-1:0]     weights;
+   reg [`nYOLOvect*N_MACS*DATAPATH_W-1:0]      weights_reg;
 
    // done output
    wire [`nYOLOvect-1:0]                vread_done;
@@ -448,7 +449,7 @@ module xyolo_read #(
          iob_2p_assim_mem_w_big #(
 	    .W_DATA_W(DATABUS_W),
       	    .W_ADDR_W(`WEIGHT_W_ADDR_W),
-      	    .R_DATA_W(`nYOLOmacs*DATAPATH_W),
+      	    .R_DATA_W(N_MACS*DATAPATH_W),
       	    .R_ADDR_W(`WEIGHT_INT_ADDR_W),
             .USE_RAM(1)
          ) mem (
@@ -462,7 +463,7 @@ module xyolo_read #(
            // Reading port
            .r_en(enB_reg),
            .r_addr(addrB_reg),
-           .data_out(weights[`nYOLOvect*`nYOLOmacs*DATAPATH_W-`nYOLOmacs*DATAPATH_W*i-1 -: `nYOLOmacs*DATAPATH_W])
+           .data_out(weights[`nYOLOvect*N_MACS*DATAPATH_W-N_MACS*DATAPATH_W*i-1 -: N_MACS*DATAPATH_W])
            );
 
       end

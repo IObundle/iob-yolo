@@ -6,7 +6,8 @@
 
 module xyolo_write #(
     	parameter                       DATAPATH_W = 32,
-        parameter			DATABUS_W = 256
+        parameter			DATABUS_W = 256,
+	parameter                       N_MACS = `nYOLOmacs
     ) (
     	input                           clk,
     	input                           rst,
@@ -32,14 +33,14 @@ module xyolo_write #(
 
     	// input data
     	input [`nYOLOvect*DATAPATH_W-1:0] flow_in_bias,
-    	input [`nYOLOvect*`nYOLOmacs*DATAPATH_W-1:0] flow_in_weight,
+    	input [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_in_weight,
 
 	// DMA - number of tranfers per burst
 	output [2*`AXI_LEN_W-1:0]       dma_len
     );
 
    // size of nYOLOmacs counter
-   localparam                           N_MACS_W = $clog2(`nYOLOmacs)+($clog2(`nYOLOmacs)==0);
+   localparam                           N_MACS_W = $clog2(N_MACS)+($clog2(N_MACS)==0);
    
    // vread latency
    localparam [`PIXEL_ADDR_W-1:0]       vread_lat = `XYOLO_READ_LAT;
