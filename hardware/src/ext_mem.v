@@ -187,7 +187,6 @@ module ext_mem
            .mem_rdata (icache_be_resp[`rdata_MIG_BUS(0)]),
            .mem_ready (icache_be_resp[`ready_MIG_BUS(0)])
            );
-`endif
 
    //
    // DATA CACHE
@@ -237,9 +236,7 @@ module ext_mem
            );
 
    // set address offset to zero
-`ifdef RUN_DDR_USE_SRAM
    assign icache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
-`endif
    assign dcache_be_req[`address_MIG_BUS(0,`ADDR_W)-`DDR_ADDR_W] = 0;
 
    //
@@ -247,8 +244,6 @@ module ext_mem
    //
 
    //Merge instruction and data caches
-`ifdef RUN_DDR_USE_SRAM
-
    //L2 buses
    wire [`REQ_MIG_BUS_W-1:0]      l2cache_req;
    wire [`RESP_MIG_BUS_W-1:0]     l2cache_resp;
@@ -280,7 +275,9 @@ module ext_mem
       .BE_ADDR_W (`DDR_ADDR_W),
       .CTRL_CACHE (0),
       .CTRL_CNT(0),       //Remove counters
+    `ifdef RUN_DDR_USE_SRAM
       .FE_DATA_W(`MIG_BUS_W),
+    `endif
       .BE_DATA_W(`MIG_BUS_W)
       )
    l2cache_read (
@@ -296,12 +293,12 @@ module ext_mem
             .rdata    (l2cache_resp[`rdata_MIG_BUS(0)]),
             .ready    (l2cache_resp[`ready_MIG_BUS(0)]),
 	 `else
-            .valid    (dcache_be_req[`valid_MIG_BUS(0)]),
-            .addr     (dcache_be_req[`address_MIG_BUS(0,`DDR_ADDR_W)-$clog2(`MIG_BUS_W/8)]),
-            .wdata    (dcache_be_req[`wdata_MIG_BUS(0)]),
-   	    .wstrb    (dcache_be_req[`wstrb_MIG_BUS(0)]),
-            .rdata    (dcache_be_resp[`rdata_MIG_BUS(0)]),
-            .ready    (dcache_be_resp[`ready_MIG_BUS(0)]),
+            .valid    (d_req[`valid(0)]),
+            .addr     (d_req[`address(0,`DDR_ADDR_W)-$clog2(`ADDR_W/8)]),
+            .wdata    (d_req[`wdata(0)]),
+   	    .wstrb    (d_req[`wstrb(0)]),
+            .rdata    (d_resp[`rdata(0)]),
+            .ready    (d_resp[`ready(0)]),
 	 `endif
 	    
             // AXI interface

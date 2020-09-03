@@ -21,7 +21,6 @@ module ext_addrgen #(
 
     // Control I/F
     input 			    run,
-    input 			    int_cnt_en,
     output reg 			    done,
 
     // Configuration
@@ -139,7 +138,7 @@ module ext_addrgen #(
                   databus_valid = 1'b1;
                   databus_wstrb = {(DATA_W/8){1'b1}};
 	          done = 1'b0;
-                  if (databus_ready && int_cnt_en)
+                  if (databus_ready)
                      counter_int_nxt += 1'b1;
 	       end
 	    end
