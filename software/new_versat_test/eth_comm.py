@@ -27,7 +27,7 @@ s.bind((interface, 0))
 
 #Open input file
 print("\nStarting input file transmission...")
-input_filename = "../new_versat_in_x4.bin"
+input_filename = "../new_versat_in_x8.bin"
 f_input = open(input_filename, 'rb')
 
 #Frame parameters
