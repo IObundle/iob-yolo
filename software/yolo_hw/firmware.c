@@ -14,7 +14,8 @@
 #include <stdlib.h>
 
 //print time of each run
-//#define TIME_RUN
+#define TIME_RUN
+#define CLK_NS 8
 
 #ifdef SIM
   int k_delta;
@@ -265,7 +266,7 @@ void layer1() {
         while(versat.done()==0);
       #ifdef TIME_RUN
         end = (unsigned int) timer_get_count(TIMER_BASE);
-        if(l != 0 || k != 0 || j != 0) uart_printf("%d\n", (end - start)*8);
+        if(l != 0 || k != 0 || j != 0) uart_printf("%d\n", (end - start)*CLK_NS);
       #endif
 
         // run configuration
@@ -409,7 +410,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
         while(versat.done()==0);
       #ifdef TIME_RUN
         end = (unsigned int) timer_get_count(TIMER_BASE);
-        uart_printf("%d\n", (end - start)*8);
+        uart_printf("%d\n", (end - start)*CLK_NS);
         if(k == 0 && j == 0 && l == 0) uart_printf("\n");
       #endif
 
@@ -467,7 +468,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
     while(versat.done()==0);
    #ifdef TIME_RUN
     end = (unsigned int) timer_get_count(TIMER_BASE);
-    uart_printf("%d\n", (end - start)*8);
+    uart_printf("%d\n", (end - start)*CLK_NS);
    #endif
     versat.run();
    #ifdef TIME_RUN
@@ -579,7 +580,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
       while(versat.done()==0);
     #ifdef TIME_RUN
       end = (unsigned int) timer_get_count(TIMER_BASE);
-      uart_printf("%d\n", (end - start)*8);
+      uart_printf("%d\n", (end - start)*CLK_NS);
     #endif
       versat.run();
     #ifdef TIME_RUN
@@ -624,7 +625,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
       while(versat.done()==0);
     #ifdef TIME_RUN
       end = (unsigned int) timer_get_count(TIMER_BASE);
-      uart_printf("%d\n", (end - start)*8);
+      uart_printf("%d\n", (end - start)*CLK_NS);
       if(k == 0 && l == 0) uart_printf("\n");
     #endif
 
@@ -652,7 +653,7 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   while(versat.done()==0);
  #ifdef TIME_RUN
   end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*8);
+  uart_printf("%d\n", (end - start)*CLK_NS);
  #endif
   versat.run();
  #ifdef TIME_RUN
@@ -735,7 +736,7 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
     while(versat.done()==0);
   #ifdef TIME_RUN
     end = (unsigned int) timer_get_count(TIMER_BASE);
-    uart_printf("%d\n", (end - start)*8);
+    uart_printf("%d\n", (end - start)*CLK_NS);
     if(l == 0) uart_printf("\n");
   #endif
 
@@ -1046,17 +1047,17 @@ int main(int argc, char **argv) {
  #ifdef TIME_RUN
   while(versat.done()==0);
   end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*8);
+  uart_printf("%d\n", (end - start)*CLK_NS);
   versat.run();
   start = (unsigned int) timer_get_count(TIMER_BASE);
   while(versat.done()==0);
   end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*8);
+  uart_printf("%d\n", (end - start)*CLK_NS);
   versat.run();
   start = (unsigned int) timer_get_count(TIMER_BASE);
   while(versat.done()==0);
   end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*8);
+  uart_printf("%d\n", (end - start)*CLK_NS);
  #else
   versat_end();
   end = timer_time_us(TIMER_BASE);
