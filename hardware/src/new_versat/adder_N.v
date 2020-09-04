@@ -45,7 +45,7 @@ module adder_N # (
    endgenerate
 
    // register output
-   always @(posedge clk, rst)
+   always @(posedge clk, posedge rst)
      if(rst)
        data_out <= {DATA_W{1'b0}};
      else
