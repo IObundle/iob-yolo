@@ -25,6 +25,7 @@
 
 //constants for bounding boxes
 #define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
 #define yolo1_div ((int16_t)(((float)1/LAYER_16_W)*((int32_t)1<<15))) //Q1.15
 #define yolo2_div ((int16_t)(((float)1/LAYER_23_W)*((int32_t)1<<15))) //Q1.15
 #define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
@@ -33,10 +34,12 @@
 #define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
 #define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
 #define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
+#define MAX_NUM_BOXES 10
 
 //variables for bounding boxes
-int16_t boxes[84*10]; //max 10 boxes
+int16_t boxes[84*MAX_NUM_BOXES];
 uint8_t nboxes = 0;
+uint8_t box_IDs[MAX_NUM_BOXES];
 
 //define peripheral base addresses
 #ifndef PCSIM
@@ -193,6 +196,92 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
   }
 }
 
+//Calculate overlapp between 2 boxes
+int16_t overlap(int16_t x1, int16_t w1, int16_t x2, int16_t w2) {
+  int16_t l1, l2, left, r1, r2, right;
+  l1 = x1 - (w1>>1);
+  l2 = x2 - (w2>>1);
+  left = l1 > l2 ? l1 : l2;
+  r1 = x1 + (w1>>1);
+  r2 = x2 + (w2>>1);
+  right = r1 < r2 ? r1 : r2;
+  return right - left;
+}
+
+//Apply non-maximum-suppresion to filter repeated boxes
+void filter_boxes() {
+
+  //Local variables
+  int i, j, k, l;
+  int obj_cnt;
+  int16_t w, h, b_union, b_iou;
+  int16_t x1, y1, w1, h1, x2, y2, w2, h2;
+  int32_t mul_32, b_inter;
+		
+  //Loop to go through classes from candidate boxes
+  for(i = 0; i < 80; i++) {
+			
+    //Count number of candidate boxes for given class
+    obj_cnt = 0;
+    for(j = 0; j < nboxes; j++) {
+      if(boxes[84*j+4+i] != 0) {
+				
+        //Store box ID in descending order of prob score
+	if(obj_cnt == 0) box_IDs[0] = j;
+	else {
+						
+	  //Search for position of new box ID
+	  for(k = 0; k < obj_cnt; k++)
+	    if(boxes[84*j+4+i] > boxes[84*box_IDs[k]+4+i])
+	      break;
+							
+	  //Store box ID
+	  if(k < obj_cnt) 
+	    for(l = obj_cnt; l > k; l--)
+	      box_IDs[l] = box_IDs[l-1];
+	  box_IDs[k] = j; //min prob score
+	}
+			
+	//Update object counter
+	obj_cnt++;
+      }
+    }
+			
+    //Apply NMS if more than 1 object from same class was detected
+    if(obj_cnt > 1) {
+      for(j = 0; j < obj_cnt; j++) {
+	if(boxes[84*box_IDs[j]+4+i] == 0) continue;
+	for(k = j+1; k < obj_cnt; k++) {
+						
+	  //Get boxes coordinates
+	  x1 = boxes[84*box_IDs[j]];
+  	  y1 = boxes[84*box_IDs[j]+1];
+	  w1 = boxes[84*box_IDs[j]+2];
+	  h1 = boxes[84*box_IDs[j]+3];
+	  x2 = boxes[84*box_IDs[k]];
+	  y2 = boxes[84*box_IDs[k]+1];
+	  w2 = boxes[84*box_IDs[k]+2];
+	  h2 = boxes[84*box_IDs[k]+3];
+						
+	  //Calculate IoU (intersection over union)
+	  w = overlap(x1, w1, x2, w2); //Q2.14
+	  h = overlap(y1, h1, y2, h2); //Q2.14
+	  if(w > 0 && h > 0) {
+	    b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q2.14 * Q2.14 = Q4.28
+	    mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q2.14 * Q2.14 = Q4.28
+	    b_union = (int16_t)(mul_32 >> 14); //w1*h1 -> Q4.28 to Q2.14
+	    mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q2.14 * Q2.14 = Q4.28
+	    b_union += (int16_t)(mul_32 >> 14); //w1*h1+w2*h2 -> Q4.28 to Q2.14
+	    b_union -= (int16_t)(b_inter >> 14); //w1*h1+w2*h2-inter -> Q4.28 to Q2.14
+	    b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q4.28 / Q2.14 = Q2.14						
+	    if(b_iou > nms_threshold) boxes[84*box_IDs[k]+4+i] = 0;
+	  }
+	}
+      }
+    }
+  }					
+}
+
 //send results back
 void send_data() {
 
@@ -256,6 +345,13 @@ int main(int argc, char **argv) {
   uart_printf("\nCreating boxes from second yolo layer\n");
   start = timer_time_us(TIMER_BASE);
   create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+
+  //filter boxes
+  uart_printf("\nFiltering boxes...\n");
+  start = timer_time_us(TIMER_BASE);
+  filter_boxes();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
