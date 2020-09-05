@@ -18,6 +18,7 @@
 #define IMG_C 3
 #define NEW_W 416
 #define NEW_H ((IMG_H*NEW_W)/IMG_W)	//312
+#define IMAGE_INPUT (IMG_W*IMG_H*IMG_C) //already 32-byte aligned
 
 //yolo constants
 #define LAYER_16_W 13
@@ -35,6 +36,12 @@
 #define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
 #define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
 #define MAX_NUM_BOXES 10
+#define box_width 3
+#define label_height 20
+
+//label constants
+#define MAX_LABEL_SIZE 2340
+#define LABELS_FILE_SIZE (81 + MAX_LABEL_SIZE*81 + 11) //+11 to be 32-byte aligned
 
 //variables for bounding boxes
 int16_t boxes[84*MAX_NUM_BOXES];
@@ -56,13 +63,15 @@ uint8_t box_IDs[MAX_NUM_BOXES];
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE ((13*13*256 + 26*26*256)*2) //16 bits
+#define INPUT_FILE_SIZE (LABELS_FILE_SIZE + (IMAGE_INPUT + 13*13*256 + 26*26*256)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (84*nboxes*2) //16 bits
+#define OUTPUT_FILE_SIZE (IMAGE_INPUT) //8 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
-#define DATA_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
+#define LABEL_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
+#define INPUT_IMAGE_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
+#define DATA_BASE_ADDRESS (INPUT_IMAGE_BASE_ADDRESS + 2*IMAGE_INPUT)
 
 //ETHERNET variables
 int rcv_timeout = 5000;
@@ -73,13 +82,17 @@ unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 //TIMER variables
 unsigned int start, end;
 
+//input image pointer
+uint8_t * fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
+int16_t * fp_image = (int16_t *) INPUT_IMAGE_BASE_ADDRESS;
+
 //receive weigths and resized padded image
 void rcv_data() {
 
   //Local variables
   int i, j;
   count_bytes = 0;
-  char * data_p = (char *) DATA_BASE_ADDRESS;
+  char * data_p = (char *) LABEL_BASE_ADDRESS;
   uart_printf("\nReady to receive yolo layers output...\n");
 
   //Loop to receive intermediate data frames
@@ -282,13 +295,140 @@ void filter_boxes() {
   }					
 }
 
+//Draw bounding box in input image
+void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green, uint8_t blue) {
+
+  //Limit box coordinates
+  if(left < 0) left = 0; else if(left >= IMG_W) left = IMG_W-1;
+  if(right < 0) right = 0; else if(right >= IMG_W) right = IMG_W-1;
+  if(top < 0) top = 0; else if(top >= IMG_H) top = IMG_H-1;
+  if(bot < 0) bot = 0; else if(bot >= IMG_H) bot = IMG_H-1;
+
+  //Draw horizontally
+  int i;
+  for(i = left; i <= right; i++) {
+    fp_image[top*IMG_W + i] = red;
+    fp_image[bot*IMG_W + i] = red;
+    fp_image[IMG_W*IMG_H + top*IMG_W + i] = green;
+    fp_image[IMG_W*IMG_H + bot*IMG_W + i] = green;
+    fp_image[IMG_W*IMG_H*2 + top*IMG_W + i] = blue;
+    fp_image[IMG_W*IMG_H*2 + bot*IMG_W + i] = blue;
+  }
+
+  //Draw vertically
+  for(i = top; i <= bot; i++) {
+    fp_image[i*IMG_W + left] = red;
+    fp_image[i*IMG_W + right] = red;
+    fp_image[IMG_W*IMG_H + i*IMG_W + left] = green;
+    fp_image[IMG_W*IMG_H + i*IMG_W + right] = green;
+    fp_image[IMG_W*IMG_H*2 + i*IMG_W + left] = blue;
+    fp_image[IMG_W*IMG_H*2 + i*IMG_W + right] = blue;
+  }
+}
+
+//Draw class label in input image
+void draw_class(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b) {
+  uint8_t label_aux[MAX_LABEL_SIZE];
+  int l, k;
+  for(l = 0; l < label_height*label_w; l++) label_aux[l] = fp_labels[81+MAX_LABEL_SIZE*j+l];
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
+      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
+      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)label_aux[l*label_w+k])) >> 8;
+      //green
+      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g*(uint16_t)label_aux[l*label_w+k])) >> 8;
+      //blue
+      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b*(uint16_t)label_aux[l*label_w+k])) >> 8;
+    }
+  }
+}
+
+//Draw detections (bounding boxes and class labels) in input image
+void draw_detections() {
+
+  //local variables
+  int i, j, k;
+  uint8_t colors[6][3] = { {255,0,255}, {0,0,255},{0,255,255},{0,255,0},{255,255,0},{255,0,0} }; //Q8.0
+  uint8_t ratio, red, green, blue, label_w;
+  uint16_t mul_16;
+  int32_t mul_32;
+  int offset, ratio_min, ratio_max;
+  int left, right, top, bot, top_width, previous_w;
+
+  //Check valid detections
+  for(i = 0; i < nboxes; i++) {
+
+    //Find detected classes
+    previous_w = 0;
+    for(j = 0; j < 80; j++) {
+      if(boxes[84*i+4+j] != 0) {
+
+        //Check if this was the first class detected for given box
+        if(previous_w == 0) {
+
+          //Randomly pick rgb colors for the box
+          offset = j*123457 % 80;
+          mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8
+          ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6
+          ratio_min = (ratio >> 6);
+          ratio_max = ratio_min + 1;
+          ratio = ratio & 0x3F; //Q2.6
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6
+          red = (mul_16 >> 6); //Q10.6 to Q8.0
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6
+          green = (mul_16 >> 6); //Q10.6 to Q8.0
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6
+          blue = (mul_16 >> 6); //Q10.6 to Q8.0
+
+          //Calculate box coordinates in image frame
+          mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+          left = (mul_32 >> 14);
+          mul_16 = boxes[84*i] + (boxes[84*i+2]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+          right = (mul_32 >> 14);
+          mul_16 = boxes[84*i+1] - (boxes[84*i+3]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+          top = (mul_32 >> 14);
+          mul_16 = boxes[84*i+1] + (boxes[84*i+3]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+          bot = (mul_32 >> 14);
+
+          //Draw box
+          for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue);
+
+          //Limit top and left box coordinates
+          if(top < 0) top = 0;
+          if(left < 0) left = 0;
+          top_width = top + box_width;
+          if(top_width - label_height >= 0) top_width -= label_height;
+
+        //Otherwise, add comma and space
+        } else {
+          label_w = fp_labels[80];
+          draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
+          previous_w += label_w;
+        }
+
+        //Draw class labels
+        label_w = fp_labels[j];
+        draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
+        previous_w += label_w;
+      }
+    }
+  }
+}
+
 //send results back
 void send_data() {
 
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) boxes;
+  char * fp_data_char = (char *) fp_image;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -299,7 +439,7 @@ void send_data() {
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
+     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES*2 + i*2];
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
@@ -355,8 +495,15 @@ int main(int argc, char **argv) {
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
+#ifndef SIM
+  //draw boxes and labels
+  uart_printf("\nDrawing boxes and labels...\n");
+  start = timer_time_us(TIMER_BASE);
+  draw_detections();
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+#else
   //verify results
-#ifdef SIM
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += 256*13*13 + 256*26*26;
   int i;

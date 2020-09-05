@@ -77,6 +77,16 @@ print("\nStarting reception of result...")
 output_filename = '../pos_cnn_out.bin'
 f_output = open(output_filename, "rb")
 
+#Open write detections file
+output_image_filename = sys.argv[3]+'/detections.bin'
+f_output_image =  open(output_image_filename, "wb")
+image_w = struct.unpack('i', f_output.read(4))[0]
+image_h = struct.unpack('i', f_output.read(4))[0]
+image_c = struct.unpack('i', f_output.read(4))[0]
+f_output_image.write(struct.pack('i', image_w))
+f_output_image.write(struct.pack('i', image_h))
+f_output_image.write(struct.pack('i', image_c))
+
 #Reset counters
 count_errors = 0
 count_bytes = 0
@@ -107,6 +117,7 @@ for j in range(num_frames_output+1):
     #Check if data is correct
     rcv = s.recv(4096)
     for sent_byte, rcv_byte in zip(payload, rcv[14:bytes_to_receive+14]):
+        f_output_image.write(struct.pack('B', ord(rcv_byte)))
         if sent_byte != rcv_byte:
             count_errors += 1
             
@@ -116,4 +127,5 @@ for j in range(num_frames_output+1):
         
 #Close file
 f_output.close()
-print("Result received with %d errors..." %(count_errors))
+f_output_image.close()
+print("Result received with %d errors...\n" %(count_errors))

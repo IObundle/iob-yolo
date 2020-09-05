@@ -7,6 +7,16 @@
 //DDR initial constants
 `define OFFSET (2**`FIRM_ADDR_W)
 
+//Label constants
+`define MAX_LABEL_SIZE 2340
+`define LABELS_FILE_SIZE (81 + `MAX_LABEL_SIZE*81 + 11) //+11 to be 32-byte aligned
+
+//Input image
+`define IMG_W 768
+`define IMG_H 576
+`define IMG_C 3
+`define IMAGE_INPUT (2*(`IMG_W*`IMG_H*`IMG_C)) //already 32-byte aligned
+
 //FM constants
 `define DATA_LAYER_16 (13*13*256)
 `define DATA_LAYER_23 (26*26*256)
@@ -15,7 +25,7 @@
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-`define FILE_SIZE ((`OFFSET + `TOTAL_FM)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + `LABELS_FILE_SIZE + `IMAGE_INPUT + `TOTAL_FM)/(`MIG_BUS_W/8))
 
 module pos_cnn_tb;
 
