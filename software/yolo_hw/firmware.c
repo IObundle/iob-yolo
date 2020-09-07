@@ -177,14 +177,14 @@ void layer1() {
   /////////////////////////////////////////////////////////////////////////
   
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C + LAYER_1_W_OFF);
+  versat.dma.yread_setLen(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C + LAYER_1_W_OFF);
   versat.yread.setOffset(2*(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C + LAYER_1_W_OFF));
   versat.yread.setExtPer((LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C + LAYER_1_W_OFF)/16);
   versat.yread.setExtIncr(16);
   versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read full line
-  versat.ywrite.read.setLen((LAYER_1_C*(LAYER_1_W+2)+LAYER_1_P_OFF)*(nSTAGES*2+2)/16-1);
+  versat.dma.ywrite_read_setLen((LAYER_1_C*(LAYER_1_W+2)+LAYER_1_P_OFF)*(nSTAGES*2+2)/16-1);
   versat.ywrite.read.setOffset(2*(2*((LAYER_1_W+2)*LAYER_1_C+LAYER_1_P_OFF)));
   versat.ywrite.read.setExtPer((LAYER_1_C*(LAYER_1_W+2)+LAYER_1_P_OFF)*(LAYER_1_KER_SIZE+1)/16); //+10 so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
@@ -225,7 +225,7 @@ void layer1() {
   versat.ywrite.write.setIntIter(LAYER_1_TILE_W/2);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(LAYER_1_TILE_W/2-1);
+  versat.dma.ywrite_write_setLen(LAYER_1_TILE_W/2-1);
   versat.ywrite.write.setOffset(2*((LAYER_1_W/2+2)*LAYER_1_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -316,14 +316,14 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(ker_size*ker_size*c);
+  versat.dma.yread_setLen(ker_size*ker_size*c);
   versat.yread.setOffset(2*(ker_size*ker_size*c));
   versat.yread.setExtPer((ker_size*ker_size*c)/16);
   versat.yread.setExtIncr(16);
   versat.yread.setExtIter(1);
 
   // configure xyolo_write vread to read tile from input fm
-  versat.ywrite.read.setLen((c*(til_w+2))/16-1);
+  versat.dma.ywrite_read_setLen((c*(til_w+2))/16-1);
   versat.ywrite.read.setOffset(2*(2*((w+2)*c)));
   versat.ywrite.read.setExtPer((c*(til_w+2))/16);
   versat.ywrite.read.setExtIncr(16);
@@ -365,7 +365,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
   versat.ywrite.write.setIntIter(til_w/2);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(((til_w/2)*(num_ker/nYOLOvect))-1);
+  versat.dma.ywrite_write_setLen(((til_w/2)*(num_ker/nYOLOvect))-1);
   versat.ywrite.write.setOffset(2*((w/2+2)*num_ker));
   versat.ywrite.write.setExtPer(1);
 
@@ -481,7 +481,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   /////////////////////////////////////////////////////////////////////////
 
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(ker_size*ker_size*c);
+  versat.dma.yread_setLen(ker_size*ker_size*c);
   versat.yread.setOffset(2*(ker_size*ker_size*c));
   versat.yread.setExtPer((ker_size*ker_size*c)/16);
   versat.yread.setExtIncr(16);
@@ -489,7 +489,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read input fm
-  versat.ywrite.read.setLen(c*(w+2*inpadd+2*ignorepadd)*(nSTAGES+2*inpadd)/16-1);
+  versat.dma.ywrite_read_setLen(c*(w+2*inpadd+2*ignorepadd)*(nSTAGES+2*inpadd)/16-1);
   versat.ywrite.read.setOffset(2*((w+2*inpadd+2*ignorepadd)*c));
   versat.ywrite.read.setExtPer((c*(w+2*inpadd+2*ignorepadd)*ker_size)/16);
   versat.ywrite.read.setExtIncr(16);
@@ -546,7 +546,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.ywrite.write.setIntIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen((1+upsample)*w-1);
+  versat.dma.ywrite_write_setLen((1+upsample)*w-1);
   if(outpos == 0) versat.ywrite.write.setOffset(2*((w+2*outpadd+stride)*num_ker));
   else versat.ywrite.write.setOffset(2*((1+upsample)*(w*(1+upsample)+2*outpadd+stride)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER)));
   versat.ywrite.write.setExtPer(w*(1+upsample));
@@ -677,12 +677,12 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
 
   // configure xyolo_write vread to read input fm
   if(outpos == 0) {
-    versat.ywrite.read.setLen(c*(w+2*inpadd+stride)*(nSTAGES*(1+inpadd)+stride)/16-1);
+    versat.dma.ywrite_read_setLen(c*(w+2*inpadd+stride)*(nSTAGES*(1+inpadd)+stride)/16-1);
     versat.ywrite.read.setOffset(2*((1+inpadd)*(w+2*inpadd+stride)*c)); 
     versat.ywrite.read.setExtPer((c*(w+2*inpadd+stride)*2)/16); //each vread reads 2 lines
     versat.ywrite.read.setExtIter(1);
   } else {
-    versat.ywrite.read.setLen(c*(w+2*inpadd+stride)/16-1);
+    versat.dma.ywrite_read_setLen(c*(w+2*inpadd+stride)/16-1);
     versat.ywrite.read.setOffset(2*((1+inpadd)*(w+2*inpadd+stride)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER)));
     versat.ywrite.read.setExtPer(c*(w+2*inpadd+stride)/16); //each vread reads 2 lines
     versat.ywrite.read.setExtIter(2);
@@ -718,7 +718,7 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(c/16-1);
+  versat.dma.ywrite_write_setLen(c/16-1);
   versat.ywrite.write.setOffset(2*((w/(1+inpadd)+2)*c));
   versat.ywrite.write.setExtPer(c/16);
   versat.ywrite.write.setExtIter(1);
