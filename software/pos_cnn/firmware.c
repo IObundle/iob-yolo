@@ -328,17 +328,17 @@ void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green,
 
 //Draw class label in input image
 void draw_class(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b) {
-  uint8_t label_aux[MAX_LABEL_SIZE];
   int l, k;
-  for(l = 0; l < label_height*label_w; l++) label_aux[l] = fp_labels[81+MAX_LABEL_SIZE*j+l];
+  uint8_t label;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
+      label = fp_labels[81+MAX_LABEL_SIZE*j+l*label_w+k];
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)label_aux[l*label_w+k])) >> 8;
+      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
       //green
-      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g*(uint16_t)label_aux[l*label_w+k])) >> 8;
+      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
       //blue
-      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b*(uint16_t)label_aux[l*label_w+k])) >> 8;
+      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
     }
   }
 }
