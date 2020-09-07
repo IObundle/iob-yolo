@@ -24,3 +24,12 @@
 
 // Response width (response = 0 - Okay = 0; Exokay = 1; Slverr = 2; decerr = 3)
 `define AXI_RESP_W 2
+
+
+// Configuration offsets
+`define DMA_XYOLO_READ_CONF_LEN        0
+`define DMA_XYOLO_WRITE_READ_CONF_LEN  1
+`define DMA_XYOLO_WRITE_WRITE_CONF_LEN 2
+
+// Address
+`define DMA_ADDR_W                 ($clog2(`DMA_XYOLO_WRITE_WRITE_CONF_LEN+1))

@@ -129,6 +129,7 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
   // configure xyolo_read vreads to read bias and kernel from DDR
   versat.yread.setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF); //+W_OFF so each filter is 32 byte aligned
+  versat.dma.yread_setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF);
   versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)); //+W_OFF so each filter is 32 byte aligned
   versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)/16); //+W_OFF so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
@@ -136,6 +137,7 @@ void conv() {
 
   // configure xyolo_write vread to read tile from input fm
   versat.ywrite.read.setLen((NTW_IN_C*(NTW_IN_W+2)+NTW_IN_P_OFF)*(nSTAGES*2+2)/16-1); //+P_OFF so each line is 32 byte aligned
+  versat.dma.ywrite_read_setLen((NTW_IN_C*(NTW_IN_W+2)+NTW_IN_P_OFF)*(nSTAGES*2+2)/16-1); //+P_OFF so each line is 32 byte aligned
   versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF))); //+P_OFF so each line is 32 byte aligned
   versat.ywrite.read.setExtPer(((NTW_IN_C*(NTW_IN_W+2)+NTW_IN_P_OFF)*(NTW_IN_KER_SIZE+1))/16); //+P_OFF so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
@@ -177,6 +179,7 @@ void conv() {
 
   // configure xyolo_write vwrite to write result back to DDR
   versat.ywrite.write.setLen(TILE_W/2-1); //send 16 values per stage
+  versat.dma.ywrite_write_setLen(TILE_W/2-1); //send 16 values per stage
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -319,6 +322,7 @@ int main(int argc, char **argv) {
   versat.yread.setOffset(2);
   versat.yread.setPingPong(1);
   versat.yread.setLen(3);
+  versat.dma.yread_setLen(3);
   versat.yread.setIntAddr(4);
   versat.yread.setExtIter(5);
   versat.yread.setExtPer(6);
@@ -338,6 +342,7 @@ int main(int argc, char **argv) {
   versat.ywrite.write.setExtAddr(1);
   versat.ywrite.write.setOffset(2);
   versat.ywrite.write.setLen(3);
+  versat.dma.ywrite_write_setLen(3);
   versat.ywrite.write.setIntAddr(4);
   versat.ywrite.write.setExtIter(5);
   versat.ywrite.write.setExtPer(6);
@@ -354,6 +359,7 @@ int main(int argc, char **argv) {
   versat.ywrite.read.setExtAddr(16);
   versat.ywrite.read.setOffset(17);
   versat.ywrite.read.setLen(18);
+  versat.dma.ywrite_read_setLen(18);
   versat.ywrite.read.setIntAddr(19);
   versat.ywrite.read.setExtIter(20);
   versat.ywrite.read.setExtPer(21);

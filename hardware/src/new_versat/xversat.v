@@ -7,6 +7,7 @@
 // FU defines
 `include "xyolo_write.vh"
 `include "xyolo_read.vh"
+`include "axi_dma.vh"
 
 module xversat # (
 	parameter  			ADDR_W = 32,
@@ -69,7 +70,7 @@ module xversat # (
     );
 
    // local parameters
-   localparam				N_SLAVES = 2;
+   localparam				N_SLAVES = 3;
    localparam				DATA_W = `IO_ADDR_W;
 
    // run_clear address mapping
@@ -137,7 +138,7 @@ module xversat # (
       .m_resp(),
       //slave interface
       .s_req(s_req),
-      .s_resp({2*`RESP_W{1'b0}})
+      .s_resp({N_SLAVES*`RESP_W{1'b0}})
    );
 
    // instantiate xyolo_read FU
@@ -209,6 +210,14 @@ module xversat # (
 	     ) dma (
 		    .clk(clk),
 		    .rst(rst),
+		    // control
+		    .clear(clear),
+		    .run(global_run),
+		    // cpu interface (only request)
+		    .valid(s_req[`valid(2)]),
+		    .addr(s_req[`address(2, `DMA_ADDR_W)]),
+		    .wdata(s_req[`wdata(2)]),
+		    .wstrb(|s_req[`wstrb(2)]),
 		    // Native interface
 		    .databus_valid    (databus_valid),
 		    .databus_addr     (databus_addr),
