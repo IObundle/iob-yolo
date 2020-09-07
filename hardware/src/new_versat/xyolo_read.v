@@ -5,37 +5,36 @@
 `include "axi_dma.vh"
 
 module xyolo_read #(
-    	parameter                      	DATAPATH_W = 32,
-	parameter			DATABUS_W = 256
+    	parameter                      		      DATAPATH_W = 32,
+	parameter				      DATABUS_W = 256,
+	parameter                                     N_MACS = `nYOLOmacs
    ) (
-    	input                           clk,
-    	input                           rst,
+    	input 					      clk,
+    	input 					      rst,
 
 	// control
-	input				clear,
-    	input                           run,
-    	output                          done,
+	input 					      clear,
+    	input 					      run,
+    	output 					      done,
 
 	// cpu interface (only request)
-	input				valid,
-	input [`XYOLO_READ_ADDR_W-1:0]	addr,
-	input [`IO_ADDR_W-1:0]		wdata,
-	input 			    	wstrb,
+	input 					      valid,
+	input [`XYOLO_READ_ADDR_W-1:0] 		      addr,
+	input [`IO_ADDR_W-1:0] 			      wdata,
+	input 					      wstrb,
 
     	// databus interface
-    	input               		databus_ready,
-    	output 			        databus_valid,
-    	output [`IO_ADDR_W-1:0]  	databus_addr,
-    	input  [DATABUS_W-1:0]      	databus_rdata,
-    	output [DATABUS_W-1:0]      	databus_wdata,
-    	output [DATABUS_W/8-1:0]    	databus_wstrb,
+    	input 					      databus_ready,
+    	output 					      databus_valid,
+    	output [`IO_ADDR_W-1:0] 		      databus_addr,
+    	input [DATABUS_W-1:0] 			      databus_rdata,
+    	output [DATABUS_W-1:0] 			      databus_wdata,
+    	output [DATABUS_W/8-1:0] 		      databus_wstrb,
 
     	// output data
-    	output [`nYOLOvect*DATAPATH_W-1:0] flow_out_bias,
-    	output [`nYOLOvect*DATAPATH_W-1:0] flow_out_weight,
+    	output [`nYOLOvect*DATAPATH_W-1:0] 	      flow_out_bias,
+	output [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_out_weight
 
-	// DMA - number of tranfers per burst
-	output [`AXI_LEN_W-1:0]		dma_len
    );
 
    // local parameter for merge
@@ -46,7 +45,6 @@ module xyolo_read #(
    reg  		                ext_addr_en;
    reg  		                offset_en;
    reg  		                pp_en; //ping-pong
-   reg					len_en;
    reg 					int_addr_en;
    reg 					iterA_en;
    reg 					perA_en;
@@ -67,7 +65,6 @@ module xyolo_read #(
    reg [`nYOLOvect*`IO_ADDR_W-1:0]      ext_addr_shadow;
    reg [`IO_ADDR_W/2-1:0] 	        offset;
    reg					pp; //ping pong
-   reg [`IO_ADDR_W/2-1:0] 		len, len_shadow;
    reg [`WEIGHT_W_ADDR_W-1:0] 		int_addr, int_addr_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		iterA, iterA_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		perA, perA_shadow;
@@ -75,9 +72,9 @@ module xyolo_read #(
    reg [`WEIGHT_ADDR_W-1:0] 		incrA, incrA_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		iterB, iterB_pip, iterB_shadow;
    reg [`WEIGHT_ADDR_W-1:0] 		perB, perB_pip, perB_shadow;
-   reg [`WEIGHT_ADDR_W-1:0] 		startB, startB_pip, startB_shadow;
-   reg [`WEIGHT_ADDR_W-1:0] 		shiftB, shiftB_pip, shiftB_shadow;
-   reg [`WEIGHT_ADDR_W-1:0] 		incrB, incrB_pip, incrB_shadow;
+   reg [`WEIGHT_INT_ADDR_W-1:0] 	startB, startB_pip, startB_shadow;
+   reg [`WEIGHT_INT_ADDR_W-1:0] 	shiftB, shiftB_pip, shiftB_shadow;
+   reg [`WEIGHT_INT_ADDR_W-1:0] 	incrB, incrB_pip, incrB_shadow;
    //bias configs
    reg [`IO_ADDR_W-1:0] 	        bias_ext_addr, bias_ext_addr_shadow;
    reg [`BIAS_ADDR_W-1:0] 		bias_int_addr, bias_int_addr_shadow;
@@ -96,8 +93,8 @@ module xyolo_read #(
    // port addresses and enables
    wire [`nYOLOvect*`WEIGHT_W_ADDR_W-1:0] addrA;
    reg [`nYOLOvect*`WEIGHT_W_ADDR_W-1:0]  addrA_reg;
-   wire [`WEIGHT_ADDR_W-1:0]            addrB;
-   reg [`WEIGHT_ADDR_W-1:0]             addrB_reg;
+   wire [`WEIGHT_INT_ADDR_W-1:0] 	  addrB;
+   reg [`WEIGHT_INT_ADDR_W-1:0] 	addrB_reg;
    wire [`BIAS_ADDR_W-1:0]		bias_addrA;
 
    // data inputs
@@ -107,8 +104,8 @@ module xyolo_read #(
    reg [DATABUS_W-1:0]			bias_inA_rvs;
 
    // data output
-   wire [`nYOLOvect*DATAPATH_W-1:0]     weights;
-   reg [`nYOLOvect*DATAPATH_W-1:0]      weights_reg;
+   wire [`nYOLOvect*N_MACS*DATAPATH_W-1:0]     weights;
+   reg [`nYOLOvect*N_MACS*DATAPATH_W-1:0]      weights_reg;
 
    // done output
    wire [`nYOLOvect-1:0]                vread_done;
@@ -126,23 +123,6 @@ module xyolo_read #(
    wire [`REQ_W-1:0]                    s_req;
    wire [`RESP_W-1:0]                   s_resp;
 
-   // define number of transactions (DMA)
-   reg [`IO_ADDR_W/2-1:0]               dma_cnt;
-   assign				dma_len = |dma_cnt[`IO_ADDR_W/2-1:`AXI_LEN_W] ? {`AXI_LEN_W{1'b1}} : dma_cnt[`AXI_LEN_W-1:0];
-
-   // update DMA length
-   always @ (posedge clk, posedge rst)
-      if(rst)
-         dma_cnt <= {`IO_ADDR_W/2{1'b0}};
-      else if(run)
-         dma_cnt <= len;
-      else if(databus_ready) begin
-         if(dma_cnt == {`IO_ADDR_W/2{1'b0}})
-            dma_cnt <= len_shadow;
-         else
-            dma_cnt <= dma_cnt - 1;
-      end
-
    // register run
    always @ (posedge clk, posedge rst)
       if(rst)
@@ -159,7 +139,6 @@ module xyolo_read #(
       ext_addr_en = 1'b0;
       offset_en = 1'b0;
       pp_en = 1'b0;
-      len_en = 1'b0;
       int_addr_en = 1'b0;
       iterA_en = 1'b0;
       perA_en = 1'b0;
@@ -179,7 +158,6 @@ module xyolo_read #(
             `XYOLO_READ_CONF_EXT_ADDR : ext_addr_en = 1'b1;
             `XYOLO_READ_CONF_OFFSET : offset_en = 1'b1;
             `XYOLO_READ_CONF_PP : pp_en = 1'b1;
-            `XYOLO_READ_CONF_LEN : len_en = 1'b1;
             `XYOLO_READ_CONF_INT_ADDR : int_addr_en = 1'b1;
             `XYOLO_READ_CONF_ITER_A : iterA_en = 1'b1;
 	    `XYOLO_READ_CONF_PER_A: perA_en = 1'b1;
@@ -204,17 +182,16 @@ module xyolo_read #(
 	 ext_addr <= `IO_ADDR_W'b0;
          offset <= {`IO_ADDR_W/2{1'b0}};
          pp <= 1'b0;
-         len <= {`IO_ADDR_W/2{1'b0}};
 	 int_addr <= {`WEIGHT_W_ADDR_W{1'b0}};
 	 iterA <= `WEIGHT_ADDR_W'b0;
 	 perA <= `WEIGHT_ADDR_W'b0;
 	 shiftA <= `WEIGHT_ADDR_W'b0;
 	 incrA <= `WEIGHT_ADDR_W'b0;
-	 iterB <= `WEIGHT_ADDR_W'b0;
+	 iterB <= {`WEIGHT_ADDR_W{1'b0}};
 	 perB <= `WEIGHT_ADDR_W'b0;
-	 startB <= `WEIGHT_ADDR_W'b0;
-	 shiftB <= `WEIGHT_ADDR_W'b0;
-	 incrB <= `WEIGHT_ADDR_W'b0;
+	 startB <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 shiftB <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 incrB <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 //bias
 	 bias_ext_addr <= `IO_ADDR_W'b0;
 	 bias_int_addr <= {`BIAS_ADDR_W{1'b0}};
@@ -223,7 +200,6 @@ module xyolo_read #(
          if(ext_addr_en) ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(offset_en) offset <= wdata[`IO_ADDR_W/2-1:0];
          if(pp_en) pp <= wdata[0];
-         if(len_en) len <= wdata[`IO_ADDR_W/2-1:0];
          if(int_addr_en) int_addr <= wdata[`WEIGHT_W_ADDR_W-1:0];
          if(iterA_en) iterA <= wdata[`WEIGHT_ADDR_W-1:0];
          if(perA_en) perA <= wdata[`WEIGHT_ADDR_W-1:0];
@@ -231,9 +207,9 @@ module xyolo_read #(
          if(incrA_en) incrA <= wdata[`WEIGHT_ADDR_W-1:0];
          if(iterB_en) iterB <= wdata[`WEIGHT_ADDR_W-1:0];
          if(perB_en) perB <= wdata[`WEIGHT_ADDR_W-1:0];
-         if(startB_en) startB <= wdata[`WEIGHT_ADDR_W-1:0];
-         if(shiftB_en) shiftB <= wdata[`WEIGHT_ADDR_W-1:0];
-         if(incrB_en) incrB <= wdata[`WEIGHT_ADDR_W-1:0];
+         if(startB_en) startB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
+         if(shiftB_en) shiftB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
+         if(incrB_en) incrB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
 	 //bias
          if(bias_ext_addr_en) bias_ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(bias_int_addr_en) bias_int_addr <= wdata[`BIAS_ADDR_W-1:0];
@@ -244,22 +220,21 @@ module xyolo_read #(
    always @(posedge clk, posedge rst)
       if(rst) begin
 	 ext_addr_shadow <= `nYOLOvect*`IO_ADDR_W'b0;
-         len_shadow <= {`IO_ADDR_W/2{1'b0}};
 	 int_addr_shadow <= {`WEIGHT_W_ADDR_W{1'b0}};
 	 iterA_shadow <= `WEIGHT_ADDR_W'b0;
 	 perA_shadow <= `WEIGHT_ADDR_W'b0;
 	 shiftA_shadow <= `WEIGHT_ADDR_W'b0;
 	 incrA_shadow <= `WEIGHT_ADDR_W'b0;
-	 iterB_shadow <= `WEIGHT_ADDR_W'b0;
-	 iterB_pip <= `WEIGHT_ADDR_W'b0;
+	 iterB_shadow <= {`WEIGHT_ADDR_W{1'b0}};
+	 iterB_pip <= {`WEIGHT_ADDR_W{1'b0}};
 	 perB_shadow <= `WEIGHT_ADDR_W'b0;
 	 perB_pip <= `WEIGHT_ADDR_W'b0;
-	 startB_shadow <= `WEIGHT_ADDR_W'b0;
-	 startB_pip <= `WEIGHT_ADDR_W'b0;
-	 shiftB_shadow <= `WEIGHT_ADDR_W'b0;
-	 shiftB_pip <= `WEIGHT_ADDR_W'b0;
-	 incrB_shadow <= `WEIGHT_ADDR_W'b0;
-	 incrB_pip <= `WEIGHT_ADDR_W'b0;
+	 startB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 startB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 shiftB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 shiftB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 incrB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 incrB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 //bias
 	 bias_ext_addr_shadow <= `IO_ADDR_W'b0;
 	 bias_int_addr_shadow <= {`BIAS_ADDR_W{1'b0}};
@@ -267,7 +242,6 @@ module xyolo_read #(
 	 bias_startB_pip <= `BIAS_ADDR_W'b0;
       end else if(run) begin
          ext_addr_shadow <= ext_addr_bus;
-	 len_shadow <= len;
 	 //XOR ensures ping-pong happens when acessing external mem
 	 int_addr_shadow <= pp ? {int_addr_shadow[`WEIGHT_W_ADDR_W-1] ^ |iterA, int_addr[`WEIGHT_W_ADDR_W-2:0]} : int_addr;
 	 iterA_shadow <= iterA;
@@ -278,7 +252,7 @@ module xyolo_read #(
 	 iterB_shadow <= iterB_pip;
 	 perB_pip <= perB;
 	 perB_shadow <= perB_pip;
-	 startB_pip <= pp ? {startB_pip[`WEIGHT_ADDR_W-1] ^ |iterA, startB[`WEIGHT_ADDR_W-2:0]} : startB;
+	 startB_pip <= pp ? {startB_pip[`WEIGHT_INT_ADDR_W-1] ^ |iterA, startB[`WEIGHT_INT_ADDR_W-2:0]} : startB;
 	 startB_shadow <= startB_pip;
 	 shiftB_pip <= shiftB;
 	 shiftB_shadow <= shiftB_pip;
@@ -334,7 +308,6 @@ module xyolo_read #(
 	.rst(rst),
         // Control
 	.run(run_reg),
-	.int_cnt_en(1'b1),
         .done(bias_done),
         // Configuration
 	.ext_addr(bias_ext_addr_shadow),
@@ -418,7 +391,6 @@ module xyolo_read #(
 	    .rst(rst),
             // Control
 	    .run(run_reg),
-	    .int_cnt_en(1'b1),
             .done(vread_done[i]),
             // Configuration
 	    .ext_addr(ext_addr_shadow[`nYOLOvect*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
@@ -450,8 +422,8 @@ module xyolo_read #(
          iob_2p_assim_mem_w_big #(
 	    .W_DATA_W(DATABUS_W),
       	    .W_ADDR_W(`WEIGHT_W_ADDR_W),
-      	    .R_DATA_W(DATAPATH_W),
-      	    .R_ADDR_W(`WEIGHT_ADDR_W),
+      	    .R_DATA_W(N_MACS*DATAPATH_W),
+      	    .R_ADDR_W(`WEIGHT_INT_ADDR_W),
             .USE_RAM(1)
          ) mem (
            .clk(clk),
@@ -464,7 +436,7 @@ module xyolo_read #(
            // Reading port
            .r_en(enB_reg),
            .r_addr(addrB_reg),
-           .data_out(weights[`nYOLOvect*DATAPATH_W-DATAPATH_W*i-1 -: DATAPATH_W])
+           .data_out(weights[`nYOLOvect*N_MACS*DATAPATH_W-N_MACS*DATAPATH_W*i-1 -: N_MACS*DATAPATH_W])
            );
 
       end
@@ -477,7 +449,7 @@ module xyolo_read #(
 
    // common internal addrgen
    xaddrgen # (
-      .MEM_ADDR_W(`WEIGHT_ADDR_W),
+      .MEM_ADDR_W(`WEIGHT_INT_ADDR_W),
       .PERIOD_W(`WEIGHT_ADDR_W)
    ) addrgenB (
       .clk(clk),

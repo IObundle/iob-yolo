@@ -7,51 +7,29 @@
 //DDR initial constants
 `define OFFSET (2**`FIRM_ADDR_W)
 
-//Offset for first layer
-`define LAYER_1_C (3+(`nYOLOmacs!=1))
-`define LAYER_1_P_OFF (10 + (-2*(`nYOLOmacs!=1))) //10 for nMAC=1, 8 for nMAC=2/4
-`define LAYER_1_W_OFF (5 + ((`nYOLOmacs!=1)*7)) //5 for NMAC=1, 12 for nMAC=2/4
+//layer 1 padding
+`define LAYER_1_P_OFF 8
 
-//FM constants
-`define DATA_LAYER_1 (418*(418*`LAYER_1_C+`LAYER_1_P_OFF)) //+LAYER_1_P_OFF to be 32 byte aligned
-`define DATA_LAYER_2 (210*210*16)
-`define DATA_LAYER_4 (106*106*32)
-`define DATA_LAYER_6 (54*54*64)
-`define DATA_LAYER_8 (28*28*128)
-`define DATA_LAYER_9 (28*28*256)
-`define DATA_LAYER_10 (15*15*256)
-`define DATA_LAYER_11 (14*14*512)
-`define DATA_LAYER_12 (15*15*512)
-`define DATA_LAYER_13 (13*13*1024)
-`define DATA_LAYER_14 (15*15*256)
-`define DATA_LAYER_15 (13*13*512)
-`define DATA_LAYER_16 (13*13*256)
-`define DATA_LAYER_19 (28*28*128)
-`define DATA_LAYER_22 (26*26*256)
-`define DATA_LAYER_23 (26*26*256)
-`define TOTAL_FM (2*(`DATA_LAYER_22 + 2*`DATA_LAYER_23)) 
+//Input image
+`define IMG_W 768
+`define IMG_H 576
+`define IMG_C 4
+`define NEW_W 416
+`define NEW_H ((`IMG_H*`NEW_W)/`IMG_W)
+`define IMAGE_INPUT (2*(`IMG_W*`IMG_H*`IMG_C)) //already 32-byte aligned
+`define NETWORK_INPUT_AUX (2*(`NEW_W*`IMG_H*`IMG_C))
+`define DATA_LAYER_1 (2*((`NEW_W+2)*((`NEW_W+2)*`IMG_C+`LAYER_1_P_OFF)))
 
-//Weight constants
-`define WEIGHTS_LAYER_1 (16 + 16*(3*3*`LAYER_1_C+`LAYER_1_W_OFF)) //+LAYER_1_W_OFF to be 32 byte aligned
-`define WEIGHTS_LAYER_3 (32 + 32*3*3*16)
-`define WEIGHTS_LAYER_5 (64 + 64*3*3*32)
-`define WEIGHTS_LAYER_7 (128 + 128*3*3*64)
-`define WEIGHTS_LAYER_9 (256 + 256*3*3*128)
-`define WEIGHTS_LAYER_11 (512 + 512*3*3*256)
-`define WEIGHTS_LAYER_13 (1024 + 1024*3*3*512)
-`define WEIGHTS_LAYER_14 (256 + 256*1*1*1024)
-`define WEIGHTS_LAYER_15 (512 + 512*3*3*256)
-`define WEIGHTS_LAYER_16 (256 + 256*1*1*512)
-`define WEIGHTS_LAYER_19 (128 + 128*1*1*256)
-`define WEIGHTS_LAYER_22 (256 + 256*3*3*384)
-`define WEIGHTS_LAYER_23 (256 + 256*1*1*256)
-`define TOTAL_WEIGHTS (2*(`WEIGHTS_LAYER_23))
+//resize constants
+`define ix_size (2*(`NEW_W*2))
+`define dx_size (2*(`NEW_W*2))
+`define dy_size (2*(`NEW_H*2))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-`define FILE_SIZE ((`OFFSET + `TOTAL_WEIGHTS + `TOTAL_FM)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
 
-module yolo_hw_tb;
+module pre_cnn_tb;
 
    parameter clk_per = 8;
 
@@ -98,21 +76,13 @@ module yolo_hw_tb;
    integer                i;
 
    //define parameters
-   parameter file_ddr = {"../../../../yolo_hw_", `STRINGIFY(`MIG_BUS_W), "_x", `STRINGIFY(`nYOLOmacs), ".hex"};
+   parameter file_ddr = "../../../../pre_cnn.hex";
    parameter file_size = `FILE_SIZE;
 
    /////////////////////////////////////////////
    // TEST PROCEDURE
    //
    initial begin
-
-`ifdef VCD
-      $dumpfile("system.vcd");
-      $dumpvars(0, yolo_hw_tb.uut.versat);
-      $dumpvars(0, yolo_hw_tb.uut.ext_mem0);
-      $dumpvars(0, yolo_hw_tb.interconnect_inst);
-      
-`endif
 
       //init cpu bus signals
       uart_valid = 0;

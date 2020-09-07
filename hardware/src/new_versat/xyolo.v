@@ -3,29 +3,32 @@
 `include "xyolo_write.vh"
 
 module xyolo # (
-		parameter		DATAPATH_W = 32
+		parameter		      DATAPATH_W = 32,
+		parameter                     N_MACS = 1,
+   		parameter                     N_MACS_W = $clog2(N_MACS)+($clog2(N_MACS)==0)
 	) (
-                input                   clk,
-                input                   rst,
+                input 			      clk,
+                input 			      rst,
 
 		//load control
-		input 			ld_acc,
-		input 			ld_mp,
-		input			ld_res,
-
+		input 			      ld_acc,
+		input 			      ld_mp,
+		input 			      ld_res,
+		input [N_MACS_W-1:0] 	      ld_nmac,
+	   
 		//configuration
-		input                   bias,
-                input                   leaky,
-                input                   sigmoid,
-                input                   maxpool,
-                input                   bypass,
-		input [`SHIFT_W-1:0]	shift,
+		input                         bias,
+                input                         leaky,
+                input                         sigmoid,
+                input                         maxpool,
+                input                         bypass,
+		input [`SHIFT_W-1:0]	      shift,
 
                 //data interface
-                input [DATAPATH_W-1:0]	flow_in_pixel,  //op_a
-                input [DATAPATH_W-1:0]	flow_in_weight, //op_b
-                input [DATAPATH_W-1:0]	flow_in_bias,   //op_c
-                output [DATAPATH_W-1:0]	flow_out
+                input [N_MACS*DATAPATH_W-1:0] flow_in_pixel, //op_a
+		input [N_MACS*DATAPATH_W-1:0] flow_in_weight, //op_b
+                input [DATAPATH_W-1:0] 	      flow_in_bias, //op_c
+                output [DATAPATH_W-1:0]       flow_out
                 );
 
    //local parameters for sigmoid linear approximation
@@ -39,17 +42,29 @@ module xyolo # (
    //data interface wires and regs
    wire [2*DATAPATH_W-1:0]              shifted, adder;
    wire signed [DATAPATH_W-1:0]         act_fnc, shifted_half, mp_w, bypass_w;
-   reg signed [DATAPATH_W-1:0]          bias_reg, result, op_a_bypass;
-   wire [DATAPATH_W-1:0]                result_w;
+   reg signed [DATAPATH_W-1:0]          bias_reg, result;
+   reg signed [DATAPATH_W-1:0] 		op_a_bypass;
+   wire [DATAPATH_W-1:0] 		result_w;
+   reg [DATAPATH_W-1:0] 		op_a_bypass_nmac;
 
    //activation function wires
    wire signed [DATAPATH_W-1:0]		sig_in, sig_out, sig_adder;
-   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t2, sig_out_r, shift_r;
+   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r, shift_r, shift_r2;
    wire signed [DATAPATH_W-1:0]		leaky_out;
 
    //multiplier wires and regs
-   wire signed [2*DATAPATH_W-1:0] 	dsp_out, adder_w;
+   wire signed [N_MACS*2*DATAPATH_W-1:0] dsp_out, adder_w;
+   wire signed [2*DATAPATH_W-1:0] 	 conv_res;
 
+   // Mux to select pixel for bypass
+   integer 			 k;
+   always @* begin
+      op_a_bypass_nmac = flow_in_pixel[0 +: DATAPATH_W];
+      for (k=0;k<N_MACS;k=k+1)
+	if (k == ld_nmac)
+	  op_a_bypass_nmac = flow_in_pixel[k*DATAPATH_W +: DATAPATH_W];
+   end
+      
    //update registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
@@ -58,36 +73,65 @@ module xyolo # (
        result <= {DATAPATH_W{1'b0}};
        sig_out_r <= {DATAPATH_W{1'b0}};
        shift_r <= {DATAPATH_W{1'b0}};
+       shift_r2 <= {DATAPATH_W{1'b0}};
+       sig_t1_r <= {DATAPATH_W{1'b0}};
+       sig_t2_r <= {DATAPATH_W{1'b0}};
      end else begin
        bias_reg <= flow_in_bias;
-       op_a_bypass <= flow_in_pixel;
+       op_a_bypass <= op_a_bypass_nmac;
        if(ld_res) result <= result_w;
        sig_out_r <= sig_out;
        shift_r <= shifted_half;
+       shift_r2 <= shift_r;
+       sig_t1_r <= sig_t1;
+       sig_t2_r <= sig_t2;
      end
 
    //double-precision bias
    assign adder = {{DATAPATH_W{1'b0}}, bias_reg};
 
-   //4-stage multiplier (DSP48E2 template)
-   mul_4stage # (
-     .DATA_W(DATAPATH_W)
-   ) mul (
-     //control
-     .clk(clk),
-     .ld_acc(ld_acc),
-     //data
-     .inA(flow_in_pixel),
-     .inB(flow_in_weight),
-     .inC(adder_w),
-     .out(dsp_out)
-   );
+   genvar i;
+   generate
+      for(i=0;i<N_MACS;i=i+1) begin : macs
 
-   //select accumulation initial value
-   assign adder_w = bias ? adder << shift : {2*DATAPATH_W{1'b0}};
+	 if (i==0) begin : bias_blk
+	    //select accumulation initial value - add only bias to first mac
+	    assign adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W] = bias ? adder << shift : {2*DATAPATH_W{1'b0}};
+	 end else begin : bias_blk
+	    //accumulation initial value - always 0
+	    assign adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W] = {2*DATAPATH_W{1'b0}};
+	 end
+	 //4-stage multiplier (DSP48E2 template)
+	 mul_4stage # (
+		       .DATA_W(DATAPATH_W)
+		       ) mul (
+			      //control
+			      .clk(clk),
+			      .ld_acc(ld_acc),
+			      //data
+			      .inA(flow_in_pixel[i*DATAPATH_W +: DATAPATH_W]),
+			      .inB(flow_in_weight[i*DATAPATH_W +: DATAPATH_W]),
+			      .inC(adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W]),
+			      .out(dsp_out[i*2*DATAPATH_W +: 2*DATAPATH_W])
+			      );	 
+      end
+   endgenerate
 
+   // add dsp outputs
+   adder_N # (
+	      .DATA_W(2*DATAPATH_W),
+	      .N_INPUTS(N_MACS)
+	      ) dsp_adder (
+			   .clk(clk),
+			   .rst(rst),
+			   // data
+			   .data_in(dsp_out),
+			   .data_out(conv_res)
+			   );
+
+   
    //apply shift to half precision
-   assign shifted = dsp_out >> shift;
+   assign shifted = conv_res >> shift;
    assign shifted_half = shifted[DATAPATH_W-1:0];
 
    //leaky activation function
@@ -110,11 +154,11 @@ module xyolo # (
          sig_t2 = sig_in >> 2;
       end
    end
-   assign sig_adder = sig_t1 + sig_t2;
-   assign sig_out = shifted_half[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
+   assign sig_adder = sig_t1_r + sig_t2_r;
+   assign sig_out = shift_r[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
 
    //choose activation function
-   assign act_fnc = leaky ? leaky_out : sigmoid ? sig_out_r : shift_r;
+   assign act_fnc = leaky ? leaky_out : sigmoid ? sig_out_r : shift_r2;
 
    //maxpooling
    assign bypass_w = bypass ? op_a_bypass : act_fnc;

@@ -31,12 +31,26 @@
 #endif //ifndef PCSIM
 
 //global constants
-#define NTW_IN_C 3
+#if (nYOLOmacs==1)
+  #define NTW_IN_C 3
+  #define NTW_IN_P_OFF 10
+  #define NTW_IN_W_OFF 5
+#elif ((nYOLOmacs==2)||(nYOLOmacs==4))
+  #define NTW_IN_C 4
+  #define NTW_IN_P_OFF 8
+  #define NTW_IN_W_OFF 12
+#else //nYOLOmacs==8
+  #define NTW_IN_C 8
+  #define NTW_IN_P_OFF 0
+  #define NTW_IN_W_OFF 8
+#endif
+
 #define NTW_IN_W 416
 #define NTW_IN_KER_SIZE 3
 #define NTW_IN_NUM_KER 16
-#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)) //+5 to be 32 byte aligned
-#define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+10)) //+10 to be 32 byte aligned
+#define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)) //+W_OFF to be 32 byte aligned
+#define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)) //+P_OFF to be 32 byte aligned
+
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
 #define TILE_W 208 //any value divisor of 416
 
@@ -113,43 +127,42 @@ void conv() {
   /////////////////////////////////////////////////////////////////////////
   //                          CONFIGURATIONS
   /////////////////////////////////////////////////////////////////////////
-
   // configure xyolo_read vreads to read bias and kernel from DDR
-  versat.yread.setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5); //+5 so each filter is 32 byte aligned
-  versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)); //+4 so each filter is 32 byte aligned
-  versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5)/16); //+4 so each filter is 32 byte aligned
+  versat.dma.yread_setLen(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF); //+W_OFF so each filter is 32 byte aligned
+  versat.yread.setOffset(2*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)); //+W_OFF so each filter is 32 byte aligned
+  versat.yread.setExtPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)/16); //+W_OFF so each filter is 32 byte aligned
   versat.yread.setExtIncr(16);
   versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read tile from input fm
-  versat.ywrite.read.setLen((NTW_IN_C*(NTW_IN_W+2)+10)*(nSTAGES*2+2)/16-1); //+10 so each line is 32 byte aligned
-  versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+10))); //+10 so each line is 32 byte aligned
-  versat.ywrite.read.setExtPer((NTW_IN_C*(NTW_IN_W+2)+10)*(NTW_IN_KER_SIZE+1)/16); //+10 so each line is 32 byte aligned
+  versat.dma.ywrite_read_setLen((NTW_IN_C*(NTW_IN_W+2)+NTW_IN_P_OFF)*(nSTAGES*2+2)/16-1); //+P_OFF so each line is 32 byte aligned
+  versat.ywrite.read.setOffset(2*(2*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF))); //+P_OFF so each line is 32 byte aligned
+  versat.ywrite.read.setExtPer(((NTW_IN_C*(NTW_IN_W+2)+NTW_IN_P_OFF)*(NTW_IN_KER_SIZE+1))/16); //+P_OFF so each line is 32 byte aligned
   versat.ywrite.read.setExtIncr(16);
   versat.ywrite.read.setPingPong(1);
 
   // configure xyolo_read vreads to write 1 + 3x3x3 kernel to flow_outs
-  versat.yread.setIntPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 27
+  versat.yread.setIntPer((NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C)/nYOLOmacs); // (3*3*(3+1))/nYOLOmacs
   versat.yread.setIntIncr(1);
   versat.yread.setIntIter(2*TILE_W); //x2 due to maxpool // 8
-  versat.yread.setIntShift(-NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // -27
+  versat.yread.setIntShift(-(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C)/nYOLOmacs); // -(3*3*(3+1))/nYOLOmacs
 
   // configure xyolo_write vread to write FM tile to xyolo
-  versat.ywrite.read.setIntPer(NTW_IN_KER_SIZE*NTW_IN_C); // 9
+  versat.ywrite.read.setIntPer(NTW_IN_KER_SIZE*(NTW_IN_C/nYOLOmacs)); // 3*(3+1)/nYOLOmacs
   versat.ywrite.read.setIntIncr(1);
   versat.ywrite.read.setIntIter(NTW_IN_KER_SIZE); // 3
-  versat.ywrite.read.setIntShift((NTW_IN_W+2)*NTW_IN_C+10 - NTW_IN_KER_SIZE*NTW_IN_C); //+2 due to padding // 9
+  versat.ywrite.read.setIntShift((((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)/nYOLOmacs) - NTW_IN_KER_SIZE*(NTW_IN_C/nYOLOmacs)); //+2 due to padding // 9
   versat.ywrite.read.setIntPer2(2);
-  versat.ywrite.read.setIntIncr2(NTW_IN_C); // 3
+  versat.ywrite.read.setIntIncr2(NTW_IN_C/nYOLOmacs); // 3
   versat.ywrite.read.setIntIter2(2);
-  versat.ywrite.read.setIntShift2((NTW_IN_W+2)*NTW_IN_C+10 - 2*NTW_IN_C); //+2 due to padding // 12
+  versat.ywrite.read.setIntShift2((((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)/nYOLOmacs) - 2*(NTW_IN_C/nYOLOmacs)); //+2 due to padding // 12
   versat.ywrite.read.setIntPer3(TILE_W/2); // /2 due to maxpool //2
-  versat.ywrite.read.setIntIncr3(2*NTW_IN_C); // 6
+  versat.ywrite.read.setIntIncr3(2*(NTW_IN_C/nYOLOmacs)); // 6
   versat.ywrite.read.setIntIter3(1);
 
   // configure xyolo to perform convolution + maxpool
   versat.ywrite.yolo.setIter(2*TILE_W); //x2 due to maxpool // 8
-  versat.ywrite.yolo.setPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 27
+  versat.ywrite.yolo.setPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*(NTW_IN_C/nYOLOmacs)); // 27
   versat.ywrite.yolo.setShift(10);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);
@@ -158,12 +171,12 @@ void conv() {
   // configure xwrite to write convolution results
   versat.ywrite.write.setIntDuty(1);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2); // 1+5-2 = 4
-  versat.ywrite.write.setIntPer(4*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C); // 108
+  versat.ywrite.write.setIntPer(4*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*(NTW_IN_C/nYOLOmacs)); // 108
   versat.ywrite.write.setIntIncr(1);
   versat.ywrite.write.setIntIter(TILE_W/2); // 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.ywrite.write.setLen(TILE_W/2-1); //send 16 values per stage
+  versat.dma.ywrite_write_setLen(TILE_W/2-1); //send 16 values per stage
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -175,48 +188,48 @@ void conv() {
 
     // read filter
     versat.yread.setExtIter(1);
-    versat.yread.setExtAddr(weights_ba + 2*l*nYOLOvect*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + 5));
+    versat.yread.setExtAddr(weights_ba + 2*l*nYOLOvect*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF));
     versat.yread.setBiasExtAddr(bias_ba + 2*l*nYOLOvect);
 
-  #ifdef SIM
+#ifdef SIM
     for(k = 0; k < k_delta; k++) {
-       uart_printf("%d\n", k);
-  #else
-    for(k = 0; k < NTW_IN_W/(2*nSTAGES); k++) { //2 due to maxpool
-  #endif
+      uart_printf("%d\n", k);
+#else
+      for(k = 0; k < NTW_IN_W/(2*nSTAGES); k++) { //2 due to maxpool
+#endif
 
-      // configure xyolo_write vread to read tile from input fm
-      versat.ywrite.read.setExtIter(1);
-      versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*((NTW_IN_W+2)*NTW_IN_C+10)*nSTAGES));
+	// configure xyolo_write vread to read tile from input fm
+	versat.ywrite.read.setExtIter(1);
+	versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)*nSTAGES));
 
-      for(j = 0; j < NTW_IN_W/TILE_W; j++) {
-      //for(j = 0; j < 1; j++) {
+	for(j = 0; j < NTW_IN_W/TILE_W; j++) {
+	  //for(j = 0; j < 1; j++) {
 
-        // configure xyolo_write vread start
-        versat.ywrite.read.setIntStart(j*TILE_W*NTW_IN_C);
+	  // configure xyolo_write vread start
+	  versat.ywrite.read.setIntStart(j*TILE_W*(NTW_IN_C/nYOLOmacs));
 
-        // configure xyolo_write vwrite to write result back to DDR
-        versat.ywrite.write.setExtAddr(LAYER_3_BASE_ADDRESS + 2*((NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
+	  // configure xyolo_write vwrite to write result back to DDR
+	  versat.ywrite.write.setExtAddr(LAYER_3_BASE_ADDRESS + 2*((NTW_IN_W/2+2+1)*NTW_IN_NUM_KER + k*(NTW_IN_W/2+2)*NTW_IN_NUM_KER*nSTAGES + j*(TILE_W/2)*NTW_IN_NUM_KER + l*nYOLOvect));
 
-        // wait until done
-        while(versat.done()==0);
-      #ifdef TIME_RUN
-        end = (unsigned int) timer_get_count(TIMER_BASE);
-        if(l != 0 || k != 0 || j != 0) uart_printf("%d\n", (end - start)*8);
-      #endif
+	  // wait until done
+	  while(versat.done()==0);
+#ifdef TIME_RUN
+	  end = (unsigned int) timer_get_count(TIMER_BASE);
+	  if(l != 0 || k != 0 || j != 0) uart_printf("%d\n", (end - start)*8);
+#endif
 
-        // run configuration
-        versat.run();
-      #ifdef TIME_RUN
-        start = (unsigned int) timer_get_count(TIMER_BASE);
-      #endif
+	  // run configuration
+	  versat.run();
+#ifdef TIME_RUN
+	  start = (unsigned int) timer_get_count(TIMER_BASE);
+#endif
 
-        // stop reading from DDR
-        versat.ywrite.read.setExtIter(0);
-        versat.yread.setExtIter(0);
+	  // stop reading from DDR
+	  versat.ywrite.read.setExtIter(0);
+	  versat.yread.setExtIter(0);
+	}
       }
     }
-  }
 
   // clear configs
   versat.clear();
@@ -235,7 +248,7 @@ void conv() {
     for(j = 0; j < NTW_IN_W/2+2; j++)
       for(k = 0; k < NTW_IN_NUM_KER; k++)
         if(fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] != fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", LAYER_3_BASE_ADDRESS + 2*(i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k), fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF);  }
+          uart_printf("(%x) res = %x, act = %x (%x)\n", LAYER_3_BASE_ADDRESS + 2*(i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k), fp_data[i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k] & 0xFFFF, LAYER_3_BASE_ADDRESS + 2*(DATA_LAYER_3 + i*(NTW_IN_W/2+2)*NTW_IN_NUM_KER + j*NTW_IN_NUM_KER + k));  }
 #endif
 }
 
@@ -305,7 +318,7 @@ int main(int argc, char **argv) {
   versat.yread.setExtAddr(1);
   versat.yread.setOffset(2);
   versat.yread.setPingPong(1);
-  versat.yread.setLen(3);
+  versat.dma.yread_setLen(3);
   versat.yread.setIntAddr(4);
   versat.yread.setExtIter(5);
   versat.yread.setExtPer(6);
@@ -324,7 +337,7 @@ int main(int argc, char **argv) {
   // vwrite
   versat.ywrite.write.setExtAddr(1);
   versat.ywrite.write.setOffset(2);
-  versat.ywrite.write.setLen(3);
+  versat.dma.ywrite_write_setLen(3);
   versat.ywrite.write.setIntAddr(4);
   versat.ywrite.write.setExtIter(5);
   versat.ywrite.write.setExtPer(6);
@@ -340,7 +353,7 @@ int main(int argc, char **argv) {
   // vread
   versat.ywrite.read.setExtAddr(16);
   versat.ywrite.read.setOffset(17);
-  versat.ywrite.read.setLen(18);
+  versat.dma.ywrite_read_setLen(18);
   versat.ywrite.read.setIntAddr(19);
   versat.ywrite.read.setExtIter(20);
   versat.ywrite.read.setExtPer(21);

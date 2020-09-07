@@ -2,16 +2,23 @@
 
 `include "system.vh"
 `include "iob_uart.vh"
+`include "xversat.vh"
 
 //constants
 `define STRINGIFY(x) `"x`"
 `define OFFSET (2**`FIRM_ADDR_W)
-`define NTW_IN_C 3
+`define NTW_IN_C (3 + (`nYOLOmacs!=1) + (4*(`nYOLOmacs==8)))
+// `define NTW_IN_C (3+1)
+
 `define NTW_IN_W 416
 `define NTW_IN_KER_SIZE 3
 `define NTW_IN_NUM_KER 16
-`define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + 5)) //+5 so each filter is 32 byte aligned
-`define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+10)) //+10 so each line is 32 byte aligned
+
+`define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + (5 + ((`nYOLOmacs!=1)*7)) -(4*(`nYOLOmacs==8)) )) //+5 so each filter is 32 byte aligned
+`define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+ (10 + (-2*(`nYOLOmacs!=1)))*(`nYOLOmacs!=8) )) //+10 so each line is 32 byte aligned
+// `define WEIGHT_SIZE (`NTW_IN_NUM_KER*(1 + `NTW_IN_KER_SIZE*`NTW_IN_KER_SIZE*`NTW_IN_C + 12)) //+5 so each filter is 32 byte aligned
+// `define DATA_LAYER_1 ((`NTW_IN_W+2)*((`NTW_IN_W+2)*`NTW_IN_C+8)) //+10 so each line is 32 byte aligned
+
 `define DATA_LAYER_3 ((`NTW_IN_W/2+2)*(`NTW_IN_W/2+2)*`NTW_IN_NUM_KER)
 `define FILE_SIZE ((`OFFSET + 2*(`WEIGHT_SIZE + `DATA_LAYER_1 + 2*`DATA_LAYER_3))/(`MIG_BUS_W/8))
 
@@ -62,7 +69,7 @@ module new_versat_test_tb;
    integer                i;
 
    //define parameters
-   parameter file_ddr = {"../../../../new_versat_", `STRINGIFY(`MIG_BUS_W), ".hex"};
+   parameter file_ddr = {"../../../../new_versat_", `STRINGIFY(`MIG_BUS_W), "_x", `STRINGIFY(`nYOLOmacs), "macs.hex"};
    parameter file_size = `FILE_SIZE;
    
 

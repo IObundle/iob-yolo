@@ -292,15 +292,6 @@ module system
 
 `ifdef USE_DDR
 
- `ifdef USE_NEW_VERSAT
-   // Connect Versat to DMA
-   wire [2:0]                   dbus_ready, dbus_valid;
-   wire [3*`MIG_BUS_W-1:0]     	dbus_wdata, dbus_rdata;
-   wire [3*`IO_ADDR_W-1:0]      dbus_addr;
-   wire [3*`MIG_BUS_W/8-1:0]   	dbus_wstrb;
-   wire [2*`AXI_LEN_W-1:0] 	dbus_len;
- `endif
-
    //
    // EXTERNAL DDR MEMORY
    //
@@ -318,61 +309,50 @@ module system
         //data bus
         .d_req                (ext_mem_d_req),
         .d_resp               (ext_mem_d_resp),
-
-`ifdef USE_NEW_VERSAT
-	//Versat bus
-	.databus_valid        (dbus_valid),
-	.databus_addr         (dbus_addr),
-	.databus_wdata        (dbus_wdata),
-	.databus_wstrb        (dbus_wstrb),
-	.databus_rdata        (dbus_rdata),
-	.databus_ready        (dbus_ready),
-	.dma_len	      (dbus_len),
-`endif
 	
         //AXI INTERFACE 
-        //address write
-        .axi_awid(m_axi_awid), 
-        .axi_awaddr(m_axi_awaddr), 
-        .axi_awlen(m_axi_awlen), 
-        .axi_awsize(m_axi_awsize), 
-        .axi_awburst(m_axi_awburst), 
-        .axi_awlock(m_axi_awlock), 
-        .axi_awcache(m_axi_awcache), 
-        .axi_awprot(m_axi_awprot),
-        .axi_awqos(m_axi_awqos), 
-        .axi_awvalid(m_axi_awvalid), 
-        .axi_awready(m_axi_awready), 
+        // Address write
+        .axi_awid(m_axi_awid[1*1+:1]), 
+        .axi_awaddr(m_axi_awaddr[1*`DDR_ADDR_W+:`DDR_ADDR_W]), 
+        .axi_awlen(m_axi_awlen[1*8+:8]), 
+        .axi_awsize(m_axi_awsize[1*3+:3]), 
+        .axi_awburst(m_axi_awburst[1*2+:2]), 
+        .axi_awlock(m_axi_awlock[1*1+:1]), 
+        .axi_awcache(m_axi_awcache[1*4+:4]), 
+        .axi_awprot(m_axi_awprot[1*3+:3]),
+        .axi_awqos(m_axi_awqos[1*4+:4]), 
+        .axi_awvalid(m_axi_awvalid[1*1+:1]), 
+        .axi_awready(m_axi_awready[1*1+:1]),
         //write
-        .axi_wdata(m_axi_wdata), 
-        .axi_wstrb(m_axi_wstrb), 
-        .axi_wlast(m_axi_wlast), 
-        .axi_wvalid(m_axi_wvalid), 
-        .axi_wready(m_axi_wready), 
+        .axi_wdata(m_axi_wdata[1*`MIG_BUS_W+:`MIG_BUS_W]), 
+        .axi_wstrb(m_axi_wstrb[1*`MIG_BUS_W/8+:`MIG_BUS_W/8]), 
+        .axi_wlast(m_axi_wlast[1*1+:1]), 
+        .axi_wvalid(m_axi_wvalid[1*1+:1]), 
+        .axi_wready(m_axi_wready[1*1+:1]), 
         //write response
-        // .axi_bid(m_axi_bid), 
-        .axi_bresp(m_axi_bresp), 
-        .axi_bvalid(m_axi_bvalid), 
-        .axi_bready(m_axi_bready), 
+        // .axi_bid(axi_bid), 
+        .axi_bresp(m_axi_bresp[1*2+:2]), 
+        .axi_bvalid(m_axi_bvalid[1*1+:1]), 
+        .axi_bready(m_axi_bready[1*1+:1]), 
         //address read
-        .axi_arid(m_axi_arid), 
-        .axi_araddr(m_axi_araddr), 
-        .axi_arlen(m_axi_arlen), 
-        .axi_arsize(m_axi_arsize), 
-        .axi_arburst(m_axi_arburst), 
-        .axi_arlock(m_axi_arlock), 
-        .axi_arcache(m_axi_arcache), 
-        .axi_arprot(m_axi_arprot), 
-        .axi_arqos(m_axi_arqos), 
-        .axi_arvalid(m_axi_arvalid), 
-        .axi_arready(m_axi_arready), 
+        .axi_arid(m_axi_arid[1*1+:1]), 
+        .axi_araddr(m_axi_araddr[1*`DDR_ADDR_W+:`DDR_ADDR_W]), 
+        .axi_arlen(m_axi_arlen[1*8+:8]), 
+        .axi_arsize(m_axi_arsize[1*3+:3]), 
+        .axi_arburst(m_axi_arburst[1*2+:2]), 
+        .axi_arlock(m_axi_arlock[1*1+:1]), 
+        .axi_arcache(m_axi_arcache[1*4+:4]), 
+        .axi_arprot(m_axi_arprot[1*3+:3]), 
+        .axi_arqos(m_axi_arqos[1*4+:4]), 
+        .axi_arvalid(m_axi_arvalid[1*1+:1]), 
+        .axi_arready(m_axi_arready[1*1+:1]), 
         //read 
-        // .axi_rid(m_axi_rid), 
-        .axi_rdata(m_axi_rdata), 
-        .axi_rresp(m_axi_rresp), 
-        .axi_rlast(m_axi_rlast), 
-        .axi_rvalid(m_axi_rvalid),  
-        .axi_rready(m_axi_rready)
+        //.axi_rid(axi_rid), 
+        .axi_rdata(m_axi_rdata[1*`MIG_BUS_W+:`MIG_BUS_W]), 
+        .axi_rresp(m_axi_rresp[1*2+:2]), 
+        .axi_rlast(m_axi_rlast[1*1+:1]), 
+        .axi_rvalid(m_axi_rvalid[1*1+:1]),  
+        .axi_rready(m_axi_rready[1*1+:1])
         );
 `endif
 

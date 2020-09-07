@@ -27,7 +27,7 @@ s.bind((interface, 0))
 
 #Open input file
 print("\nStarting input file transmission...")
-input_filename = "../yolo_hw_in_x4.bin"
+input_filename = "../pre_cnn_in.bin"
 f_input = open(input_filename, 'rb')
 
 #Frame parameters
@@ -74,7 +74,7 @@ print("input file transmitted with %d errors..." %(count_errors))
 
 #Open output image files
 print("\nStarting reception of result...")
-output_filename = '../yolo_hw_out.bin'
+output_filename = '../pre_cnn_out.bin'
 f_output = open(output_filename, "rb")
 
 #Reset counters
@@ -116,4 +116,4 @@ for j in range(num_frames_output+1):
         
 #Close file
 f_output.close()
-print("Result received with %d errors..." %(count_errors))
+print("Result received with %d errors...\n" %(count_errors))

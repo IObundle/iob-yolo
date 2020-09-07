@@ -5,8 +5,8 @@
 #define MEMGET(base, location)        (*((volatile int*) (base + (sizeof(int)) * location)))
 
 //constants
-#define RUN (1<<(ADDR_W-2-1-N_SLAVES_W-2-1)) //2 -> picoRV, 1 -> STAGE_W
-#define CLEAR (RUN + (1<<(ADDR_W-2-1-N_SLAVES_W-2-1-1)))
+#define RUN (1<<(ADDR_W-2-1-N_SLAVES_W-2-2)) //2 -> picoRV, 1 -> STAGE_W
+#define CLEAR (RUN + (1<<(ADDR_W-2-1-N_SLAVES_W-2-2-1)))
 
 //
 // VERSAT CLASSES
@@ -34,9 +34,6 @@ class CYoloRead {
     }
     void setPingPong(int pp) {
       MEMSET(base, XYOLO_READ_CONF_PP, pp);
-    }
-    void setLen(int len) {
-      MEMSET(base, XYOLO_READ_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, XYOLO_READ_CONF_INT_ADDR, intAddr);
@@ -102,9 +99,6 @@ class CRead {
     }
     void setPingPong(int pp) {
       MEMSET(base, VREAD_CONF_PP, pp);
-    }
-    void setLen(int len) {
-      MEMSET(base, VREAD_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VREAD_CONF_INT_ADDR, intAddr);
@@ -182,9 +176,6 @@ class CWrite {
     }
     void setOffset(int offset) {
       MEMSET(base, VWRITE_CONF_OFFSET, offset);
-    }
-    void setLen(int len) {
-      MEMSET(base, VWRITE_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VWRITE_CONF_INT_ADDR, intAddr);
@@ -289,12 +280,39 @@ class CYoloWrite {
     }
 };//end class CYoloWrite
 
+class CDma {
+
+  public:
+    int base;
+  
+    //Default constructor
+    CDma(){
+    }
+
+    //Constructor with an associated base
+    CDma(int base) {
+      this->base = base;
+    }
+
+    //Methods to set config parameters
+    void yread_setLen(int len) {
+      MEMSET(base, DMA_XYOLO_READ_CONF_LEN, len);
+    }
+    void ywrite_read_setLen(int len) {
+      MEMSET(base, DMA_XYOLO_WRITE_READ_CONF_LEN, len);
+    }
+    void ywrite_write_setLen(int len) {
+      MEMSET(base, DMA_XYOLO_WRITE_WRITE_CONF_LEN, len);
+    }  
+};//end class CDma
+  
 class CVersat {
 
   public:
     int versat_base;
     CYoloRead yread;
     CYoloWrite ywrite;
+    CDma dma;
 
     //Default constructor
     CVersat() {
@@ -307,7 +325,8 @@ class CVersat {
 
       //Init stages
       yread = CYoloRead(base);
-      ywrite = CYoloWrite(base + (1<<(ADDR_W-2-1-N_SLAVES_W)));
+      ywrite = CYoloWrite(base + (1<<(ADDR_W-2-1-N_SLAVES_W-1)));
+      dma = CDma(base + (1<<(ADDR_W-2-1-N_SLAVES_W)));
     }
 
     //Methods
