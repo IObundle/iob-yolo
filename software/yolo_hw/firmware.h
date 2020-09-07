@@ -6,10 +6,14 @@
   #define LAYER_1_C 3
   #define LAYER_1_P_OFF 10
   #define LAYER_1_W_OFF 5
-#else
+#elif ((nYOLOmacs==2)||(nYOLOmacs==4))
   #define LAYER_1_C 4
   #define LAYER_1_P_OFF 8
   #define LAYER_1_W_OFF 12
+#else //nYOLOmacs==8
+  #define LAYER_1_C 8
+  #define LAYER_1_P_OFF 0
+  #define LAYER_1_W_OFF 8
 #endif
 #define DATA_LAYER_1 ((LAYER_1_W+2)*((LAYER_1_W+2)*LAYER_1_C+LAYER_1_P_OFF))
 #define WEIGHTS_LAYER_1 (LAYER_1_NUM_KER+LAYER_1_NUM_KER*(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C+LAYER_1_W_OFF))
