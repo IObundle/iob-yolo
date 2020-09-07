@@ -12,14 +12,26 @@
 #include <string.h>
 #include <stdlib.h>
 
+//layer 1 padding
+#if nYOLOmacs == 1
+  #define IMG_C 3
+  #define LAYER_1_P_OFF 10
+  #define C_PADD 0
+#else
+  #define IMG_C 4
+  #define LAYER_1_P_OFF 8
+  #define C_PADD 1
+#endif
+
 //input image constants
 #define IMG_W 768
 #define IMG_H 576
-#define IMG_C 4
 #define NEW_W 416
 #define NEW_H ((IMG_H*NEW_W)/IMG_W)	//312
+#define EXTRA_H ((NEW_W-NEW_H)/2) 	//52
 #define IMAGE_INPUT (IMG_W*IMG_H*IMG_C) //already 32-byte aligned
 #define NETWORK_INPUT_AUX (NEW_W*IMG_H*IMG_C)
+#define DATA_LAYER_1 ((NEW_W+2)*((NEW_W+2)*IMG_C+LAYER_1_P_OFF))
 
 //resize constants
 #define h_scale ((float)(IMG_H-1)/(NEW_H-1))
@@ -45,7 +57,7 @@ int16_t iy[NEW_H];
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((ix_size + dx_size + dy_size + IMAGE_INPUT)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (NETWORK_INPUT_AUX*2)
+#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2)
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -72,13 +84,38 @@ void prepare_resize() {
   float val;
 
   //loop to initialize iy
-  for(i = 0; i < NEW_H; i++) {
-  #ifdef SIM
+#ifdef SIM
+  for(i = 0; i < 4; i++) {
     uart_printf("%d\n", i);
-  #endif
+#else
+  for(i = 0; i < NEW_H; i++) {
+#endif
     val = i*h_scale;
     iy[i] = (int) val;
   }
+}
+
+//reset certain DDR positions to zero due to padding
+void reset_DDR() {
+
+  //local variables
+  int i;
+  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + NETWORK_INPUT_AUX;
+
+  //input network
+  for(i = 0; i < DATA_LAYER_1; i++) fp_data[i] = 0;
+}
+
+//fill grey CNN input image (except padding)
+void fill_grey() {
+  int i, j, k;
+  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
+  //pass first padding line and padding column
+  fp_data += NETWORK_INPUT_AUX + (NEW_W+2)*IMG_C + LAYER_1_P_OFF + IMG_C;
+  for(j = 0; j < NEW_W; j++)
+    for(k = 0; k < NEW_W; k++) 
+      for(i = 0; i < IMG_C-C_PADD; i++)
+	fp_data[j*((NEW_W+2)*IMG_C + LAYER_1_P_OFF) + k*IMG_C + i] = 0x0080;
 }
 
 //receive weigths and resized padded image
@@ -147,13 +184,42 @@ void width_resize() {
   }
 }
 
+//height resize -> 576 to 312
+void height_resize() {
+  
+  //local variables
+  int16_t r, c, k;
+  int32_t mul;
+  int16_t * dy = (int16_t *) dy_BASE_ADDRESS;
+  int16_t * im_in = (int16_t *) DATA_BASE_ADDRESS;
+  int16_t * im_out = (int16_t *) DATA_BASE_ADDRESS;
+  //pass extra and first padding lines and padding column
+  im_out += NETWORK_INPUT_AUX + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1) + IMG_C;
+
+  //perform height reduction
+#ifdef SIM
+  for(r = 0; r < 2; r++) {
+    uart_printf("%d\n", r);
+#else
+  for(r = 0; r < NEW_H; r++) {
+#endif
+    for(c = 0; c < NEW_W; c++) {
+      for(k = 0; k < IMG_C; k++) {
+        mul = (int32_t)((int32_t)dy[2*r]*(int32_t)im_in[iy[r]*NEW_W*IMG_C + c*IMG_C + k]); //Q2.14 * Q1.15 = Q3.29
+	mul += (int32_t)((int32_t)dy[2*r+1]*(int32_t)im_in[(iy[r]+1)*NEW_W*IMG_C + c*IMG_C + k]); //Q3.29
+	im_out[r*((NEW_W+2)*IMG_C+LAYER_1_P_OFF) + c*IMG_C + k] = (int16_t)(mul >> 21);
+      }
+    }
+  }
+}
+
 //send results back
 void send_data() {
 
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS;
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*NETWORK_INPUT_AUX;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -189,10 +255,20 @@ int main(int argc, char **argv) {
   //send init message
   uart_printf("\nPRE CNN\n\n");
 
+  //fill CNN input with grey
+#ifndef SIM
+  uart_printf("\nResetting DDR to zero and grey...\n");
+  start = timer_time_us(TIMER_BASE);
+  reset_DDR();
+  fill_grey();
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+#endif
+
   //initialize iy
   uart_printf("\nPreparing resize...\n");
   start = timer_time_us(TIMER_BASE);
-  //prepare_resize();
+  prepare_resize();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
@@ -204,7 +280,6 @@ int main(int argc, char **argv) {
 
   //receive data via ethernet
   rcv_data();
-#endif
 
   //width resize
   uart_printf("\nWidth resizing...\n");
@@ -212,17 +287,26 @@ int main(int argc, char **argv) {
   width_resize();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
+#endif
+
+  //height resize
+  uart_printf("\nHeight resizing...\n");
+  start = timer_time_us(TIMER_BASE);
+  height_resize();
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
 
 #ifdef SIM
   //verify results
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
+  fp_data += NETWORK_INPUT_AUX + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1);;
   int i, j, k;
   uart_printf("\nVerifying...\n");
   for(i = 0; i < 2; i++)
-    for(j = 0; j < NEW_W; j++)
+    for(j = 0; j < NEW_W+2; j++)
       for(k = 0; k < IMG_C; k++)
-        if(fp_data[i*NEW_W*IMG_C + j*IMG_C + k] != fp_data[NETWORK_INPUT_AUX + i*NEW_W*IMG_C + j*IMG_C + k])
-	  uart_printf("(%d) res = %x, act = %x\n", i*NEW_W*IMG_C + j*IMG_C + k, fp_data[i*NEW_W*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[NETWORK_INPUT_AUX + i*NEW_W*IMG_C + j*IMG_C + k] & 0xFFFF);   
+        if(fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] != fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k])
+	  uart_printf("(%d) res = %x, act = %x\n", i*(NEW_W+2)*IMG_C + j*IMG_C + k, fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF);   
 #endif
 
 #ifndef SIM

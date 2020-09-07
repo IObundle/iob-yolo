@@ -7,6 +7,9 @@
 //DDR initial constants
 `define OFFSET (2**`FIRM_ADDR_W)
 
+//layer 1 padding
+`define LAYER_1_P_OFF 8
+
 //Input image
 `define IMG_W 768
 `define IMG_H 576
@@ -15,6 +18,7 @@
 `define NEW_H ((`IMG_H*`NEW_W)/`IMG_W)
 `define IMAGE_INPUT (2*(`IMG_W*`IMG_H*`IMG_C)) //already 32-byte aligned
 `define NETWORK_INPUT_AUX (2*(`NEW_W*`IMG_H*`IMG_C))
+`define DATA_LAYER_1 (2*((`NEW_W+2)*((`NEW_W+2)*`IMG_C+`LAYER_1_P_OFF)))
 
 //resize constants
 `define ix_size (2*(`NEW_W*2))
@@ -23,7 +27,7 @@
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + 2*`NETWORK_INPUT_AUX)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
 
 module pre_cnn_tb;
 
