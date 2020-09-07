@@ -47,9 +47,6 @@ module axi_dma #(
     	output [N_IFACES*`MIG_BUS_W-1:0]  databus_rdata,
     	output reg [N_IFACES-1:0] 	  databus_ready,
 
-        // DMA configuration
-	input [2*`AXI_LEN_W-1:0] 	  len,
-
 	// AXI Interface
 	// Master Interface Write Address
 	output wire [`AXI_ID_W-1:0] 	  m_axi_awid,
@@ -252,7 +249,6 @@ module axi_dma #(
 		    .rdata    (read_s_resp[`rdata_MIG_BUS(0)]),
 		    .ready    (read_s_resp[`ready_MIG_BUS(0)]),
 		    // DMA configuration
-		    // .len      (len[`AXI_LEN_W-1:0]),
 		    .len      (dma_r_len),
 		    //address read
 		    .m_axi_arid(m_axi_arid), 
@@ -288,7 +284,6 @@ module axi_dma #(
 	    .wstrb    (databus_wstrb[3*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8]),
 	    .ready    (databus_ready[2]),
 	    // DMA configurations
-	    // .len	(len[2*`AXI_LEN_W-1:`AXI_LEN_W]),
 	    .len        (ywrite_write_len_shadow),
 	    // Address write
 	    .m_axi_awid(m_axi_awid), 

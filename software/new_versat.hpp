@@ -35,9 +35,6 @@ class CYoloRead {
     void setPingPong(int pp) {
       MEMSET(base, XYOLO_READ_CONF_PP, pp);
     }
-    void setLen(int len) {
-      MEMSET(base, XYOLO_READ_CONF_LEN, len);
-    }
     void setIntAddr(int intAddr) {
       MEMSET(base, XYOLO_READ_CONF_INT_ADDR, intAddr);
     }
@@ -102,9 +99,6 @@ class CRead {
     }
     void setPingPong(int pp) {
       MEMSET(base, VREAD_CONF_PP, pp);
-    }
-    void setLen(int len) {
-      MEMSET(base, VREAD_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VREAD_CONF_INT_ADDR, intAddr);
@@ -182,9 +176,6 @@ class CWrite {
     }
     void setOffset(int offset) {
       MEMSET(base, VWRITE_CONF_OFFSET, offset);
-    }
-    void setLen(int len) {
-      MEMSET(base, VWRITE_CONF_LEN, len);
     }
     void setIntAddr(int intAddr) {
       MEMSET(base, VWRITE_CONF_INT_ADDR, intAddr);

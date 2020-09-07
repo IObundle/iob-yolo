@@ -94,12 +94,6 @@ module xversat # (
    wire [3*`MIG_BUS_W-1:0]     	databus_wdata, databus_rdata;
    wire [3*`IO_ADDR_W-1:0]      databus_addr;
    wire [3*`MIG_BUS_W/8-1:0]   	databus_wstrb;
-   wire [2*`AXI_LEN_W-1:0] 	dma_len;
-
-
-   // select DMA len
-   wire [`AXI_LEN_W-1:0] 		read_dma_len, write_dma_len;
-   assign				dma_len[`AXI_LEN_W-1:0] = databus_valid[0] ? read_dma_len :  write_dma_len;
 
    // split request interface
    wire [`REQ_W-1:0]    		m_req;
@@ -166,9 +160,7 @@ module xversat # (
       .databus_wstrb(databus_wstrb[DATABUS_W/8-1:0]),
       // output data
       .flow_out_bias(flow_bias),
-      .flow_out_weight(flow_weight),
-      // dma burst
-      .dma_len(read_dma_len)
+      .flow_out_weight(flow_weight)
    );
 
    // instantiate xyolo_write FU
@@ -196,9 +188,7 @@ module xversat # (
       .databus_wstrb(databus_wstrb[3*DATABUS_W/8-1:DATABUS_W/8]),
       // output data
       .flow_in_bias(flow_bias),
-      .flow_in_weight(flow_weight),
-      // dma burst
-      .dma_len({dma_len[2*`AXI_LEN_W-1:`AXI_LEN_W], write_dma_len})
+      .flow_in_weight(flow_weight)
    );
 
    //
@@ -225,8 +215,6 @@ module xversat # (
 		    .databus_wstrb    (databus_wstrb),
 		    .databus_rdata    (databus_rdata),
 		    .databus_ready    (databus_ready),
-		    // DMA configuration
-		    .len      (dma_len),
 		    //AXI Interface
 		    // Address write
 		    .m_axi_awid(axi_awid), 
