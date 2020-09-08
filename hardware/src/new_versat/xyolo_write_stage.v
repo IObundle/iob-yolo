@@ -52,6 +52,7 @@ module xyolo_write_stage #(
 	input [`nYOLOvect-1:0]          	     xyolo_sig_mask,
 	input                           	     xyolo_maxpool,
 	input                           	     xyolo_bypass,
+	input                           	     xyolo_bypass_adder,
 	input [`SHIFT_W-1:0]            	     xyolo_shift,
 
     	// databus interface (1 vread + 1 vwrite)
@@ -64,7 +65,7 @@ module xyolo_write_stage #(
 
     	// input data
     	input [`nYOLOvect*DATAPATH_W-1:0] 	     flow_in_bias,
-	input [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_in_weight
+	input [`nYOLOvect*N_MACS*DATAPATH_W-1:0]     flow_in_weight
     );
 
    // external addrgen wires and regs
@@ -234,7 +235,8 @@ module xyolo_write_stage #(
 	 //xyolo
 	 xyolo #(
 	    .DATAPATH_W(DATAPATH_W),
-	    .N_MACS(N_MACS)
+	    .N_MACS(N_MACS),
+	    .INDEX(i%`nYOLOmacs)
 	 ) xyolo (
 	    .clk(clk),
 	    .rst(global_run),
@@ -249,6 +251,7 @@ module xyolo_write_stage #(
 	    .sigmoid(xyolo_sigmoid & xyolo_sig_mask[i]),
 	    .maxpool(xyolo_maxpool),
 	    .bypass(xyolo_bypass),
+	    .bypass_adder(xyolo_bypass_adder),
 	    .shift(xyolo_shift),
 	    //data interface
 	    .flow_in_pixel(pixel),

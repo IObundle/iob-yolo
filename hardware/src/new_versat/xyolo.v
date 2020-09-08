@@ -5,6 +5,7 @@
 module xyolo # (
 		parameter		      DATAPATH_W = 32,
 		parameter                     N_MACS = 1,
+		parameter		      INDEX = 0,
    		parameter                     N_MACS_W = $clog2(N_MACS)+($clog2(N_MACS)==0)
 	) (
                 input 			      clk,
@@ -22,6 +23,7 @@ module xyolo # (
                 input                         sigmoid,
                 input                         maxpool,
                 input                         bypass,
+                input                         bypass_adder,
 		input [`SHIFT_W-1:0]	      shift,
 
                 //data interface
@@ -79,7 +81,7 @@ module xyolo # (
      end else begin
        bias_reg <= flow_in_bias;
        op_a_bypass <= op_a_bypass_nmac;
-       if(ld_res) result <= result_w;
+       if(ld_res) result <= bypass_adder ? dsp_out[INDEX*2*DATAPATH_W +: 2*DATAPATH_W] >> shift : result_w;
        sig_out_r <= sig_out;
        shift_r <= shifted_half;
        shift_r2 <= shift_r;
