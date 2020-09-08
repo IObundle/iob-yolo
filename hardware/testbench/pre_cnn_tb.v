@@ -20,14 +20,19 @@
 `define NETWORK_INPUT_AUX (2*(`NEW_W*`IMG_H*`IMG_C))
 `define DATA_LAYER_1 (2*((`NEW_W+2)*((`NEW_W+2)*`IMG_C+`LAYER_1_P_OFF)))
 
+//Padding to height
+`define IMG_H_PADD (`IMG_H+9) //(576+9)/13 = 45
+`define NETWORK_INPUT_AUX_PADD (2*(`NEW_W*`IMG_H_PADD*`IMG_C))
+
 //resize constants
 `define ix_size (2*(`NEW_W*2))
-`define dx_size (2*(`NEW_W*2))
+`define dx_size (2*(`NEW_W*2*`nYOLOmacs))
 `define dy_size (2*(`NEW_H*2))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
+//`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + 2*`NETWORK_INPUT_AUX_PADD)/(`MIG_BUS_W/8))
 
 module pre_cnn_tb;
 
@@ -83,6 +88,12 @@ module pre_cnn_tb;
    // TEST PROCEDURE
    //
    initial begin
+
+    `ifdef VCD
+      $dumpfile("system.vcd");
+      $dumpvars(0, pre_cnn_tb.uut.versat);
+      $dumpvars(0, pre_cnn_tb.uut.ext_mem0);
+    `endif
 
       //init cpu bus signals
       uart_valid = 0;
