@@ -188,6 +188,7 @@ void conv() {
 
     // read filter
     versat.yread.setExtIter(1);
+    versat.yread.setBiasExtIter(1);
     versat.yread.setExtAddr(weights_ba + 2*l*nYOLOvect*(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF));
     versat.yread.setBiasExtAddr(bias_ba + 2*l*nYOLOvect);
 
@@ -227,6 +228,7 @@ void conv() {
 	  // stop reading from DDR
 	  versat.ywrite.read.setExtIter(0);
 	  versat.yread.setExtIter(0);
+	  versat.yread.setBiasExtIter(0);
 	}
       }
     }
