@@ -48,6 +48,7 @@
 #define NETWORK_INPUT_AUX_PADD (NEW_W_PADD*IMG_H_PADD*IMG_C)
 
 //resize constants
+#define w_scale ((float)(IMG_W-1)/(NEW_W-1))
 #define h_scale ((float)(IMG_H-1)/(NEW_H-1))
 #define ix_size ((NEW_W_PADD+ix_PADD)*2)
 #define dx_size (NEW_W_PADD*2*nYOLOmacs)
@@ -69,7 +70,7 @@ int16_t iy[NEW_H];
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE ((ix_size + dx_size + dy_size + IMAGE_INPUT)*2) //16 bits
+#define INPUT_FILE_SIZE (IMAGE_INPUT*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define OUTPUT_FILE_SIZE (DATA_LAYER_1*2)
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
@@ -94,10 +95,40 @@ unsigned int start, end;
 void prepare_resize() {
 
   //local variables
-  int i;
-  float val;
+  int i, j, val_i, val_i_first;
+  float val, val_d;
+  int16_t * ix = (int16_t *) ix_BASE_ADDRESS;
+  int16_t * dx = (int16_t *) dx_BASE_ADDRESS;
+  int16_t * dy = (int16_t *) dy_BASE_ADDRESS;
 
-  //loop to initialize iy
+  //loop to initialize ix and dx
+#ifndef SIM
+  for(i = 0; i < NEW_W; i++) {
+    val = i*w_scale;
+    val_i = (int) val;
+    val_d = val - val_i;
+    if(i == 0) {
+      //add 2 extra initial positions
+      val_i_first = val_i;
+      ix[0] = val_i;
+      ix[1] = val_i;
+      for(j = 0; j < 2*nYOLOmacs; j++) dx[j] = 0;
+    }
+    //normal positions
+    ix[2+2*i] = val_i;
+    for(j = 0; j < nYOLOmacs; j++) {
+      dx[2*nYOLOmacs + 2*nYOLOmacs*i + j] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+      dx[2*nYOLOmacs + 2*nYOLOmacs*i + nYOLOmacs + j] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+    }
+    //add 7 extra final positions for ix
+    if(i == NEW_W-1) for(j = 0; j < 8; j++) ix[2+2*i+1+j] = val_i_first;
+    else ix[2+2*i+1] = val_i + 1;
+  }
+  //add 3 extra final positions for dx
+  for(j = 0; j < 2*nYOLOmacs*3; j++) dx[2*nYOLOmacs*(NEW_W+1)  + j] = 0;
+#endif
+
+  //loop to initialize iy and dy
 #ifdef SIM
   for(i = 0; i < 10; i++) {
     uart_printf("%d\n", i);
@@ -106,6 +137,14 @@ void prepare_resize() {
 #endif
     val = i*h_scale;
     iy[i] = (int) val;
+  #ifndef SIM
+    val_d = val - iy[i];
+    //dy
+    for(j = 0; j < nYOLOmacs; j++) {
+      dy[2*nYOLOmacs*i + j] = (int16_t)((1-val_d)*((int16_t)1<<14)); //Q2.14
+      dy[2*nYOLOmacs*i + nYOLOmacs + j] = (int16_t)(val_d*((int16_t)1<<14)); //Q2.14
+    }
+  #endif
   }
 
   //configure ix vread to read ix from DDR
@@ -156,7 +195,7 @@ void rcv_data() {
   //Local variables
   int i, j;
   count_bytes = 0;
-  char * data_p = (char *) ix_BASE_ADDRESS;
+  char * data_p = (char *) INPUT_IMAGE_BASE_ADDRESS;
   uart_printf("\nReady to receive data...\n");
 
   //Loop to receive intermediate data frames
@@ -438,7 +477,7 @@ int main(int argc, char **argv) {
   fill_grey();
 #endif
 
-  //initialize iy
+  //initialize ix, iy, dx and dy arrays
   uart_printf("\nPreparing resize...\n");
   start = timer_time_us(TIMER_BASE);
   prepare_resize();
