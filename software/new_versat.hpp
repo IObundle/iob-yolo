@@ -65,6 +65,15 @@ class CYoloRead {
     void setIntIncr(int incr) {
       MEMSET(base, XYOLO_READ_CONF_INCR_B, incr);
     }
+    void setIntDelay(int delay) {
+      MEMSET(base, XYOLO_READ_CONF_DELAY_B, delay);
+    }
+    //////////////////////////////////////////////////
+    // BIAS
+    //////////////////////////////////////////////////
+    void setBiasExtIter(int iter) {
+      MEMSET(base, BIAS_CONF_ITER_A, iter);
+    }
     void setBiasExtAddr(int extAddr) {
       MEMSET(base, BIAS_CONF_EXT_ADDR, extAddr);
     }
@@ -153,6 +162,24 @@ class CRead {
     }
     void setIntIncr3(int incr) {
       MEMSET(base, VREAD_CONF_INCR3_B, incr);
+    }
+    //////////////////////////////////////////////////
+    // ix
+    //////////////////////////////////////////////////
+    void setExt(int ext) {
+      MEMSET(base, VREAD_CONF_EXT, ext);
+    }
+    void setIxExtAddr(int extAddr) {
+      MEMSET(base, IX_CONF_EXT_ADDR, extAddr);
+    }
+    void setIxExtIter(int iter) {
+      MEMSET(base, IX_CONF_ITER_A, iter);
+    }
+    void setIxExtPer(int per) {
+      MEMSET(base, IX_CONF_PER_A, per);
+    }
+    void setIxExtIncr(int incr) {
+      MEMSET(base, IX_CONF_INCR_A, incr);
     }
 };//end class CRead
 
@@ -256,6 +283,9 @@ class CYolo {
     }
     void setBypass(int bypass) {
       MEMSET(base, XYOLO_CONF_BYPASS, bypass);
+    }
+    void setBypassAdder(int bypass) {
+      MEMSET(base, XYOLO_CONF_BYPASS_ADD, bypass);
     }
 };//end class CYOLO
 

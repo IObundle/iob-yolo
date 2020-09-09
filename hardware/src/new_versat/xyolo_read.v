@@ -33,7 +33,7 @@ module xyolo_read #(
 
     	// output data
     	output [`nYOLOvect*DATAPATH_W-1:0] 	      flow_out_bias,
-	output [`nYOLOvect*N_MACS*DATAPATH_W-1:0] flow_out_weight
+	output [`nYOLOvect*N_MACS*DATAPATH_W-1:0]     flow_out_weight
 
    );
 
@@ -55,7 +55,9 @@ module xyolo_read #(
    reg 					startB_en;
    reg 					shiftB_en;
    reg 					incrB_en;
+   reg 					delayB_en;
    //bias configs
+   reg 					bias_iterA_en;
    reg					bias_ext_addr_en;
    reg 					bias_int_addr_en;
    reg					bias_startB_en;
@@ -75,7 +77,9 @@ module xyolo_read #(
    reg [`WEIGHT_INT_ADDR_W-1:0] 	startB, startB_pip, startB_shadow;
    reg [`WEIGHT_INT_ADDR_W-1:0] 	shiftB, shiftB_pip, shiftB_shadow;
    reg [`WEIGHT_INT_ADDR_W-1:0] 	incrB, incrB_pip, incrB_shadow;
+   reg [`WEIGHT_ADDR_W-1:0] 		delayB, delayB_pip, delayB_shadow;
    //bias configs
+   reg [`BIAS_ADDR_W-1:0] 		bias_iterA, bias_iterA_shadow;
    reg [`IO_ADDR_W-1:0] 	        bias_ext_addr, bias_ext_addr_shadow;
    reg [`BIAS_ADDR_W-1:0] 		bias_int_addr, bias_int_addr_shadow;
    reg [`BIAS_ADDR_W-1:0] 		bias_startB, bias_startB_pip, bias_startB_shadow;
@@ -149,7 +153,9 @@ module xyolo_read #(
       startB_en = 1'b0;
       shiftB_en = 1'b0;
       incrB_en = 1'b0;
+      delayB_en = 1'b0;
       //bias
+      bias_iterA_en = 1'b0;
       bias_ext_addr_en = 1'b0;
       bias_int_addr_en = 1'b0;
       bias_startB_en = 1'b0;
@@ -168,7 +174,9 @@ module xyolo_read #(
 	    `XYOLO_READ_CONF_START_B : startB_en = 1'b1;
 	    `XYOLO_READ_CONF_SHIFT_B : shiftB_en = 1'b1;
 	    `XYOLO_READ_CONF_INCR_B : incrB_en = 1'b1;
+	    `XYOLO_READ_CONF_DELAY_B : delayB_en = 1'b1;
 	    //bias
+            `BIAS_CONF_ITER_A : bias_iterA_en = 1'b1;
             `BIAS_CONF_EXT_ADDR : bias_ext_addr_en = 1'b1;
             `BIAS_CONF_INT_ADDR : bias_int_addr_en = 1'b1;
 	    `BIAS_CONF_START_B : bias_startB_en = 1'b1;
@@ -192,7 +200,9 @@ module xyolo_read #(
 	 startB <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 shiftB <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 incrB <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 delayB <= `WEIGHT_ADDR_W'b0;
 	 //bias
+	 bias_iterA <= `BIAS_ADDR_W'b0;
 	 bias_ext_addr <= `IO_ADDR_W'b0;
 	 bias_int_addr <= {`BIAS_ADDR_W{1'b0}};
 	 bias_startB <= `BIAS_ADDR_W'b0;
@@ -210,7 +220,9 @@ module xyolo_read #(
          if(startB_en) startB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
          if(shiftB_en) shiftB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
          if(incrB_en) incrB <= wdata[`WEIGHT_INT_ADDR_W-1:0];
+         if(delayB_en) delayB <= wdata[`WEIGHT_ADDR_W-1:0];
 	 //bias
+         if(bias_iterA_en) bias_iterA <= wdata[`BIAS_ADDR_W-1:0];
          if(bias_ext_addr_en) bias_ext_addr <= wdata[`IO_ADDR_W-1:0];
          if(bias_int_addr_en) bias_int_addr <= wdata[`BIAS_ADDR_W-1:0];
          if(bias_startB_en) bias_startB <= wdata[`BIAS_ADDR_W-1:0];
@@ -235,7 +247,10 @@ module xyolo_read #(
 	 shiftB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 incrB_shadow <= {`WEIGHT_INT_ADDR_W{1'b0}};
 	 incrB_pip <= {`WEIGHT_INT_ADDR_W{1'b0}};
+	 delayB_shadow <= `WEIGHT_ADDR_W'b0;
+	 delayB_pip <= `WEIGHT_ADDR_W'b0;
 	 //bias
+	 bias_iterA_shadow <= `BIAS_ADDR_W'b0;
 	 bias_ext_addr_shadow <= `IO_ADDR_W'b0;
 	 bias_int_addr_shadow <= {`BIAS_ADDR_W{1'b0}};
 	 bias_startB_shadow <= `BIAS_ADDR_W'b0;
@@ -258,7 +273,10 @@ module xyolo_read #(
 	 shiftB_shadow <= shiftB_pip;
 	 incrB_pip <= incrB;
 	 incrB_shadow <= incrB_pip;
+	 delayB_pip <= delayB;
+	 delayB_shadow <= delayB_pip;
 	 //bias
+	 bias_iterA_shadow <= bias_iterA;
          bias_ext_addr_shadow <= bias_ext_addr;
 	 bias_int_addr_shadow <= pp ? {bias_int_addr_shadow[`BIAS_ADDR_W-1] ^ |iterA, bias_int_addr[`BIAS_ADDR_W-2:0]} : bias_int_addr;
 	 bias_startB_pip <= pp ? {bias_startB_pip[`BIAS_ADDR_W-1] ^ |iterA, bias_startB[`BIAS_ADDR_W-2:0]} : bias_startB;
@@ -313,7 +331,7 @@ module xyolo_read #(
 	.ext_addr(bias_ext_addr_shadow),
         .int_addr(bias_int_addr_shadow),
 	.direction(2'b01),
-	.iterations(iterA_shadow[`BIAS_ADDR_W-1:0]),
+	.iterations(bias_iterA_shadow),
 	.period(`BIAS_ADDR_W'd1),
 	.duty(`BIAS_ADDR_W'd1),
 	.start(`BIAS_ADDR_W'd0),
@@ -380,6 +398,10 @@ module xyolo_read #(
    generate
       for (i=0; i < `nYOLOvect; i=i+1) begin : vread_array
 
+	 //check if asking for the same data as previous vread
+	 wire cond = (databus_addr == m_req[`address((`nYOLOvect-i-1), `IO_ADDR_W)]) & m_req[`valid((`nYOLOvect-i-1))];
+         wire databus_ready_w = (cond & databus_ready) | m_resp[`ready((`nYOLOvect-i-1))];
+
          // external address generator
          ext_addrgen #(
             .DATA_W(DATABUS_W),
@@ -404,10 +426,10 @@ module xyolo_read #(
 	    .incr(incrA_shadow),
 	    .delay(`WEIGHT_ADDR_W'd0),
             // Databus interface
- 	    .databus_ready(m_resp[`ready((`nYOLOvect-i-1))]),
+ 	    .databus_ready(databus_ready_w),
  	    .databus_valid(m_req[`valid((`nYOLOvect-i-1))]),
 	    .databus_addr(m_req[`address((`nYOLOvect-i-1), `IO_ADDR_W)]),
-	    .databus_rdata(m_resp[`rdata((`nYOLOvect-i-1))]),
+	    .databus_rdata(databus_rdata),
 	    .databus_wdata(m_req[`wdata((`nYOLOvect-i-1))]),
 	    .databus_wstrb(m_req[`wstrb((`nYOLOvect-i-1))]),
             // internal memory interface
@@ -463,7 +485,7 @@ module xyolo_read #(
       .start(startB_shadow),
       .shift(shiftB_shadow),
       .incr(incrB_shadow),
-      .delay(`WEIGHT_ADDR_W'd0),
+      .delay(delayB_shadow),
       .addr(addrB),
       .mem_en(enB),
       .done(doneB)

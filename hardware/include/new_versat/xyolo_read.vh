@@ -19,9 +19,11 @@
 `define XYOLO_READ_CONF_START_B     10
 `define XYOLO_READ_CONF_SHIFT_B     11
 `define XYOLO_READ_CONF_INCR_B      12
-`define BIAS_CONF_EXT_ADDR    	    13
-`define BIAS_CONF_INT_ADDR          14
-`define BIAS_CONF_START_B           15
+`define XYOLO_READ_CONF_DELAY_B     13
+`define BIAS_CONF_EXT_ADDR    	    14
+`define BIAS_CONF_INT_ADDR          15
+`define BIAS_CONF_ITER_A      	    16
+`define BIAS_CONF_START_B           17
 
 // Address
 `define XYOLO_READ_ADDR_W	    ($clog2(`BIAS_CONF_START_B+1))
