@@ -9,6 +9,8 @@
 
 //layer 1 padding
 `define LAYER_1_P_OFF 8
+`define NEW_W_PADD 420
+`define ix_PADD 4
 
 //Input image
 `define IMG_W 768
@@ -22,16 +24,16 @@
 
 //Padding to height
 `define IMG_H_PADD (`IMG_H+9) //(576+9)/13 = 45
-`define NETWORK_INPUT_AUX_PADD (2*(`NEW_W*`IMG_H_PADD*`IMG_C))
+`define NETWORK_INPUT_AUX_PADD (2*(`NEW_W_PADD*`IMG_H_PADD*`IMG_C))
 
 //resize constants
-`define ix_size (2*(`NEW_W*2))
-`define dx_size (2*(`NEW_W*2*`nYOLOmacs))
-`define dy_size (2*(`NEW_H*2))
+`define ix_size (2*((`NEW_W_PADD+`ix_PADD)*2))
+`define dx_size (2*(`NEW_W_PADD*2*`nYOLOmacs))
+`define dy_size (2*(`NEW_H*2*`nYOLOmacs))
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-//`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
+//`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX_PADD + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
 `define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + 2*`NETWORK_INPUT_AUX_PADD)/(`MIG_BUS_W/8))
 
 module pre_cnn_tb;
