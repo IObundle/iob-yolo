@@ -120,6 +120,7 @@ module xyolo_write #(
    reg [`PIXEL_ADDR_W-1:0]              vwrite_perB, vwrite_perB_pip, vwrite_perB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_shiftB, vwrite_shiftB_pip, vwrite_shiftB_shadow;
    reg [`PIXEL_ADDR_W-1:0]              vwrite_incrB, vwrite_incrB_pip, vwrite_incrB_shadow;
+   reg					mask_shadow, mask_pip0, mask_pip1;
 
    // vread configuration parameters
    reg [`IO_ADDR_W-1:0]			vread_ext_addr;
@@ -484,6 +485,9 @@ module xyolo_write #(
          vwrite_shiftB_pip <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_shadow <= `PIXEL_ADDR_W'b0;
          vwrite_incrB_pip <= `PIXEL_ADDR_W'b0;
+         mask_pip0 <= 1'b0;
+	 mask_pip1 <= 1'b0;
+	 mask_shadow <= 1'b0;
 	 //vread
          vread_ext_addr_shadow <= `nSTAGES*`IO_ADDR_W'b0;
          vread_int_addr_shadow <= {`PIXEL_W_ADDR_W{1'b0}};
@@ -581,6 +585,9 @@ module xyolo_write #(
 	 vwrite_shiftB_shadow <= vwrite_shiftB_pip;
 	 vwrite_incrB_pip <= vwrite_incrB;
 	 vwrite_incrB_shadow <= vwrite_incrB_pip;
+         mask_pip0 <= |vwrite_offset;
+	 mask_pip1 <= mask_pip0;
+	 mask_shadow <= mask_pip1;
 	 //vread
 	 vread_ext_addr_shadow <= vread_ext_addr_bus;
 	 //XOR ensures ping-pong happens when acessing external mem
@@ -903,6 +910,10 @@ module xyolo_write #(
 	wire cond = (databus_addr[`IO_ADDR_W-1:0] == vread_m_req[`address((`nSTAGES-i-1), `IO_ADDR_W)]) & vread_m_req[`valid((`nSTAGES-i-1))];
         wire databus_ready_w = (cond & databus_ready[0]) | vread_m_resp[`ready((`nSTAGES-i-1))];
 
+ 	//prepare vwrite mask
+ 	wire [`PIXEL_ADDR_W-1:0] vwrite_iterA_w = (i == 0) ? vwrite_iterA_shadow : vwrite_iterA_shadow & {`PIXEL_ADDR_W{mask_shadow}};
+	wire [`EXT_ADDR_W-1:0] vread_iterA_w = (i == 0) ? vread_iterA_shadow : vread_iterA_shadow & {`EXT_ADDR_W{mask_pip0}};
+
         //instantiate xyolo_write_stage
         xyolo_write_stage # (
            .DATAPATH_W(DATAPATH_W),
@@ -926,14 +937,14 @@ module xyolo_write #(
            //vread config params
            .vread_ext_addr(vread_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
            .vread_int_addr(vread_int_addr_shadow),
-           .vread_iterA(vread_iterA_shadow),
+           .vread_iterA(vread_iterA_w),
            .vread_perA(vread_perA_shadow),
            .vread_shiftA(vread_shiftA_shadow),
            .vread_incrA(vread_incrA_shadow),
            //vwrite config params
            .vwrite_ext_addr(vwrite_ext_addr_shadow[`nSTAGES*`IO_ADDR_W-`IO_ADDR_W*i-1 -: `IO_ADDR_W]),
            .vwrite_int_addr(vwrite_int_addr_shadow),
-           .vwrite_iterA(vwrite_iterA_shadow),
+           .vwrite_iterA(vwrite_iterA_w),
            .vwrite_perA(vwrite_perA_shadow),
            .vwrite_shiftA(vwrite_shiftA_shadow),
            .vwrite_incrA(vwrite_incrA_shadow),

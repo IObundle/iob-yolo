@@ -33,8 +33,7 @@
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-//`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX_PADD + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
-`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + 2*`NETWORK_INPUT_AUX_PADD)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + `ix_size + `dx_size + `dy_size + `IMAGE_INPUT + `NETWORK_INPUT_AUX_PADD + 2*`DATA_LAYER_1)/(`MIG_BUS_W/8))
 
 module pre_cnn_tb;
 

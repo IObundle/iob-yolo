@@ -23,7 +23,7 @@
   #define C_PADD 0
   #define NEW_W_PADD 416
   #define ix_PADD 0
-#else
+#elif nYOLOmacs == 4
   #define IMG_C 4
   #define LAYER_1_P_OFF 8
   #define C_PADD 1
@@ -71,8 +71,7 @@ int16_t iy[NEW_H];
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
 #define INPUT_FILE_SIZE ((ix_size + dx_size + dy_size + IMAGE_INPUT)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-//#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2)
-#define OUTPUT_FILE_SIZE (NETWORK_INPUT_AUX*2)
+#define OUTPUT_FILE_SIZE (DATA_LAYER_1*2)
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -100,7 +99,7 @@ void prepare_resize() {
 
   //loop to initialize iy
 #ifdef SIM
-  for(i = 0; i < 4; i++) {
+  for(i = 0; i < 10; i++) {
     uart_printf("%d\n", i);
 #else
   for(i = 0; i < NEW_H; i++) {
@@ -127,8 +126,16 @@ void reset_DDR() {
   int i;
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + NETWORK_INPUT_AUX_PADD;
 
+  //measure initial time
+  uart_printf("\nSetting DDR positions to zero\n");
+  start = timer_time_us(TIMER_BASE);
+
   //input network
   for(i = 0; i < DATA_LAYER_1; i++) fp_data[i] = 0;
+
+  //measure final time
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
 //fill grey CNN input image (except padding)
@@ -233,7 +240,7 @@ void width_resize() {
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(NEW_W_PADD*IMG_C/nYOLOvect);
+  versat.dma.ywrite_write_setLen(NEW_W_PADD*IMG_C/nYOLOvect-1);
   versat.ywrite.write.setOffset(2*(NEW_W_PADD*IMG_C));
   versat.ywrite.write.setExtPer(NEW_W_PADD*IMG_C/nYOLOvect);
   versat.ywrite.write.setExtIter(1);
@@ -281,7 +288,7 @@ void height_resize() {
   //local variables
   int i;
   //pass extra and first padding lines and padding column
-  unsigned int p_out = DATA_BASE_ADDRESS + 2*(NETWORK_INPUT_AUX_PADD + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1) + IMG_C);
+  unsigned int p_out = DATA_BASE_ADDRESS + 2*(NETWORK_INPUT_AUX_PADD + NEW_W_PADD*IMG_C*(EXTRA_H+1));
 
   /////////////////////////////////////////////////////////////////////////
   //                          FIXED CONFIGURATIONS
@@ -296,26 +303,26 @@ void height_resize() {
   versat.yread.setExtAddr(dy_BASE_ADDRESS);
 
   // configure xyolo_write vread to read line from DDR
-  versat.dma.ywrite_read_setLen(NEW_W*IMG_C*2/16-1); //2 lines
+  versat.dma.ywrite_read_setLen(NEW_W_PADD*IMG_C*2/16-1); //2 lines
   versat.ywrite.read.setPingPong(1);
-  versat.ywrite.read.setExtPer(NEW_W*IMG_C*2/16);
+  versat.ywrite.read.setExtPer(NEW_W_PADD*IMG_C*2/16);
   versat.ywrite.read.setExtIncr(16);
   versat.ywrite.read.setExtIter(1);
 
   // configure xyolo_read vreads to write 1-dy/dy sequence to xyolo
   versat.yread.setIntPer(2);
   versat.yread.setIntIncr(1);
-  versat.yread.setIntIter(NEW_W);
+  versat.yread.setIntIter(NEW_W_PADD);
   versat.yread.setIntShift(-2);
 
   // configure xyolo_write vreads to write pixels to xyolo
   versat.ywrite.read.setIntPer(2);
-  versat.ywrite.read.setIntIncr(NEW_W);
-  versat.ywrite.read.setIntIter(NEW_W);
-  versat.ywrite.read.setIntShift(-2*NEW_W+1);
+  versat.ywrite.read.setIntIncr(NEW_W_PADD);
+  versat.ywrite.read.setIntIter(NEW_W_PADD);
+  versat.ywrite.read.setIntShift(-2*NEW_W_PADD+1);
 
   // configure xyolo to multiply pixel with dy
-  versat.ywrite.yolo.setIter(NEW_W);
+  versat.ywrite.yolo.setIter(NEW_W_PADD);
   versat.ywrite.yolo.setPer(2);
   versat.ywrite.yolo.setShift(21);
   versat.ywrite.yolo.setBypassAdder(1);
@@ -324,12 +331,12 @@ void height_resize() {
   versat.ywrite.write.setIntDuty(2*nYOLOvect/IMG_C);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 3);
   versat.ywrite.write.setIntPer(2*nYOLOvect/IMG_C);
-  versat.ywrite.write.setIntIter(NEW_W/(nYOLOvect/IMG_C));
+  versat.ywrite.write.setIntIter(NEW_W_PADD/(nYOLOvect/IMG_C));
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(NEW_W*IMG_C/nYOLOvect);
-  versat.ywrite.write.setExtPer(NEW_W*IMG_C/nYOLOvect);
+  versat.dma.ywrite_write_setLen(NEW_W_PADD*IMG_C/nYOLOvect-1);
+  versat.ywrite.write.setExtPer(NEW_W_PADD*IMG_C/nYOLOvect);
   versat.ywrite.write.setExtIter(1);
 
   /////////////////////////////////////////////////////////////////////////
@@ -337,8 +344,7 @@ void height_resize() {
   /////////////////////////////////////////////////////////////////////////
 
 #ifdef SIM
-  for(i = 0; i < 1; i++) {
-    uart_printf("%d\n", i);
+  for(i = 0; i < 10; i++) {
 #else
   for(i = 0; i < NEW_H; i++) {
 #endif
@@ -347,16 +353,17 @@ void height_resize() {
     versat.yread.setIntStart(2*i);
 
     // configure xyolo_write vread to read lines from input fm
-    versat.ywrite.read.setExtAddr(DATA_BASE_ADDRESS + 2*iy[i]*NEW_W*IMG_C);
+    versat.ywrite.read.setExtAddr(DATA_BASE_ADDRESS + 2*iy[i]*NEW_W_PADD*IMG_C);
 
     // configure xyolo_write vwrite to write result back to DDR
-    versat.ywrite.write.setExtAddr(p_out + 2*i*((NEW_W+2)*IMG_C+LAYER_1_P_OFF));
+    versat.ywrite.write.setExtAddr(p_out + 2*i*NEW_W_PADD*IMG_C);
 
     // wait until done
     while(versat.done()==0);
   #ifdef TIME_RUN
     end = (unsigned int) timer_get_count(TIMER_BASE);
-    if(i != 0) uart_printf("%d\n", (end - start)*CLK_NS);
+    uart_printf("%d\n", (end - start)*CLK_NS);
+    if(i == 0) uart_printf("\n");
   #endif
 
     // run configuration
@@ -371,33 +378,6 @@ void height_resize() {
 
   // clear configs
   versat.clear();
-
-/*
-  //local variables
-  int16_t r, c, k;
-  int32_t mul;
-  int16_t * dy = (int16_t *) dy_BASE_ADDRESS;
-  int16_t * im_in = (int16_t *) DATA_BASE_ADDRESS;
-  int16_t * im_out = (int16_t *) DATA_BASE_ADDRESS;
-  //pass extra and first padding lines and padding column
-  im_out += NETWORK_INPUT_AUX_PADD + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1) + IMG_C;
-
-  //perform height reduction
-#ifdef SIM
-  for(r = 0; r < 2; r++) {
-    uart_printf("%d\n", r);
-#else
-  for(r = 0; r < NEW_H; r++) {
-#endif
-    for(c = 0; c < NEW_W; c++) {
-      for(k = 0; k < IMG_C; k++) {
-        mul = (int32_t)((int32_t)dy[2*r]*(int32_t)im_in[iy[r]*NEW_W*IMG_C + c*IMG_C + k]); //Q2.14 * Q1.15 = Q3.29
-	mul += (int32_t)((int32_t)dy[2*r+1]*(int32_t)im_in[(iy[r]+1)*NEW_W*IMG_C + c*IMG_C + k]); //Q3.29
-	im_out[r*((NEW_W+2)*IMG_C+LAYER_1_P_OFF) + c*IMG_C + k] = (int16_t)(mul >> 21);
-      }
-    }
-  }
-*/
 }
 
 //send results back
@@ -406,8 +386,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS;
-  //char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*NETWORK_INPUT_AUX_PADD;
+  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*NETWORK_INPUT_AUX_PADD;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -443,17 +422,20 @@ int main(int argc, char **argv) {
   //send init message
   uart_printf("\nPRE CNN\n\n");
 
+#ifndef SIM
+  //init ETHERNET
+  eth_init(ETHERNET_BASE);
+  eth_set_rx_payload_size(ETH_NBYTES);
+#endif
+
   //init VERSAT
   versat_init(VERSAT_BASE);
 
   //fill CNN input with grey
 #ifndef SIM
-  uart_printf("\nResetting DDR to zero and grey...\n");
-  start = timer_time_us(TIMER_BASE);
   reset_DDR();
+  rcv_data();
   fill_grey();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
 #endif
 
   //initialize iy
@@ -464,14 +446,6 @@ int main(int argc, char **argv) {
   uart_printf("Done in %d us\n\n", end-start);
 
 #ifndef SIM
-  //init ETHERNET
-  eth_init(ETHERNET_BASE);
-  eth_set_rx_payload_size(ETH_NBYTES);
-
-  //receive data via ethernet
-  rcv_data();
-
-#endif
 
   //width resize
  #ifndef TIME_RUN
@@ -479,42 +453,13 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   width_resize();
-  //end versat
- #ifdef TIME_RUN
-  while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
-  versat.run();
-  start = (unsigned int) timer_get_count(TIMER_BASE);
-  while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
-  versat.run();
-  start = (unsigned int) timer_get_count(TIMER_BASE);
-  while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
- #else
-  versat_end();
+ #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
  #endif
 
-  //verify results
-#ifdef SIM
-  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
-  int i, j, k;
-  uart_printf("\nVerifying...\n");
-  for(i = 0; i < 2*nSTAGES; i++) {
-    uart_printf("Line %d\n", i);
-    for(j = 0; j < NEW_W_PADD; j++)
-      for(k = 0; k < IMG_C; k++)
-        if(fp_data[i*NEW_W_PADD*IMG_C + j*IMG_C + k] != fp_data[NETWORK_INPUT_AUX_PADD + i*NEW_W_PADD*IMG_C + j*IMG_C + k])
-	  uart_printf("(%d) res = %x, act = %x\n", j*IMG_C + k, fp_data[i*NEW_W_PADD*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[NETWORK_INPUT_AUX_PADD + i*NEW_W_PADD*IMG_C + j*IMG_C + k] & 0xFFFF);   
-  }
 #endif
 
-/*
   //height resize
  #ifndef TIME_RUN
   uart_printf("\nHeight resizing...\n");
@@ -548,14 +493,14 @@ int main(int argc, char **argv) {
   fp_data += NETWORK_INPUT_AUX_PADD + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1);
   int i, j, k;
   uart_printf("\nVerifying...\n");
-  for(i = 0; i < 1; i++) {
+  for(i = 0; i < 10; i++) {
     uart_printf("Line %d\n", i);
     for(j = 0; j < NEW_W+2; j++)
       for(k = 0; k < IMG_C; k++)
         if(fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] != fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k])
 	  uart_printf("(%d) res = %x, act = %x\n", i*(NEW_W+2)*IMG_C + j*IMG_C + k, fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF);   
   }
-#endif*/
+#endif
 
 #ifndef SIM
   send_data();
