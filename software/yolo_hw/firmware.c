@@ -703,16 +703,16 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.ywrite.read.setIntIncr(16/nYOLOmacs);
   versat.ywrite.read.setIntIter(2);
   versat.ywrite.read.setIntShift((w+2*inpadd+stride)*c/nYOLOmacs - 32/nYOLOmacs);
-  versat.ywrite.read.setIntPer2(16/nYOLOmacs);
+  versat.ywrite.read.setIntPer2(nYOLOmacs);
   versat.ywrite.read.setIntIter2(1);
   versat.ywrite.read.setIntIncr3(1);
-  versat.ywrite.read.setIntPer3(nYOLOmacs);
+  versat.ywrite.read.setIntPer3(nYOLOvect/nYOLOmacs);
   versat.ywrite.read.setIntIter3(c/16);
-  versat.ywrite.read.setIntShift3((w+2*inpadd+stride)*16/nYOLOmacs - nYOLOmacs);
+  versat.ywrite.read.setIntShift3((w+2*inpadd+stride)*16/nYOLOmacs - nYOLOvect/nYOLOmacs);
 
   // configure xyolo to perform maxpool
-  versat.ywrite.yolo.setIter(4*c/nYOLOmacs);
-  versat.ywrite.yolo.setPer(nYOLOmacs);
+  versat.ywrite.yolo.setIter(c);
+  versat.ywrite.yolo.setPer(4);
   versat.ywrite.yolo.setMaxpool(1);
   versat.ywrite.yolo.setBypass(1);
 
