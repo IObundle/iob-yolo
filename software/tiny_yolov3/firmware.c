@@ -1749,13 +1749,17 @@ int main(int argc, char **argv) {
  #endif
 
 #ifndef SIM
+ #ifndef TIME_RUN
   //draw boxes and labels
   uart_printf("\nDrawing boxes and labels...\n");
   start = timer_time_us(TIMER_BASE);
+ #endif
   draw_detections();
+ #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
+ #endif
 #else
   //verify results
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
@@ -1768,7 +1772,9 @@ int main(int argc, char **argv) {
 #endif
 
 #ifndef SIM
+ #ifndef TIME_RUN
   uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
+ #endif
   //print detected objects and corresponding probability scores
   uart_printf("\nDetections:\n");
   print_results();
