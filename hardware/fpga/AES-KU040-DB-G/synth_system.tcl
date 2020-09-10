@@ -100,7 +100,7 @@ if { $USE_DDR < 0 } {
 
 }
 
-synth_design -include_dirs $INCLUDE -verilog_define $DEFINE -part $PART -top $TOP -verbose
+synth_design -include_dirs $INCLUDE -verilog_define $DEFINE -part $PART -top $TOP
 
 read_xdc ./synth_system.xdc
 

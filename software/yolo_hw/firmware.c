@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-#define TIME_RUN
+//#define TIME_RUN
 #define CLK_NS 8
 
 #ifdef SIM
@@ -241,6 +241,7 @@ void layer1() {
 
     // read filter
     versat.yread.setExtIter(1);
+    versat.yread.setBiasExtIter(1);
     versat.yread.setExtAddr(WEIGHTS_BASE_ADDRESS + 2*LAYER_1_NUM_KER + 2*l*nYOLOvect*(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C + LAYER_1_W_OFF));
     versat.yread.setBiasExtAddr(WEIGHTS_BASE_ADDRESS + 2*l*nYOLOvect);
 
@@ -278,6 +279,7 @@ void layer1() {
         // stop reading from DDR
         versat.ywrite.read.setExtIter(0);
         versat.yread.setExtIter(0);
+        versat.yread.setBiasExtIter(0);
       }
     }
   }
@@ -321,6 +323,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
   versat.yread.setExtPer((ker_size*ker_size*c)/16);
   versat.yread.setExtIncr(16);
   versat.yread.setExtIter(1);
+  versat.yread.setBiasExtIter(1);
 
   // configure xyolo_write vread to read tile from input fm
   versat.dma.ywrite_read_setLen((c*(til_w+2))/16-1);
@@ -426,6 +429,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
 
       //stop xyolo_read vread reading from DDR
       versat.yread.setExtIter(0);
+      versat.yread.setBiasExtIter(0);
     }
   }
 
@@ -486,6 +490,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.yread.setExtPer((ker_size*ker_size*c)/16);
   versat.yread.setExtIncr(16);
   versat.yread.setExtIter(1);
+  versat.yread.setBiasExtIter(1);
   versat.yread.setPingPong(1);
 
   // configure xyolo_write vread to read input fm
@@ -568,6 +573,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 
       //stop reading weights and computation
       versat.yread.setExtIter(0);
+      versat.yread.setBiasExtIter(0);
       versat.yread.setIntIter(0);
       versat.ywrite.read.setIntIter(0);
       versat.ywrite.read.setIntIter2(0);
@@ -589,6 +595,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 
       //recover former configs
       versat.yread.setExtIter(1);
+      versat.yread.setBiasExtIter(1);
       versat.yread.setIntIter(w*(1+upsample));
       versat.ywrite.read.setIntIter(c/16);
       versat.ywrite.read.setIntIter2(ker_size);
@@ -709,7 +716,7 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.ywrite.yolo.setMaxpool(1);
   versat.ywrite.yolo.setBypass(1);
 
-  // configure xwrite to write convolution results
+  // configure xwrite to write maxpool results
   // hw internally has counter to adress each vwrite individually when bypass is enabled
   versat.ywrite.write.setIntDuty(4*16);
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_BYPASS_LAT - 2);

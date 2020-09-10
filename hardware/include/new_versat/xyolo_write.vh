@@ -5,6 +5,7 @@
 //define vread mem write address width
 `define PIXEL_W_ADDR_W         (`PIXEL_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
 `define PIXEL_INT_ADDR_W       (`PIXEL_ADDR_W-$clog2(`nYOLOmacs))
+`define IX_W_ADDR_W	       (`IX_ADDR_W-$clog2(DATABUS_W/DATAPATH_W))
 
 // xyolo shift width
 `define SHIFT_W                 ($clog2(DATAPATH_W)+1)
@@ -48,16 +49,24 @@
 `define VREAD_CONF_SHIFT3_B     33
 `define VREAD_CONF_INCR3_B      34
 
+// ix configuration offsets
+`define VREAD_CONF_EXT 		35
+`define IX_CONF_EXT_ADDR 	36
+`define IX_CONF_ITER_A  	37
+`define IX_CONF_PER_A  		38
+`define IX_CONF_INCR_A  	39
+
 // xyolo configuration offsets
-`define XYOLO_CONF_ITER  	35
-`define XYOLO_CONF_PER   	36
-`define XYOLO_CONF_SHIFT   	37
-`define XYOLO_CONF_BIAS   	38
-`define XYOLO_CONF_LEAKY   	39
-`define XYOLO_CONF_SIGMOID   	40
-`define XYOLO_CONF_SIG_MASK   	41
-`define XYOLO_CONF_MAXPOOL   	42
-`define XYOLO_CONF_BYPASS   	43
+`define XYOLO_CONF_ITER  	40
+`define XYOLO_CONF_PER   	41
+`define XYOLO_CONF_SHIFT   	42
+`define XYOLO_CONF_BIAS   	43
+`define XYOLO_CONF_LEAKY   	44
+`define XYOLO_CONF_SIGMOID   	45
+`define XYOLO_CONF_SIG_MASK   	46
+`define XYOLO_CONF_MAXPOOL   	47
+`define XYOLO_CONF_BYPASS   	48
+`define XYOLO_CONF_BYPASS_ADD  	49
 
 // Address
-`define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS+1))
+`define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS_ADD+1))
