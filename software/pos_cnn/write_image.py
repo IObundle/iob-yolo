@@ -18,10 +18,11 @@ if len(sys.argv)==2:
     rgbArray = np.zeros((h,w,c), 'uint8')
     
     #Read pixels
-    for i in range(c):
-        for j in range(h):
-            for k in range(w):
+    for j in range(h):
+        for k in range(w):
+            for i in range(c):
                 rgbArray[j, k, i] = struct.unpack('B', f.read(1))[0]
+            f.read(1) #channel 4
     
     f.close()
     

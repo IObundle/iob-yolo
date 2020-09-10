@@ -14,7 +14,7 @@
 //Input image
 `define IMG_W 768
 `define IMG_H 576
-`define IMG_C 3
+`define IMG_C 4
 `define IMAGE_INPUT (2*(`IMG_W*`IMG_H*`IMG_C)) //already 32-byte aligned
 
 //FM constants
