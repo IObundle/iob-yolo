@@ -30,6 +30,27 @@ int16_t iy[NEW_H];
 
 //obj and prob score threshold
 #define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
+#define yolo1_div ((int16_t)(((float)1/LAYER_16_W)*((int32_t)1<<15))) //Q1.15
+#define yolo2_div ((int16_t)(((float)1/LAYER_23_W)*((int32_t)1<<15))) //Q1.15
+#define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define y_bias ((int16_t)(((float)(NEW_W-NEW_H)/(NEW_H*2))*((int32_t)1<<14))) //Q2.14
+#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
+#define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
+#define MAX_NUM_BOXES 10
+#define box_width 3
+#define label_height 20
+
+//label constants
+#define MAX_LABEL_SIZE 2340
+#define LABELS_FILE_SIZE (81 + MAX_LABEL_SIZE*81 + 11) //+11 to be 32-byte aligned
+
+//variables for bounding boxes
+int16_t boxes[84*MAX_NUM_BOXES];
+uint8_t nboxes = 0;
+uint8_t box_IDs[MAX_NUM_BOXES];
 
 //define peripheral base addresses
 #ifndef PCSIM
@@ -52,9 +73,9 @@ int16_t iy[NEW_H];
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE ((TOTAL_WEIGHTS + IMAGE_INPUT)*2) //16 bits
+#define INPUT_FILE_SIZE (LABELS_FILE_SIZE + (TOTAL_WEIGHTS + IMAGE_INPUT)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
-#define OUTPUT_FILE_SIZE (DATA_LAYER_23*2) //16 bits
+#define OUTPUT_FILE_SIZE (IMAGE_INPUT) //8 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
@@ -62,9 +83,14 @@ int16_t iy[NEW_H];
 #define dx_BASE_ADDRESS (ix_BASE_ADDRESS + 2*ix_size)
 #define dy_BASE_ADDRESS (dx_BASE_ADDRESS + 2*dx_size)
 #define WEIGHTS_BASE_ADDRESS (dy_BASE_ADDRESS + 2*dy_size)
-#define INPUT_IMAGE_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + 2*TOTAL_WEIGHTS) //16 bits
+#define LABEL_BASE_ADDRESS (WEIGHTS_BASE_ADDRESS + 2*TOTAL_WEIGHTS) //16 bits
+#define INPUT_IMAGE_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
 #define RESIZED_IMAGE_BASE_ADDRESS (INPUT_IMAGE_BASE_ADDRESS + 2*IMAGE_INPUT)
-#define DATA_BASE_ADDRESS (RESIZED_IMAGE_BASE_ADDRESS + 2* NETWORK_INPUT_AUX)
+#ifdef SIM
+  #define DATA_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
+#else
+  #define DATA_BASE_ADDRESS (RESIZED_IMAGE_BASE_ADDRESS + 2* NETWORK_INPUT_AUX)
+#endif
 
 //ETHERNET variables
 int rcv_timeout = 5000;
@@ -76,7 +102,11 @@ unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 unsigned int start, end;
 
 //weights and data updatable initial positions
-unsigned int w_pos = 0, p_pos;
+unsigned int w_pos = 0, p_pos = 0;
+
+//input image pointer
+uint8_t * fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
+int16_t * fp_image = (int16_t *) INPUT_IMAGE_BASE_ADDRESS;
 
 //reset certain DDR positions to zero due to padding
 void reset_DDR() {
@@ -1048,42 +1078,323 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.clear();
 }
 
-//print detected objects and corresponding probability scores
-void print_results(int w, unsigned int pos) {
+// polynomial approximation of exponential function
+int16_t exp_fnc(int16_t val) {
+  int16_t val_16, exp_val_fixed;
+  int32_t val_32;
+  exp_val_fixed = val + 0x0100; //1+w -> Q8.8
+  exp_val_fixed = exp_val_fixed << 6; //Q8.8 to Q2.14
+  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q8.8*Q8.8 = Q16.16
+  val_16 = (int16_t)(val_32 >> 2); //w^2 -> Q16.16 to Q2.14
+  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^3 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q4.28 to Q2.14
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q2.14*Q8.8 = Q10.22
+  val_16 = (int16_t)(val_32 >> 8); //w^4 -> Q10.22 to Q2.14
+  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q2.14 = Q4.28
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q4.28 to Q2.14
+  return exp_val_fixed; //Q2.14
+}
+
+// create boxes
+void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
   //local variable
-  int i, j, k, m;
-  int16_t arr[256], val_16;
-  const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};
+  int i, j, k, m, n, n_start, n_end;
+  int16_t val_16, obj_score;
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + pos;
   int32_t val_32;
+  int16_t yolo_bias[12] = {0x0280, 0x0380, 0x05C0, 0x06C0, 0x0940, 0x0E80, 0x1440, 0x1480, 0x21C0, 0x2A40, 0x5600, 0x4FC0}; //Q10.6
 
   //print detections
   for(i = 0; i < w; i++) {
     for(j = 0; j < w; j++) {
 
-      //fill array
-      for(k = 0; k < 16; k++)
-        for(m = 0; m < 16; m++)
-          arr[k*16 + m] = fp_data[i*w*256 + j*16 + k*w*16 + m];
-
       //check if obj score is higher than threshold
-      for(k = 0; k < 255; k+=85) {
-        if(arr[k+4] > threshold) {
+      for(k = 0; k < 3; k++) {
+        obj_score = fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 4];
+        if(obj_score > threshold) {
+
+          //Calculate x
+          val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k] + (j<<8))*(int32_t)xy_div);
+          boxes[84*nboxes] = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+
+          //Calculate y
+          val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 1] + (i<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
+          val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+          val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q2.14 * Q2.14 = Q4.28
+          val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+          val_16 -= (int16_t)y_bias; //Q2.14
+          boxes[84*nboxes+1] = val_16;
+
+          //Calculate w
+          val_32 = (int32_t)((int32_t)exp_fnc(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 2])*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
+          val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+          val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
+          boxes[84*nboxes+2] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+
+          //Calculate h
+          val_32 = (int32_t)((int32_t)exp_fnc(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 3])*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
+          val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
+          val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
+          boxes[84*nboxes+3] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+
           //check if prob score is higher than threshold
-          for(m = 0; m < 80; m++) {
-            val_32 = (int32_t)((int32_t)arr[k+5+m]*(int32_t)arr[k+4]<<6); //Q8.8 * Q2.14 = Q10.22
-            val_16 = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
-	    if(val_16 > (threshold << 6)) {
-	      val_32 = (uint32_t)((uint32_t)val_16*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
-	      if((val_32&0x3FFF) > 0x2000) uart_printf("%s: %d%%\n", class_names[m], (val_32>>14)+1);
-	      else uart_printf("%s: %d%%\n", class_names[m], (val_32>>14));
+          n_start = 5*k + 5;
+          n_end = 16;
+          for(m = 0; m < 6; m++) {
+            for(n = n_start; n < n_end; n++) {
+              val_32 = (int32_t)((int32_t)fp_data[i*w*256 + j*16 + 5*k*w*16 + m*w*16 + n]*(int32_t)obj_score<<6); //Q8.8 * Q2.14 = Q10.22
+              val_16 = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
+              if(val_16 > (threshold << 6)) boxes[84*nboxes+4+m*16+n-(5*k+5)] = val_16;
+              n_start = 0;
             }
-	  }
-        } 
+            if(m == 4) n_end = 5*k + 5;
+          }
+
+          //Update number of candidate boxes
+          nboxes++;
+        }
       }
     }
   }
+}
+
+//Calculate overlapp between 2 boxes
+int16_t overlap(int16_t x1, int16_t w1, int16_t x2, int16_t w2) {
+  int16_t l1, l2, left, r1, r2, right;
+  l1 = x1 - (w1>>1);
+  l2 = x2 - (w2>>1);
+  left = l1 > l2 ? l1 : l2;
+  r1 = x1 + (w1>>1);
+  r2 = x2 + (w2>>1);
+  right = r1 < r2 ? r1 : r2;
+  return right - left;
+}
+
+//Apply non-maximum-suppresion to filter repeated boxes
+void filter_boxes() {
+
+  //Local variables
+  int i, j, k, l;
+  int obj_cnt;
+  int16_t w, h, b_union, b_iou;
+  int16_t x1, y1, w1, h1, x2, y2, w2, h2;
+  int32_t mul_32, b_inter;
+
+  //Loop to go through classes from candidate boxes
+  for(i = 0; i < 80; i++) {
+
+    //Count number of candidate boxes for given class
+    obj_cnt = 0;
+    for(j = 0; j < nboxes; j++) {
+      if(boxes[84*j+4+i] != 0) {
+
+        //Store box ID in descending order of prob score
+        if(obj_cnt == 0) box_IDs[0] = j;
+        else {
+
+          //Search for position of new box ID
+          for(k = 0; k < obj_cnt; k++)
+            if(boxes[84*j+4+i] > boxes[84*box_IDs[k]+4+i])
+              break;
+
+          //Store box ID
+          if(k < obj_cnt)
+            for(l = obj_cnt; l > k; l--)
+              box_IDs[l] = box_IDs[l-1];
+          box_IDs[k] = j; //min prob score
+        }
+
+        //Update object counter
+        obj_cnt++;
+      }
+    }
+
+    //Apply NMS if more than 1 object from same class was detected
+    if(obj_cnt > 1) {
+      for(j = 0; j < obj_cnt; j++) {
+        if(boxes[84*box_IDs[j]+4+i] == 0) continue;
+        for(k = j+1; k < obj_cnt; k++) {
+
+          //Get boxes coordinates
+          x1 = boxes[84*box_IDs[j]];
+          y1 = boxes[84*box_IDs[j]+1];
+          w1 = boxes[84*box_IDs[j]+2];
+          h1 = boxes[84*box_IDs[j]+3];
+          x2 = boxes[84*box_IDs[k]];
+          y2 = boxes[84*box_IDs[k]+1];
+          w2 = boxes[84*box_IDs[k]+2];
+          h2 = boxes[84*box_IDs[k]+3];
+
+          //Calculate IoU (intersection over union)
+          w = overlap(x1, w1, x2, w2); //Q2.14
+          h = overlap(y1, h1, y2, h2); //Q2.14
+          if(w > 0 && h > 0) {
+            b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q2.14 * Q2.14 = Q4.28
+            mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q2.14 * Q2.14 = Q4.28
+            b_union = (int16_t)(mul_32 >> 14); //w1*h1 -> Q4.28 to Q2.14
+            mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q2.14 * Q2.14 = Q4.28
+            b_union += (int16_t)(mul_32 >> 14); //w1*h1+w2*h2 -> Q4.28 to Q2.14
+            b_union -= (int16_t)(b_inter >> 14); //w1*h1+w2*h2-inter -> Q4.28 to Q2.14
+            b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q4.28 / Q2.14 = Q2.14
+            if(b_iou > nms_threshold) boxes[84*box_IDs[k]+4+i] = 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+//Draw bounding box in input image
+void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green, uint8_t blue) {
+
+  //Limit box coordinates
+  if(left < 0) left = 0; else if(left >= IMG_W) left = IMG_W-1;
+  if(right < 0) right = 0; else if(right >= IMG_W) right = IMG_W-1;
+  if(top < 0) top = 0; else if(top >= IMG_H) top = IMG_H-1;
+  if(bot < 0) bot = 0; else if(bot >= IMG_H) bot = IMG_H-1;
+
+  //Draw horizontally
+  int i;
+  for(i = left; i <= right; i++) {
+    fp_image[top*IMG_W*LAYER_1_C + i*LAYER_1_C] = red;
+    fp_image[top*IMG_W*LAYER_1_C + i*LAYER_1_C + 1] = green;
+    fp_image[top*IMG_W*LAYER_1_C + i*LAYER_1_C + 2] = blue;
+    fp_image[bot*IMG_W*LAYER_1_C + i*LAYER_1_C] = red;
+    fp_image[bot*IMG_W*LAYER_1_C + i*LAYER_1_C + 1] = green;
+    fp_image[bot*IMG_W*LAYER_1_C + i*LAYER_1_C + 2] = blue;
+  }
+
+  //Draw vertically
+  for(i = top; i <= bot; i++) {
+    fp_image[i*IMG_W*LAYER_1_C + left*LAYER_1_C] = red;
+    fp_image[i*IMG_W*LAYER_1_C + left*LAYER_1_C + 1] = green;
+    fp_image[i*IMG_W*LAYER_1_C + left*LAYER_1_C + 2] = blue;
+    fp_image[i*IMG_W*LAYER_1_C + right*LAYER_1_C] = red;
+    fp_image[i*IMG_W*LAYER_1_C + right*LAYER_1_C + 1] = green;
+    fp_image[i*IMG_W*LAYER_1_C + right*LAYER_1_C + 2] = blue;
+  }
+}
+
+//Draw class label in input image
+void draw_class(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b) {
+  int l, k;
+  uint8_t label;
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
+      label = fp_labels[81+MAX_LABEL_SIZE*j+l*label_w+k];
+      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
+      fp_image[(l+top_width)*IMG_W*LAYER_1_C+(k+left+previous_w)*LAYER_1_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      //green
+      fp_image[(l+top_width)*IMG_W*LAYER_1_C+(k+left+previous_w)*LAYER_1_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
+      //blue
+      fp_image[(l+top_width)*IMG_W*LAYER_1_C+(k+left+previous_w)*LAYER_1_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+    }
+  }
+}
+
+//Draw detections (bounding boxes and class labels) in input image
+void draw_detections() {
+
+  //local variables
+  int i, j, k;
+  uint8_t colors[6][3] = { {255,0,255}, {0,0,255},{0,255,255},{0,255,0},{255,255,0},{255,0,0} }; //Q8.0
+  uint8_t ratio, red, green, blue, label_w;
+  uint16_t mul_16;
+  int32_t mul_32;
+  int offset, ratio_min, ratio_max;
+  int left, right, top, bot, top_width, previous_w;
+
+  //Check valid detections
+  for(i = 0; i < nboxes; i++) {
+
+    //Find detected classes
+    previous_w = 0;
+    for(j = 0; j < 80; j++) {
+      if(boxes[84*i+4+j] != 0) {
+
+        //Check if this was the first class detected for given box
+        if(previous_w == 0) {
+
+          //Randomly pick rgb colors for the box
+          offset = j*123457 % 80;
+          mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8
+          ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6
+          ratio_min = (ratio >> 6);
+          ratio_max = ratio_min + 1;
+          ratio = ratio & 0x3F; //Q2.6
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6
+          red = (mul_16 >> 6); //Q10.6 to Q8.0
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6
+          green = (mul_16 >> 6); //Q10.6 to Q8.0
+          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6
+          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6
+          blue = (mul_16 >> 6); //Q10.6 to Q8.0
+
+          //Calculate box coordinates in image frame
+          mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+          left = (mul_32 >> 14);
+          mul_16 = boxes[84*i] + (boxes[84*i+2]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
+          right = (mul_32 >> 14);
+          mul_16 = boxes[84*i+1] - (boxes[84*i+3]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+          top = (mul_32 >> 14);
+          mul_16 = boxes[84*i+1] + (boxes[84*i+3]>>1); //Q2.14
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
+          bot = (mul_32 >> 14);
+
+          //Draw box
+          for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue);
+
+          //Limit top and left box coordinates
+          if(top < 0) top = 0;
+          if(left < 0) left = 0;
+          top_width = top + box_width;
+          if(top_width - label_height >= 0) top_width -= label_height;
+
+        //Otherwise, add comma and space
+        } else {
+          label_w = fp_labels[80];
+          draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
+          previous_w += label_w;
+        }
+
+        //Draw class labels
+        label_w = fp_labels[j];
+        draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
+        previous_w += label_w;
+      }
+    }
+  }
+}
+
+//print detected objects and corresponding probability scores
+void print_results() {
+
+  //local variables
+  int i, j;
+  const char *class_names[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant", "bed", "dining table", "toilet", "tvmonitor", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"};
+  uint32_t pred_32;
+
+  //print detections
+  for(i = 0; i < nboxes; i++) {
+    for(j = 0; j < 80; j++) {
+      if(boxes[84*i+4+j] != 0) {
+	pred_32 = (uint32_t)((uint32_t)boxes[84*i+4+j]*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
+	if( (pred_32&0x3FFF) > 0x2000) uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14)+1);
+	else uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14));
+      }
+    }
+  }
+  uart_printf("\n");
 }
 
 //send results back
@@ -1092,7 +1403,7 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) DATA_BASE_ADDRESS + 2*(DATA_LAYER_1 + DATA_LAYER_2 + DATA_LAYER_4 + DATA_LAYER_6 + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_19 + DATA_LAYER_9 + DATA_LAYER_22);
+  char * fp_data_char = (char *) fp_image;
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
@@ -1103,7 +1414,7 @@ void send_data() {
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES + i];
+     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES*2 + i*2];
 
      //send frame
      eth_send_frame(data_to_send, ETH_NBYTES);
@@ -1363,8 +1674,6 @@ int main(int argc, char **argv) {
   total_time += end-start;
  #endif
 
-#endif
-
   //layers 23 and 24
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 23 and 24...\n");
@@ -1391,29 +1700,78 @@ int main(int argc, char **argv) {
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
   total_time += end-start;
-  uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
+ #endif
+
+#endif
+
+  //create boxes from 1st yolo layer
+ #ifndef TIME_RUN
+  uart_printf("\nCreating boxes from first yolo layer\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+ #ifdef SIM
+  create_boxes(LAYER_16_W, 0, yolo1_div, 1);
+ #else
+  create_boxes(LAYER_16_W, data_pos_layer19-DATA_LAYER_16, yolo1_div, 1);
+ #endif
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+  total_time += end-start;
+ #endif
+
+  //create boxes from 2nd yolo layer
+ #ifndef TIME_RUN
+  uart_printf("\nCreating boxes from second yolo layer\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+ #ifdef SIM
+  create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
+ #else
+  create_boxes(LAYER_23_W, p_pos, yolo2_div, 0);
+ #endif
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+  total_time += end-start;
+ #endif
+
+  //filter boxes
+ #ifndef TIME_RUN
+  uart_printf("\nFiltering boxes...\n");
+  start = timer_time_us(TIMER_BASE);
+ #endif
+  filter_boxes();
+ #ifndef TIME_RUN
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+  total_time += end-start;
  #endif
 
 #ifndef SIM
-  //print detected objects and corresponding probability scores
-  uart_printf("\nResults of first yolo layer:\n");
-  print_results(LAYER_16_W, data_pos_layer19-DATA_LAYER_16);
-  uart_printf("\nResults of second yolo layer:\n");
-  print_results(LAYER_23_W, p_pos);
+  //draw boxes and labels
+  uart_printf("\nDrawing boxes and labels...\n");
+  start = timer_time_us(TIMER_BASE);
+  draw_detections();
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
+  total_time += end-start;
+#else
+  //verify results
+  int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
+  fp_data += 256*13*13 + 256*26*26;
+  int i;
+  uart_printf("\nVerifying...\n");
+  for(i = 0; i < 84*nboxes; i++)
+    if(boxes[i] != fp_data[i])
+      uart_printf("(%d) res = %x, act = %x\n", i, boxes[i] & 0xFFFF, fp_data[i] & 0xFFFF);
 #endif
 
-#ifdef SIM
-  int16_t * fp_data = (int16_t *) RESIZED_IMAGE_BASE_ADDRESS;
-  fp_data += DATA_LAYER_22;
-  int i, j, k;
-  uart_printf("\nVerifying...\n");
-  for(i = 0; i < LAYER_23_W; i++) {
-    uart_printf("Line %d base addr = %x\n", i, DATA_BASE_ADDRESS + 2*(DATA_LAYER_22 + i*LAYER_23_W*LAYER_23_NUM_KER));
-    for(j = 0; j < LAYER_23_W; j++)
-      for(k = 0; k < LAYER_23_NUM_KER; k++)
-        if(fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] != fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k])
-          uart_printf("(%x) res = %x, act = %x\n", DATA_BASE_ADDRESS + 2*(DATA_LAYER_22 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k), fp_data[i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF, fp_data[DATA_LAYER_23 + i*LAYER_23_W*LAYER_23_NUM_KER + j*LAYER_23_NUM_KER + k] & 0xFFFF);
-  }
+#ifndef SIM
+  uart_printf("\n\n TOTAL_TIME = %d us\n\n", total_time);
+  //print detected objects and corresponding probability scores
+  uart_printf("\nDetections:\n");
+  print_results();
 #endif
 
 #ifndef SIM

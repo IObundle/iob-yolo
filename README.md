@@ -22,3 +22,4 @@ Repository for the implementation of an object detection application based on th
 - **yolo_hw:** Execution of yolov3-tiny CNN in new_versat. Goal: accelerate yolo with new versat system.
 - **pre_cnn:** Performs input image resize before CNN. Goal: accelerate pre_cnn with new versat.
 - **pos_cnn:** Performs detection filtering and box/label display after CNN.
+- **tiny_yolov3:** Execution of full yolov3-tiny pipeline (pre-CNN, CNN and pos-CNN) in new_versat. Goal: run all pipeline in 30 fps.
