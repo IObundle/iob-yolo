@@ -80,12 +80,16 @@ module write_aligner_tb;
    reg signed [`PIXEL_ADDR_W - 1:0]  	shift;
    reg signed [`PIXEL_ADDR_W - 1:0]  	incr;
 
+   //dma configuration
+   reg [`IO_ADDR_W-1:0] 		endAddr;
+   
+   
    //databus interface
-   wire                           	databus_ready;
-   wire                       		databus_valid;
-   wire [`IO_ADDR_W-1:0]          	databus_addr;
-   wire [`MIG_BUS_W-1:0]              	databus_wdata;
-   wire [`MIG_BUS_W/8-1:0]        	databus_wstrb; 
+   wire                           	databus_ready, dma_w_ready;
+   wire                       		databus_valid, dma_w_valid;
+   wire [`IO_ADDR_W-1:0]          	databus_addr, dma_w_addr;
+   wire [`MIG_BUS_W-1:0]              	databus_wdata, dma_w_wdata;
+   wire [`MIG_BUS_W/8-1:0]        	databus_wstrb, dma_w_wstrb; 
 
    /////////////////////////////////////////////
    // DMA configurations
@@ -118,7 +122,8 @@ module write_aligner_tb;
       incr <= `PIXEL_ADDR_W'b0;
 
       // dma config
-      len <= `AXI_LEN_W'd15; //transfer 16 values in single burst
+      endAddr <= `IO_ADDR_W'b0;
+      // len <= `AXI_LEN_W'd15; //transfer 16 values in single burst
       
       // deassert rst
       repeat (100) @(posedge clk);
@@ -132,6 +137,9 @@ module write_aligner_tb;
       iterations <= `PIXEL_ADDR_W'd1;
       period <= `PIXEL_ADDR_W'd16;
 
+      // configure dma_w end address
+      endAddr <= `IO_ADDR_W'h11FF;
+      
       //run and wait for done
       run_conf();
       conf_done();
@@ -315,20 +323,52 @@ module write_aligner_tb;
    );
 
    //
-   // UNIT UNDER TEST (axi-dma)
+   // UNIT UNDER TEST (wdata_aligner)
    //
+   wdata_aligner #(
+		   .ADDR_W(`IO_ADDR_W),
+		   .DATA_W(`MIG_BUS_W)
+		   ) uut (
+			  // system inputs
+			  .clk(clk),
+			  .rst(reset),
+			  // control
+			  .clear(),
+			  .run(run),
+			  .endAddr(endAddr),
+			  // databus interface
+			  .dbus_valid(databus_valid),
+			  .dbus_addr(databus_addr),
+			  .dbus_wdata(databus_wdata),
+			  .dbus_wstrb(databus_wstrb),
+			  .dbus_ready(databus_ready),
+			  // DMA interface
+			  .dma_w_valid(dma_w_valid),
+			  .dma_w_addr(dma_w_addr),
+			  .dma_w_wdata(dma_w_wdata),
+			  .dma_w_wstrb(dma_w_wstrb),
+			  .dma_w_ready(dma_w_ready),
+			  // DMA len
+			  .dma_w_len(len)
+			  );
    
+
+
+   
+   //
+   // AXI DMA WRITE
+   //
    axi_dma_w # (
       .USE_RAM(1) //no need to 1-cycle delay on ready signal
    ) dma (
       .clk(clk),
       .rst(reset),
       //databus interface
-      .ready(databus_ready),
-      .valid(databus_valid),
-      .addr(databus_addr[`DDR_ADDR_W-1:0]),
-      .wdata(databus_wdata),
-      .wstrb(databus_wstrb),
+      .ready(dma_w_ready),
+      .valid(dma_w_valid),
+      .addr(dma_w_addr[`DDR_ADDR_W-1:0]),
+      .wdata(dma_w_wdata),
+      .wstrb(dma_w_wstrb),
       //dma configs
       .len(len),
       //address write
@@ -360,7 +400,7 @@ module write_aligner_tb;
 
    //use CPU to confirm data written
 
-   system uut (
+   system system_inst (
 	       .clk           (clk),
 	       .reset         (cpu_rst),
 	       .trap          (trap),

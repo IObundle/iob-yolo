@@ -49,7 +49,8 @@ module wdata_aligner #(
    reg 						   cfg_en, buffer_en, len_cnt_en;
    reg [DATA_W/8-1:0] 				   first_wstrb, last_wstrb;
    reg [ADDR_W-1:0] 				   len, len_cnt;
-   reg [OFFSET_W-1:0] 				   wdata_offset;
+   reg [(OFFSET_W+3)-1:0] 			   wdata_offset;
+   reg 						   dbus_valid_r;
    
    //register dbus
    reg 						   buffer_r0_valid, buffer_r1_valid, dma_w_ready_reg;
@@ -68,18 +69,18 @@ module wdata_aligner #(
      if(rst) begin
 	state <= `ALGN_IDLE;
 	dma_w_ready_reg <= 1'b0;
+	dbus_valid_r <= 1'b0;
      end else begin
 	state <= state_nxt;
 	dma_w_ready_reg <= dma_w_ready;
+	dbus_valid_r <= dbus_valid;
 	if(cfg_en) begin
 	   // calculate len (aligned end- alined start)/Bytes per transfer
 	   len <= ({endAddr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}} - {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}) >> OFFSET_W;
 	   len_cnt <= ({endAddr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}} - {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}) >> OFFSET_W;
-	   // save wdata offset
-	   wdata_offset <= buffer_r0_addr[0+:OFFSET_W];
 	   // calculate first and last wstrbs
 	   first_wstrb <= {DATA_W/8{1'b1}} >> buffer_r0_addr[0+:OFFSET_W];
-	   last_wstrb <= {1'b1, {(DATA_W/8-1){1'b0}}} >>> endAddr[0+:OFFSET_W];
+	   last_wstrb <= $signed({1'b1, {(DATA_W/8-1){1'b0}}}) >>> endAddr[0+:OFFSET_W];
 	end else if(len_cnt_en) begin
 	   if(dma_w_ready) begin
 	      len_cnt = len_cnt - 1;
@@ -93,14 +94,15 @@ module wdata_aligner #(
       state_nxt = state;
       cfg_en = 1'b0;
       buffer_en = 1'b0;
-      len_cnt = 1'b0;
       w_align_valid = 1'b0;
       w_align_wstrb = {DATA_W/8{1'b0}};
+      wdata_offset = wdata_offset;
       case (state)
 	`ALGN_IDLE: begin //wait for dbus_valid
-	   if(dbus_valid) begin
+	   if(dbus_valid_r) begin
 	      state_nxt = `ALGN_CONFIG;
 	      buffer_en = 1'b1; //register first write request
+	      wdata_offset = {~dbus_addr[0+:OFFSET_W], 3'b0};
 	   end
 	end
 	`ALGN_CONFIG: begin //set len, offset, first and last wstrbs
@@ -150,13 +152,13 @@ module wdata_aligner #(
 	 buffer_r0_wstrb <= {(DATA_W/8){1'b0}};
 	 buffer_r1_wstrb <= {(DATA_W/8){1'b0}};	 
       end else if(buffer_en || dma_w_ready_reg) begin
-	 buffer_r0_valid <= dbus_valid;
+	 buffer_r0_valid <= dbus_valid_r;
 	 buffer_r0_addr <= dbus_addr;
 	 buffer_r0_wdata <= {buffer_r0_wdata[0+:(DATA_W-8)], dbus_wdata};
 	 buffer_r0_wstrb <= dbus_wstrb;
 	 buffer_r1_valid <= buffer_r0_valid;
-	 buffer_r1_addr <= {buffer_r0_addr[ADDR_W:OFFSET_W], {OFFSET_W{1'b0}}}; //Align with DATA_W
-	 buffer_r1_wdata <= buffer_r0_wdata[0+:(2*DATA_W-8)] << (8*(~wdata_offset));
+	 buffer_r1_addr <= {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}; //Align with DATA_W
+	 buffer_r1_wdata <= buffer_r0_wdata[0+:(2*DATA_W-8)] << wdata_offset;
 	 buffer_r1_wstrb <= buffer_r0_wstrb;
       end
    end
