@@ -19,11 +19,11 @@ BOOTROM_ADDR_W:=12
 
 #Init memory (only works in simulation or FPGA not running DDR)
 ifeq ($(INIT_MEM),)
-	INIT_MEM:=0
+	INIT_MEM:=1
 endif
 
 #Choose Firmware (in SW_DIR)
-TEST:=tiny_yolov3
+TEST:=write_aligner
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
