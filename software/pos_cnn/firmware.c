@@ -15,7 +15,7 @@
 //input image constants
 #define IMG_W 768
 #define IMG_H 576
-#define IMG_C 3
+#define IMG_C 4
 #define NEW_W 416
 #define NEW_H ((IMG_H*NEW_W)/IMG_W)	//312
 #define IMAGE_INPUT (IMG_W*IMG_H*IMG_C) //already 32-byte aligned
@@ -307,22 +307,22 @@ void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green,
   //Draw horizontally
   int i;
   for(i = left; i <= right; i++) {
-    fp_image[top*IMG_W + i] = red;
-    fp_image[bot*IMG_W + i] = red;
-    fp_image[IMG_W*IMG_H + top*IMG_W + i] = green;
-    fp_image[IMG_W*IMG_H + bot*IMG_W + i] = green;
-    fp_image[IMG_W*IMG_H*2 + top*IMG_W + i] = blue;
-    fp_image[IMG_W*IMG_H*2 + bot*IMG_W + i] = blue;
+    fp_image[top*IMG_W*IMG_C + i*IMG_C] = red;
+    fp_image[top*IMG_W*IMG_C + i*IMG_C + 1] = green;
+    fp_image[top*IMG_W*IMG_C + i*IMG_C + 2] = blue;
+    fp_image[bot*IMG_W*IMG_C + i*IMG_C] = red;
+    fp_image[bot*IMG_W*IMG_C + i*IMG_C + 1] = green;
+    fp_image[bot*IMG_W*IMG_C + i*IMG_C + 2] = blue;
   }
 
   //Draw vertically
   for(i = top; i <= bot; i++) {
-    fp_image[i*IMG_W + left] = red;
-    fp_image[i*IMG_W + right] = red;
-    fp_image[IMG_W*IMG_H + i*IMG_W + left] = green;
-    fp_image[IMG_W*IMG_H + i*IMG_W + right] = green;
-    fp_image[IMG_W*IMG_H*2 + i*IMG_W + left] = blue;
-    fp_image[IMG_W*IMG_H*2 + i*IMG_W + right] = blue;
+    fp_image[i*IMG_W*IMG_C + left*IMG_C] = red;
+    fp_image[i*IMG_W*IMG_C + left*IMG_C + 1] = green;
+    fp_image[i*IMG_W*IMG_C + left*IMG_C + 2] = blue;
+    fp_image[i*IMG_W*IMG_C + right*IMG_C] = red;
+    fp_image[i*IMG_W*IMG_C + right*IMG_C + 1] = green;
+    fp_image[i*IMG_W*IMG_C + right*IMG_C + 2] = blue;
   }
 }
 
@@ -334,11 +334,11 @@ void draw_class(int label_w, int j, int top_width, int left, int previous_w, uin
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
       label = fp_labels[81+MAX_LABEL_SIZE*j+l*label_w+k];
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      fp_image[(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
       //green
-      fp_image[IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
       //blue
-      fp_image[2*IMG_W*IMG_H+(l+top_width)*IMG_W+(k+left+previous_w)] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
     }
   }
 }
