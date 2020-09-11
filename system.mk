@@ -23,7 +23,7 @@ ifeq ($(INIT_MEM),)
 endif
 
 #Choose Firmware (in SW_DIR)
-TEST:=pos_cnn
+TEST:=tiny_yolov3
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
