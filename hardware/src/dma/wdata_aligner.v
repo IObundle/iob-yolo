@@ -24,7 +24,7 @@ module wdata_aligner #(
 			 //control
 			 input 		       clear,
 			 input 		       run,
-			 input [ADDR_W-1:0]    endAddr,
+			 input [ADDR_W-1:0]    NBytesW,
 			 
 			 // Databus interface
 			 input 		       dbus_valid,
@@ -76,11 +76,11 @@ module wdata_aligner #(
 	state <= state_nxt;
 	if(cfg_en) begin
 	   // calculate len (aligned end- alined start)/Bytes per transfer
-	   len <= ({endAddr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}} - {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}) >> OFFSET_W;
-	   len_cnt <= ({endAddr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}} - {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}) >> OFFSET_W;
+	   len <= (NBytesW + {{(ADDR_W-OFFSET_W){1'b0}}, buffer_r0_addr[0+:OFFSET_W]}) >> OFFSET_W;
+	   len_cnt <= (NBytesW + {{(ADDR_W-OFFSET_W){1'b0}}, buffer_r0_addr[0+:OFFSET_W]}) >> OFFSET_W;
 	   // calculate first and last wstrbs
 	   first_wstrb <= {DATA_W/8{1'b1}} << buffer_r0_addr[0+:OFFSET_W];
-	   last_wstrb <= {DATA_W/8{1'b1}} >> ~endAddr[0+:OFFSET_W];
+	   last_wstrb <= {DATA_W/8{1'b1}} >> ~(NBytesW[0+:OFFSET_W] + buffer_r0_addr[0+:OFFSET_W]);
 	end else if(len_cnt_en) begin
 	   len <= len;
 	   first_wstrb <= first_wstrb;

@@ -83,7 +83,7 @@ module write_aligner_tb;
    reg signed [`PIXEL_ADDR_W - 1:0]  	incr;
 
    //dma configuration
-   reg [`IO_ADDR_W-1:0] 		endAddr;
+   reg [`IO_ADDR_W-1:0] 		NBytesW;
    
    
    //databus interface
@@ -124,7 +124,7 @@ module write_aligner_tb;
       incr <= `PIXEL_ADDR_W'b0;
 
       // dma config
-      endAddr <= `IO_ADDR_W'b0;
+      NBytesW <= `IO_ADDR_W'b0;
       // len <= `AXI_LEN_W'd15; //transfer 16 values in single burst
       
       // deassert rst
@@ -140,7 +140,7 @@ module write_aligner_tb;
       period <= `PIXEL_ADDR_W'd7;
 
       // configure dma_w end address
-      endAddr <= `IO_ADDR_W'h10e1;
+      NBytesW <= `IO_ADDR_W'h00DF;
       
       //run and wait for done
       run_conf();
@@ -338,7 +338,7 @@ module write_aligner_tb;
 			  // control
 			  .clear(),
 			  .run(run),
-			  .endAddr(endAddr),
+			  .NBytesW(NBytesW),
 			  // databus interface
 			  .dbus_valid(databus_valid),
 			  .dbus_addr(databus_addr),

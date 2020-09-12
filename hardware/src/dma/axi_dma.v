@@ -102,14 +102,14 @@ module axi_dma #(
    reg 					  yread_len_en;
    reg 					  ywrite_read_len_en;
    // write
-   reg 					  ywrite_write_endAddr_en;
+   reg 					  ywrite_write_nBytesW_en;
 
    // dma configuration parameters
    // read
    reg [`IO_ADDR_W/2-1:0] 		  yread_len, yread_len_shadow;
    reg [`IO_ADDR_W/2-1:0] 		  ywrite_read_len, ywrite_read_len_shadow;
    // write
-   reg [`IO_ADDR_W-1:0] 		  ywrite_write_endAddr, ywrite_write_endAddr_shadow, ywrite_write_endAddr_pip0, ywrite_write_endAddr_pip1;
+   reg [`IO_ADDR_W-1:0] 		  ywrite_write_nBytesW, ywrite_write_nBytesW_shadow, ywrite_write_nBytesW_pip0, ywrite_write_nBytesW_pip1;
 
    // define number of transactions (DMA)
    reg [N_IFACES_R*`IO_ADDR_W/2-1:0] 		  dma_cnt;
@@ -126,6 +126,14 @@ module axi_dma #(
    wire [`REQ_MIG_BUS_W-1:0] 		 read_s_req;
    wire [`RESP_MIG_BUS_W-1:0] 		 read_s_resp;
 
+   // DMA W native interface
+   wire 				 dma_w_valid, dma_w_ready;
+   wire [`IO_ADDR_W-1:0] 		 dma_w_addr;
+   wire [`MIG_BUS_W-1:0] 		 dma_w_wdata;
+   wire [`MIG_BUS_W/8-1:0] 		 dma_w_wstrb;
+   wire [`AXI_LEN_W-1:0] 		 dma_w_len;
+
+   
    
    // addr decoder enable
    always @* begin
@@ -133,14 +141,14 @@ module axi_dma #(
       yread_len_en = 1'b0;
       ywrite_read_len_en = 1'b0;
       //write
-      ywrite_write_endAddr_en = 1'b0;
+      ywrite_write_nBytesW_en = 1'b0;
       if(valid & wstrb)
 	   case(addr)
 	     //read
 	     `DMA_XYOLO_READ_CONF_LEN : yread_len_en = 1'b1;
 	     `DMA_XYOLO_WRITE_READ_CONF_LEN : ywrite_read_len_en = 1'b1;
 	     //write
-	     `DMA_XYOLO_WRITE_WRITE_CONF_ENDADDR : ywrite_write_endAddr_en = 1'b1;
+	     `DMA_XYOLO_WRITE_WRITE_CONF_NBYTESW : ywrite_write_nBytesW_en = 1'b1;
 	     default : ;
 	   endcase // case (addr)
    end // always @ *
@@ -152,13 +160,13 @@ module axi_dma #(
 	yread_len <= {`IO_ADDR_W/2{1'b0}};
 	ywrite_read_len <= {`IO_ADDR_W/2{1'b0}};
 	//write
-	ywrite_write_endAddr <= {`IO_ADDR_W{1'b0}};
+	ywrite_write_nBytesW <= {`IO_ADDR_W{1'b0}};
      end else begin
 	//read
 	if(yread_len_en) yread_len <= wdata[`IO_ADDR_W/2-1:0];
 	if(ywrite_read_len_en) ywrite_read_len <= wdata[`IO_ADDR_W/2-1:0];
 	//write
-	if(ywrite_write_endAddr_en) ywrite_write_endAddr <= wdata[`IO_ADDR_W-1:0];
+	if(ywrite_write_nBytesW_en) ywrite_write_nBytesW <= wdata[`IO_ADDR_W-1:0];
      end // else: !if(clear || rst)
 
    // configurable parameters shadow register
@@ -168,17 +176,17 @@ module axi_dma #(
 	yread_len_shadow <= {`IO_ADDR_W/2{1'b0}};
 	ywrite_read_len_shadow <= {`IO_ADDR_W/2{1'b0}};
 	//write
-	ywrite_write_endAddr_shadow <= {`IO_ADDR_W{1'b0}};
-	ywrite_write_endAddr_pip0 <= {`IO_ADDR_W{1'b0}};
-	ywrite_write_endAddr_pip1 <= {`IO_ADDR_W{1'b0}};
+	ywrite_write_nBytesW_shadow <= {`IO_ADDR_W{1'b0}};
+	ywrite_write_nBytesW_pip0 <= {`IO_ADDR_W{1'b0}};
+	ywrite_write_nBytesW_pip1 <= {`IO_ADDR_W{1'b0}};
      end else if(run) begin
 	//read
 	yread_len_shadow <= yread_len;
 	ywrite_read_len_shadow <= ywrite_read_len;
 	//write
-	ywrite_write_endAddr_pip0 <= ywrite_write_endAddr;
-	ywrite_write_endAddr_pip1 <= ywrite_write_endAddr_pip0;
-	ywrite_write_endAddr_shadow <= ywrite_write_endAddr_pip1;
+	ywrite_write_nBytesW_pip0 <= ywrite_write_nBytesW;
+	ywrite_write_nBytesW_pip1 <= ywrite_write_nBytesW_pip0;
+	ywrite_write_nBytesW_shadow <= ywrite_write_nBytesW_pip1;
      end
 
    // update DMA length - READ
@@ -270,6 +278,36 @@ module axi_dma #(
 		    .m_axi_rvalid(m_axi_rvalid),  
 		    .m_axi_rready(m_axi_rready)
 		    );
+
+
+   // Align WDATA
+   wdata_aligner #(
+		   .ADDR_W(`IO_ADDR_W),
+		   .DATA_W(`MIG_BUS_W)
+		   ) wdata_aligner_inst (
+					 .clk(clk),
+					 .rst(rst),
+					 // control
+					 .clear(clear),
+					 .run(run),
+					 .NBytesW(ywrite_write_nBytesW_shadow),
+					 // Databus interface
+					 .dbus_valid(databus_valid[N_IFACES_R]),
+					 .dbus_addr(databus_addr[N_IFACES_R*`IO_ADDR_W+:`IO_ADDR_W]),
+					 .dbus_wdata(databus_wdata[N_IFACES_R*`MIG_BUS_W+:`MIG_BUS_W]),
+					 .dbus_wstrb(databus_wstrb[N_IFACES_R*(`MIG_BUS_W/8)+:(`MIG_BUS_W/8)]),
+					 .dbus_ready(databus_ready[N_IFACES_R]),
+					 //DMA_W interface
+					 .dma_w_valid(dma_w_valid),
+					 .dma_w_addr(dma_w_addr),
+					 .dma_w_wdata(dma_w_wdata),
+					 .dma_w_wstrb(dma_w_wstrb),
+					 .dma_w_ready(dma_w_ready),
+					 //DMA_W len
+					 .dma_w_len(dma_w_len)
+					 );
+   
+
    
    // AXI_DMA WRITE
    axi_dma_w # (
@@ -278,13 +316,13 @@ module axi_dma #(
 	    .clk(clk),
 	    .rst(rst),
 	    // Native interface
-	    .valid    (databus_valid[2]),
-	    .addr     (databus_addr[3*`IO_ADDR_W-1-(`IO_ADDR_W-`DDR_ADDR_W) -: `DDR_ADDR_W]),
-	    .wdata    (databus_wdata[3*`MIG_BUS_W-1 -: `MIG_BUS_W]),
-	    .wstrb    (databus_wstrb[3*`MIG_BUS_W/8-1 -: `MIG_BUS_W/8]),
-	    .ready    (databus_ready[2]),
+	    .valid    (dma_w_valid),
+	    .addr     (dma_w_addr[0 +: `DDR_ADDR_W]),
+	    .wdata    (dma_w_wdata),
+	    .wstrb    (dma_w_wstrb),
+	    .ready    (dma_w_ready),
 	    // DMA configurations
-	    .len        (), //TODO
+	    .len        (dma_w_len), //TODO
 	    // Address write
 	    .m_axi_awid(m_axi_awid), 
             .m_axi_awaddr(m_axi_awaddr), 
