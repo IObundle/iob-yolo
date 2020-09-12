@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   //set positions to zero due to output padding
   int16_t * val = (int16_t *) (DDR_MEM + 0x1000);
   int i;
-  for(i = 0; i < 16; i++) uart_printf("(%x) %x\n", &val[16*i], val[16*i]);
+  for(i = 0; i < 16*8; i++) uart_printf("(%x) %x\n", &val[i], val[i]);
 
   //finish
   uart_putc(ETX);

@@ -10,7 +10,9 @@
 module write_aligner_tb;
 
    //define parameters
-   parameter file_name = {"../../../../dma_", `STRINGIFY(`MIG_BUS_W), ".hex"};
+   // parameter file_name = {"../../../../dma_", `STRINGIFY(`MIG_BUS_W), ".hex"};
+   parameter file_name = {"../../../../write_align.hex"};
+
    parameter clk_per = 10;
 
    //clock
@@ -133,12 +135,12 @@ module write_aligner_tb;
       repeat (10) @(posedge clk) #1;
 
       //configure ext_addrgen to read 16 lines
-      ext_addr <= `IO_ADDR_W'h1000;
+      ext_addr <= `IO_ADDR_W'h1002;
       iterations <= `PIXEL_ADDR_W'd1;
-      period <= `PIXEL_ADDR_W'd16;
+      period <= `PIXEL_ADDR_W'd7;
 
       // configure dma_w end address
-      endAddr <= `IO_ADDR_W'h11FF;
+      endAddr <= `IO_ADDR_W'h10e1;
       
       //run and wait for done
       run_conf();
