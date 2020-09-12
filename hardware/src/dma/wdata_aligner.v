@@ -50,10 +50,9 @@ module wdata_aligner #(
    reg [DATA_W/8-1:0] 				   first_wstrb, last_wstrb;
    reg [ADDR_W-1:0] 				   len, len_cnt;
    reg [(OFFSET_W+3)-1:0] 			   wdata_offset;
-   reg 						   dbus_valid_r;
    
    //register dbus
-   reg 						   buffer_r0_valid, buffer_r1_valid, dma_w_ready_reg;
+   reg 						   buffer_r0_valid, buffer_r1_valid;
    reg [ADDR_W-1:0] 				   buffer_r0_addr, buffer_r1_addr;
    reg [2*DATA_W-8-1:0] 			   buffer_r0_wdata, buffer_r1_wdata;
    reg [DATA_W/8-1:0] 				   buffer_r0_wstrb, buffer_r1_wstrb;
@@ -68,12 +67,12 @@ module wdata_aligner #(
    always @(posedge clk, posedge rst)
      if(rst) begin
 	state <= `ALGN_IDLE;
-	dma_w_ready_reg <= 1'b0;
-	dbus_valid_r <= 1'b0;
+	len <= {ADDR_W{1'b0}};
+	len_cnt <= {ADDR_W{1'b0}};
+	first_wstrb <= {DATA_W/8{1'b0}};
+	last_wstrb <= {DATA_W/8{1'b0}};
      end else begin
 	state <= state_nxt;
-	dma_w_ready_reg <= dma_w_ready;
-	dbus_valid_r <= dbus_valid;
 	if(cfg_en) begin
 	   // calculate len (aligned end- alined start)/Bytes per transfer
 	   len <= ({endAddr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}} - {buffer_r0_addr[ADDR_W-1:OFFSET_W], {OFFSET_W{1'b0}}}) >> OFFSET_W;
@@ -82,9 +81,19 @@ module wdata_aligner #(
 	   first_wstrb <= {DATA_W/8{1'b1}} >> buffer_r0_addr[0+:OFFSET_W];
 	   last_wstrb <= $signed({1'b1, {(DATA_W/8-1){1'b0}}}) >>> endAddr[0+:OFFSET_W];
 	end else if(len_cnt_en) begin
+	   len <= len;
+	   first_wstrb <= first_wstrb;
+	   last_wstrb <= last_wstrb;
 	   if(dma_w_ready) begin
 	      len_cnt = len_cnt - 1;
+	   end else begin
+	      len_cnt <= len_cnt;
 	   end
+	end else begin
+	   len <= len;
+	   len_cnt <= len_cnt;
+	   first_wstrb <= first_wstrb;
+	   last_wstrb <= last_wstrb;
 	end
 	
      end
@@ -99,7 +108,7 @@ module wdata_aligner #(
       wdata_offset = wdata_offset;
       case (state)
 	`ALGN_IDLE: begin //wait for dbus_valid
-	   if(dbus_valid_r) begin
+	   if(dbus_valid) begin
 	      state_nxt = `ALGN_CONFIG;
 	      buffer_en = 1'b1; //register first write request
 	      wdata_offset = {~dbus_addr[0+:OFFSET_W], 3'b0};
@@ -113,25 +122,27 @@ module wdata_aligner #(
 	`ALGN_FIRST: begin //send first transfer
 	   len_cnt_en = 1'b1;
 	   w_align_valid = buffer_r1_valid;
-	   w_align_wstrb = buffer_r1_wstrb && first_wstrb;
 	   if(len_cnt=={ADDR_W{1'b0}}) begin // case of single transfer: burst length==1
-	      w_align_wstrb = buffer_r1_wstrb && first_wstrb && last_wstrb;
+	      w_align_wstrb = buffer_r1_wstrb & first_wstrb & last_wstrb;
 	      if(dma_w_ready) begin
 		 state_nxt = `ALGN_IDLE;
 	      end
-	   end
-	   if(dma_w_ready) begin //wait for ready
-	      state_nxt = `ALGN_TRANSFER;
+	   end else begin // first != last transfer
+	      w_align_wstrb = buffer_r1_wstrb & first_wstrb;
+	      if(dma_w_ready) begin //wait for ready
+		 state_nxt = `ALGN_TRANSFER;
+	      end
 	   end
 	end
 	`ALGN_TRANSFER: begin
 	   w_align_valid = buffer_r1_valid;
-	   w_align_wstrb = buffer_r1_wstrb;
-	   if(dma_w_ready && len_cnt == {ADDR_W{1'b0}}) begin
-	      w_align_wstrb = buffer_r1_wstrb && last_wstrb;
+	   if(dma_w_ready && len_cnt == {ADDR_W{1'b0}}) begin // last transfer
+	      w_align_wstrb = buffer_r1_wstrb & last_wstrb;
 	      if(dma_w_ready) begin
 		 state_nxt = `ALGN_IDLE;
 	      end
+	   end else begin // middle transfers
+	      w_align_wstrb = buffer_r1_wstrb;
 	   end
 	end
 	default: begin
@@ -151,8 +162,8 @@ module wdata_aligner #(
 	 buffer_r1_wdata <= {(2*DATA_W-8){1'b0}};
 	 buffer_r0_wstrb <= {(DATA_W/8){1'b0}};
 	 buffer_r1_wstrb <= {(DATA_W/8){1'b0}};	 
-      end else if(buffer_en || dma_w_ready_reg) begin
-	 buffer_r0_valid <= dbus_valid_r;
+      end else if(buffer_en || dma_w_ready) begin
+	 buffer_r0_valid <= dbus_valid;
 	 buffer_r0_addr <= dbus_addr;
 	 buffer_r0_wdata <= {buffer_r0_wdata[0+:(DATA_W-8)], dbus_wdata};
 	 buffer_r0_wstrb <= dbus_wstrb;
@@ -164,7 +175,7 @@ module wdata_aligner #(
    end
 
    // update DMA length
-   assign dma_w_len = |len_cnt[ADDR_W-1:`AXI_LEN_W] ? {`AXI_LEN_W{1'b1}} : len_cnt[`AXI_LEN_W-1:0];
+   assign dma_w_len = |len_cnt[ADDR_W-1:`AXI_LEN_W] ? {`AXI_LEN_W{1'b1}} : len[`AXI_LEN_W-1:0];
    
    // remaining dma side outputs
    assign dma_w_addr = buffer_r1_addr;

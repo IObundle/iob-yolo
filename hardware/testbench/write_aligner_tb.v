@@ -272,7 +272,8 @@ module write_aligner_tb;
    iob_sp_ram # (
       .FILE(file_name),
       .DATA_W(`MIG_BUS_W),
-      .ADDR_W(`VWRITE_ADDR_W)
+      .ADDR_W(`VWRITE_ADDR_W),
+      .USE_RAM(0)
    ) ram (
       .clk(clk),
       .en(en),
@@ -359,7 +360,7 @@ module write_aligner_tb;
    // AXI DMA WRITE
    //
    axi_dma_w # (
-      .USE_RAM(1) //no need to 1-cycle delay on ready signal
+      .USE_RAM(0) //no need to 1-cycle delay on ready signal
    ) dma (
       .clk(clk),
       .rst(reset),
