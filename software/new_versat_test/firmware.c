@@ -176,7 +176,8 @@ void conv() {
   versat.ywrite.write.setIntIter(TILE_W/2); // 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(TILE_W/2-1); //send 16 values per stage
+  /* versat.dma.ywrite_write_setLen(TILE_W/2-1); //send 16 values per stage */
+  versat.dma.ywrite_write_setNBytesW(NTW_IN_NUM_KER*TILE_W); // #Bytes written per burst
   versat.ywrite.write.setOffset(2*((NTW_IN_W/2+2)*NTW_IN_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -339,7 +340,7 @@ int main(int argc, char **argv) {
   // vwrite
   versat.ywrite.write.setExtAddr(1);
   versat.ywrite.write.setOffset(2);
-  versat.dma.ywrite_write_setLen(3);
+  versat.dma.ywrite_write_setNBytesW(3);
   versat.ywrite.write.setIntAddr(4);
   versat.ywrite.write.setExtIter(5);
   versat.ywrite.write.setExtPer(6);
