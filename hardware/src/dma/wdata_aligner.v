@@ -192,7 +192,7 @@ module wdata_aligner #(
    assign dma_w_wstrb = w_align_wstrb;
    
    // dbus_ready
-   assign dbus_ready = buffer_en ? 1'b1 : dma_w_ready;
+   assign dbus_ready = buffer_en ? 1'b1 : (dma_w_ready && {|len_cnt[ADDR_W-1:1]});
    
    
 endmodule

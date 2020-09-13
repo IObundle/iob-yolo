@@ -1003,13 +1003,13 @@ module xyolo_write #(
    //
 
    //instantiate merge
-   merge #(
+   vread_merge #(
       .N_MASTERS(`nSTAGES),
       .DATA_W(DATABUS_W),
       .ADDR_W(ADDR_W)
    ) vwrite_merge (
-      .clk (clk),
-      .rst (rst),
+      // .clk (clk),
+      // .rst (rst),
       //masters interface
       .m_req(vwrite_m_req),
       .m_resp(vwrite_m_resp),
