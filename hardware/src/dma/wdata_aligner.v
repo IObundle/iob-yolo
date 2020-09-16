@@ -191,7 +191,7 @@ module wdata_aligner #(
    assign dma_w_valid = w_align_valid;
    assign dma_w_wstrb = w_align_wstrb;
    
-   // dbus_ready
+   // dbus_ready - 1 for 2 cycles after valid set to 1, and 0 for the last 2 cycles of the burst
    assign dbus_ready = buffer_en ? 1'b1 : (dma_w_ready && {|len_cnt[ADDR_W-1:1]});
    
    

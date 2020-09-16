@@ -7,9 +7,15 @@
 //DDR initial constants
 `define OFFSET (2**`FIRM_ADDR_W)
 
+//RGB constants
+`define RGB_LINE 16
+`define RGB_VALUES_SIZE (`RGB_LINE*81)
+
 //Label constants
 `define MAX_LABEL_SIZE 2340
-`define LABELS_FILE_SIZE (81 + `MAX_LABEL_SIZE*81 + 11) //+11 to be 32-byte aligned
+`define LABEL_SIZE 9600
+`define LABEL_W_OFF (81+15)
+`define LABELS_FILE_SIZE (`LABEL_W_OFF + `LABEL_SIZE*81) //+11 to be 32-byte aligned
 
 //Input image
 `define IMG_W 768
@@ -25,7 +31,7 @@
 
 //Total constants
 `define STRINGIFY(x) `"x`"
-`define FILE_SIZE ((`OFFSET + `LABELS_FILE_SIZE + `IMAGE_INPUT + `TOTAL_FM)/(`MIG_BUS_W/8))
+`define FILE_SIZE ((`OFFSET + 2*`RGB_VALUES_SIZE + 2*`LABELS_FILE_SIZE + `IMAGE_INPUT + `TOTAL_FM)/(`MIG_BUS_W/8))
 
 module pos_cnn_tb;
 

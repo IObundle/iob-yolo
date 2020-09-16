@@ -39,9 +39,21 @@
 #define box_width 3
 #define label_height 20
 
+//rgb values constants - 16bit values
+// one line for each class: 00000000000 B[j] G[j] R[j]
+// 81st line with:          00000000000 1    1    1
+#define RGB_LINE 16
+#define RGB_VALUES_SIZE (RGB_LINE*81)
+
 //label constants
 #define MAX_LABEL_SIZE 2340
-#define LABELS_FILE_SIZE (81 + MAX_LABEL_SIZE*81 + 11) //+11 to be 32-byte aligned
+#define LABEL_LINES 20
+#define LABEL_W_OFF (81+15)
+//Original MAX_LABEL_SIZE/20*4 + 12 values of padding 
+//each 4 bytes have 3x label_px_value and 0, for padding channel 
+#define LABEL_LINE_SIZE (117*4 + 12)
+#define LABEL_SIZE (9600) // LABEL_LINE_SIZE * LABEL_LINES
+#define LABELS_FILE_SIZE (LABEL_W_OFF + LABEL_SIZE*81) //label_w + labels for versat 16bit values
 
 //variables for bounding boxes
 int16_t boxes[84*MAX_NUM_BOXES];
@@ -63,14 +75,15 @@ uint8_t box_IDs[MAX_NUM_BOXES];
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
-#define INPUT_FILE_SIZE (LABELS_FILE_SIZE + (IMAGE_INPUT + 13*13*256 + 26*26*256)*2) //16 bits
+#define INPUT_FILE_SIZE ((RGB_VALUES_SIZE + LABELS_FILE_SIZE + IMAGE_INPUT + 13*13*256 + 26*26*256)*2) //16 bits
 #define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define OUTPUT_FILE_SIZE (IMAGE_INPUT) //8 bits
 #define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
-#define LABEL_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
-#define INPUT_IMAGE_BASE_ADDRESS (LABEL_BASE_ADDRESS + LABELS_FILE_SIZE)
+#define RGB_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
+#define LABEL_BASE_ADDRESS (RGB_BASE_ADDRESS + 2*RGB_VALUES_SIZE)
+#define INPUT_IMAGE_BASE_ADDRESS (LABEL_BASE_ADDRESS + 2*LABELS_FILE_SIZE)
 #define DATA_BASE_ADDRESS (INPUT_IMAGE_BASE_ADDRESS + 2*IMAGE_INPUT)
 
 //ETHERNET variables
@@ -83,7 +96,8 @@ unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 unsigned int start, end;
 
 //input image pointer
-uint8_t * fp_labels = (uint8_t *) LABEL_BASE_ADDRESS;
+int16_t * fp_rgb = (int16_t *) RGB_BASE_ADDRESS;
+int16_t * fp_labels = (int16_t *) LABEL_BASE_ADDRESS;
 int16_t * fp_image = (int16_t *) INPUT_IMAGE_BASE_ADDRESS;
 
 //receive weigths and resized padded image
@@ -296,7 +310,7 @@ void filter_boxes() {
 }
 
 //Draw bounding box in input image
-void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green, uint8_t blue) {
+void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green, int16_t blue) {
 
   //Limit box coordinates
   if(left < 0) left = 0; else if(left >= IMG_W) left = IMG_W-1;
@@ -326,13 +340,31 @@ void draw_box(int left, int top, int right, int bot, uint8_t red, uint8_t green,
   }
 }
 
-//Draw class label in input image
-void draw_class(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b) {
+//draw class using versat
+void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b){
   int l, k;
   uint8_t label;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
-      label = fp_labels[81+MAX_LABEL_SIZE*j+l*label_w+k];
+      label = fp_labels[LABEL_W_OFF+MAX_LABEL_SIZE*j+l*label_w+k];
+      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      //green
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
+      //blue
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+    }
+  }
+}
+
+
+//Draw class label in input image
+void draw_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
+  int l, k;
+  uint8_t label;
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
+      label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
       //green
@@ -348,8 +380,9 @@ void draw_detections() {
 
   //local variables
   int i, j, k;
-  uint8_t colors[6][3] = { {255,0,255}, {0,0,255},{0,255,255},{0,255,0},{255,255,0},{255,0,0} }; //Q8.0
-  uint8_t ratio, red, green, blue, label_w;
+  /* uint8_t colors[6][3] = { {255,0,255}, {0,0,255},{0,255,255},{0,255,0},{255,255,0},{255,0,0} }; //Q8.0 */
+  /* uint8_t ratio, red, green, blue, label_w; */
+  int16_t label_w, red, green, blue;
   uint16_t mul_16;
   int32_t mul_32;
   int offset, ratio_min, ratio_max;
@@ -367,21 +400,26 @@ void draw_detections() {
         if(previous_w == 0) {
 
           //Randomly pick rgb colors for the box
-          offset = j*123457 % 80;
-          mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8
-          ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6
-          ratio_min = (ratio >> 6);
-          ratio_max = ratio_min + 1;
-          ratio = ratio & 0x3F; //Q2.6
-          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6
-          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6
-          red = (mul_16 >> 6); //Q10.6 to Q8.0
-          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6
-          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6
-          green = (mul_16 >> 6); //Q10.6 to Q8.0
-          mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6
-          mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6
-          blue = (mul_16 >> 6); //Q10.6 to Q8.0
+          /* offset = j*123457 % 80; */
+          /* mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8 */
+          /* ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6 */
+          /* ratio_min = (ratio >> 6); */
+          /* ratio_max = ratio_min + 1; */
+          /* ratio = ratio & 0x3F; //Q2.6 */
+          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6 */
+          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6 */
+          /* red = (mul_16 >> 6); //Q10.6 to Q8.0 */
+          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6 */
+          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6 */
+          /* green = (mul_16 >> 6); //Q10.6 to Q8.0 */
+          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6 */
+          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6 */
+          /* blue = (mul_16 >> 6); //Q10.6 to Q8.0 */
+
+	  // pick generated colors based on class value
+	  red = fp_rgb[RGB_LINE*j + 0];
+	  green = fp_rgb[RGB_LINE*j + 1];
+	  blue = fp_rgb[RGB_LINE*j + 2];
 
           //Calculate box coordinates in image frame
           mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
