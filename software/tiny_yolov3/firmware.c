@@ -325,7 +325,7 @@ void width_resize() {
 
   // configure xwrite to write results
   versat.ywrite.write.setIntDuty(2*nYOLOvect/LAYER_1_C);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 3);
   versat.ywrite.write.setIntPer(2*nYOLOvect/LAYER_1_C);
   versat.ywrite.write.setIntIter(NEW_W_PADD/(nYOLOvect/LAYER_1_C));
   versat.ywrite.write.setIntShift(1);
@@ -420,7 +420,7 @@ void height_resize() {
 
   // configure xwrite to write results
   versat.ywrite.write.setIntDuty(2*nYOLOvect/LAYER_1_C);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 3);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 4);
   versat.ywrite.write.setIntPer(2*nYOLOvect/LAYER_1_C);
   versat.ywrite.write.setIntIter(NEW_W_PADD/(nYOLOvect/LAYER_1_C));
   versat.ywrite.write.setIntShift(1);
@@ -862,7 +862,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
 
   // configure xwrite to write convolution results
   versat.ywrite.write.setIntDuty(1+upsample);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2 + 2*(1-leaky));
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2 + (1-leaky));
   versat.ywrite.write.setIntPer(ker_size*ker_size*c/nYOLOmacs);
   versat.ywrite.write.setIntIncr(1);
   versat.ywrite.write.setIntIter(w*(1+upsample)+upsample); //+upsample to use duty of 2

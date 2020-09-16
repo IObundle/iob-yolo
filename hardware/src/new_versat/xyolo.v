@@ -51,8 +51,9 @@ module xyolo # (
 
    //activation function wires
    wire signed [DATAPATH_W-1:0]		sig_in, sig_out, sig_adder;
-   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r, shift_r, shift_r2;
-   wire signed [DATAPATH_W-1:0]		leaky_out;
+   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r;
+   wire signed [DATAPATH_W-1:0]		leaky_in, leaky_out;
+   reg signed [DATAPATH_W-1:0]		shift_r, shift_r2, leaky_out_r;
 
    //multiplier wires and regs
    wire signed [N_MACS*2*DATAPATH_W-1:0] dsp_out, adder_w;
@@ -73,6 +74,7 @@ module xyolo # (
        bias_reg <= {DATAPATH_W{1'b0}};
        op_a_bypass <= {DATAPATH_W{1'b0}};
        result <= {DATAPATH_W{1'b0}};
+       leaky_out_r <= {DATAPATH_W{1'b0}};
        sig_out_r <= {DATAPATH_W{1'b0}};
        shift_r <= {DATAPATH_W{1'b0}};
        shift_r2 <= {DATAPATH_W{1'b0}};
@@ -82,6 +84,7 @@ module xyolo # (
        bias_reg <= flow_in_bias;
        op_a_bypass <= op_a_bypass_nmac;
        if(ld_res) result <= bypass_adder ? dsp_out[INDEX*2*DATAPATH_W +: 2*DATAPATH_W] >> shift : result_w;
+       leaky_out_r <= leaky_out;
        sig_out_r <= sig_out;
        shift_r <= shifted_half;
        shift_r2 <= shift_r;
@@ -137,7 +140,8 @@ module xyolo # (
    assign shifted_half = shifted[DATAPATH_W-1:0];
 
    //leaky activation function
-   assign leaky_out = shifted_half[DATAPATH_W-1] ? shifted_half >>> 3 : shifted_half;
+   //assign leaky_in = (shifted_half >>> 4) + (shifted_half >>> 5) + (shifted_half >>> 7);
+   assign leaky_out = shifted_half[DATAPATH_W-1] ? leaky_in : shifted_half;
    
    //sigmoid activation function
    assign sig_in = shifted_half[DATAPATH_W-1] ? ~shifted_half + 1'b1 : shifted_half;
@@ -160,7 +164,7 @@ module xyolo # (
    assign sig_out = shift_r[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
 
    //choose activation function
-   assign act_fnc = leaky ? leaky_out : sigmoid ? sig_out_r : shift_r2;
+   assign act_fnc = leaky ? leaky_out_r : sigmoid ? sig_out_r : shift_r2;
 
    //maxpooling
    assign bypass_w = bypass ? op_a_bypass : act_fnc;

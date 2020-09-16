@@ -115,6 +115,8 @@ report_utilization -hierarchical -file utilization.txt
 
 report_timing
 
+report_power
+
 write_bitstream -force synth_system.bit
 
 write_verilog -force synth_system.v

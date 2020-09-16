@@ -1,5 +1,5 @@
 // Latency
-`define XYOLO_WRITE_LAT        	6
+`define XYOLO_WRITE_LAT        	7
 `define XYOLO_WRITE_BYPASS_LAT  2
 
 //define vread mem write address width
