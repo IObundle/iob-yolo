@@ -20,7 +20,7 @@
 //FM constants
 `define DATA_LAYER_16 (13*13*256)
 `define DATA_LAYER_23 (26*26*256)
-`define nboxes 8
+`define nboxes 5
 `define TOTAL_FM (2*(`DATA_LAYER_16 + `DATA_LAYER_23 + `nboxes*84)) 
 
 //Total constants

@@ -186,7 +186,7 @@ void fill_grey() {
   for(j = 0; j < NEW_W; j++)
     for(k = 0; k < NEW_W; k++) 
       for(i = 0; i < IMG_C-C_PADD; i++)
-	fp_data[j*((NEW_W+2)*IMG_C + LAYER_1_P_OFF) + k*IMG_C + i] = 0x0080;
+	fp_data[j*((NEW_W+2)*IMG_C + LAYER_1_P_OFF) + k*IMG_C + i] = 0x4000; //0.5 in Q1.15
 }
 
 //receive weigths and resized padded image
@@ -363,7 +363,7 @@ void height_resize() {
   // configure xyolo to multiply pixel with dy
   versat.ywrite.yolo.setIter(NEW_W_PADD);
   versat.ywrite.yolo.setPer(2);
-  versat.ywrite.yolo.setShift(21);
+  versat.ywrite.yolo.setShift(14);
   versat.ywrite.yolo.setBypassAdder(1);
 
   // configure xwrite to write results
