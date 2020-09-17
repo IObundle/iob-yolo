@@ -25,35 +25,37 @@ module xyolo # (
                 input                         bypass,
                 input                         bypass_adder,
 		input [`SHIFT_W-1:0]	      shift,
+		input [`SHIFT_W-1:0]	      b_shift,
+		input [`SHIFT_W-1:0]	      sig_shift,
 
                 //data interface
                 input [N_MACS*DATAPATH_W-1:0] flow_in_pixel, //op_a
 		input [N_MACS*DATAPATH_W-1:0] flow_in_weight, //op_b
-                input [DATAPATH_W-1:0] 	      flow_in_bias, //op_c
+                input [DATAPATH_W-1:0]        flow_in_bias, //op_c
                 output [DATAPATH_W-1:0]       flow_out
                 );
 
-   //local parameters for sigmoid linear approximation
-   localparam [DATAPATH_W-1:0]		fp5 = 'h500;
-   localparam [DATAPATH_W-1:0]		fp2375 = 'h260;
-   localparam [DATAPATH_W-1:0]		fp1 = 'h100;
-   localparam [DATAPATH_W-1:0]		fp084375 = 'hD8;
-   localparam [DATAPATH_W-1:0]		fp0625 = 'hA0;
-   localparam [DATAPATH_W-1:0]		fp05 = 'h80;
+   //wires for sigmoid linear approximation
+   wire [2*DATAPATH_W-1:0]		fp5 = 'h500 << sig_shift;
+   wire [2*DATAPATH_W-1:0]		fp2375 = 'h260 << sig_shift;
+   wire [2*DATAPATH_W-1:0]		fp1 = 'h100 << sig_shift;
+   wire [2*DATAPATH_W-1:0]		fp084375 = 'hD8 << sig_shift;
+   wire [2*DATAPATH_W-1:0]		fp0625 = 'hA0 << sig_shift;
+   wire [2*DATAPATH_W-1:0]		fp05 = 'h80 << sig_shift;
 
    //data interface wires and regs
-   wire [2*DATAPATH_W-1:0]              shifted, adder;
-   wire signed [DATAPATH_W-1:0]         act_fnc, shifted_half, mp_w, bypass_w;
-   reg signed [DATAPATH_W-1:0]          bias_reg, result;
-   reg signed [DATAPATH_W-1:0] 		op_a_bypass;
+   wire signed [2*DATAPATH_W-1:0]       shifted, bias_shifted;
+   wire signed [DATAPATH_W-1:0]         shifted_half, mp_w, bypass_w;
+   reg signed [DATAPATH_W-1:0]          result, op_a_bypass;
+   reg signed [2*DATAPATH_W-1:0] 	bias_reg;
    wire [DATAPATH_W-1:0] 		result_w;
    reg [DATAPATH_W-1:0] 		op_a_bypass_nmac;
 
    //activation function wires
-   wire signed [DATAPATH_W-1:0]		sig_in, sig_out, sig_adder;
-   reg signed [DATAPATH_W-1:0]		sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r;
-   wire signed [DATAPATH_W-1:0]		leaky_in, leaky_out;
-   reg signed [DATAPATH_W-1:0]		shift_r, shift_r2, leaky_out_r;
+   wire signed [2*DATAPATH_W-1:0]	sig_in, sig_out, sig_adder;
+   reg signed [2*DATAPATH_W-1:0]	sig_t1, sig_t1_r, sig_t2, sig_t2_r, sig_out_r;
+   wire signed [2*DATAPATH_W-1:0]	leaky_in, leaky_out, act_fnc;
+   reg signed [2*DATAPATH_W-1:0]	conv_r, conv_r2, leaky_out_r;
 
    //multiplier wires and regs
    wire signed [N_MACS*2*DATAPATH_W-1:0] dsp_out, adder_w;
@@ -71,29 +73,29 @@ module xyolo # (
    //update registers
    always @ (posedge clk, posedge rst)
      if (rst) begin
-       bias_reg <= {DATAPATH_W{1'b0}};
+       bias_reg <= {2*DATAPATH_W{1'b0}};
        op_a_bypass <= {DATAPATH_W{1'b0}};
        result <= {DATAPATH_W{1'b0}};
-       leaky_out_r <= {DATAPATH_W{1'b0}};
-       sig_out_r <= {DATAPATH_W{1'b0}};
-       shift_r <= {DATAPATH_W{1'b0}};
-       shift_r2 <= {DATAPATH_W{1'b0}};
-       sig_t1_r <= {DATAPATH_W{1'b0}};
-       sig_t2_r <= {DATAPATH_W{1'b0}};
+       leaky_out_r <= {2*DATAPATH_W{1'b0}};
+       sig_out_r <= {2*DATAPATH_W{1'b0}};
+       conv_r <= {2*DATAPATH_W{1'b0}};
+       conv_r2 <= {2*DATAPATH_W{1'b0}};
+       sig_t1_r <= {2*DATAPATH_W{1'b0}};
+       sig_t2_r <= {2*DATAPATH_W{1'b0}};
      end else begin
-       bias_reg <= flow_in_bias;
+       bias_reg <= {flow_in_bias, `DATAPATH_W'b0};
        op_a_bypass <= op_a_bypass_nmac;
        if(ld_res) result <= bypass_adder ? dsp_out[INDEX*2*DATAPATH_W +: 2*DATAPATH_W] >> shift : result_w;
        leaky_out_r <= leaky_out;
        sig_out_r <= sig_out;
-       shift_r <= shifted_half;
-       shift_r2 <= shift_r;
+       conv_r <= conv_res;
+       conv_r2 <= conv_r;
        sig_t1_r <= sig_t1;
        sig_t2_r <= sig_t2;
      end
 
    //double-precision bias
-   assign adder = {{DATAPATH_W{1'b0}}, bias_reg};
+   assign bias_shifted = bias_reg >>> b_shift;
 
    genvar i;
    generate
@@ -101,7 +103,7 @@ module xyolo # (
 
 	 if (i==0) begin : bias_blk
 	    //select accumulation initial value - add only bias to first mac
-	    assign adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W] = bias ? adder << shift : {2*DATAPATH_W{1'b0}};
+	    assign adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W] = bias ? bias_shifted : {2*DATAPATH_W{1'b0}};
 	 end else begin : bias_blk
 	    //accumulation initial value - always 0
 	    assign adder_w[i*2*DATAPATH_W +: 2*DATAPATH_W] = {2*DATAPATH_W{1'b0}};
@@ -134,17 +136,12 @@ module xyolo # (
 			   .data_out(conv_res)
 			   );
 
-   
-   //apply shift to half precision
-   assign shifted = conv_res >> shift;
-   assign shifted_half = shifted[DATAPATH_W-1:0];
-
    //leaky activation function
-   //assign leaky_in = (shifted_half >>> 4) + (shifted_half >>> 5) + (shifted_half >>> 7);
-   assign leaky_out = shifted_half[DATAPATH_W-1] ? leaky_in : shifted_half;
-   
+   assign leaky_in = (conv_res >>> 4) + (conv_res >>> 5) + (conv_res >>> 7);
+   assign leaky_out = conv_res[2*DATAPATH_W-1] ? leaky_in : conv_res;
+
    //sigmoid activation function
-   assign sig_in = shifted_half[DATAPATH_W-1] ? ~shifted_half + 1'b1 : shifted_half;
+   assign sig_in = conv_res[2*DATAPATH_W-1] ? ~conv_res + 1'b1 : conv_res;
    always @ * begin
       if(sig_in >= fp5) begin
          sig_t1 = fp1;
@@ -161,13 +158,15 @@ module xyolo # (
       end
    end
    assign sig_adder = sig_t1_r + sig_t2_r;
-   assign sig_out = shift_r[DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
+   assign sig_out = conv_r[2*DATAPATH_W-1] ? fp1 - sig_adder : sig_adder;
 
    //choose activation function
-   assign act_fnc = leaky ? leaky_out_r : sigmoid ? sig_out_r : shift_r2;
+   assign act_fnc = leaky ? leaky_out_r : sigmoid ? sig_out_r : conv_r2;
+   assign shifted = act_fnc >>> shift;
+   assign shifted_half = shifted[DATAPATH_W-1:0];
 
    //maxpooling
-   assign bypass_w = bypass ? op_a_bypass : act_fnc;
+   assign bypass_w = bypass ? op_a_bypass : shifted_half;
    assign mp_w = ld_mp & result > bypass_w ? result : bypass_w;
 
    //result

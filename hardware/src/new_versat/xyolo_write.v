@@ -96,6 +96,8 @@ module xyolo_write #(
    reg					xyolo_iter_en;
    reg					xyolo_per_en;
    reg					xyolo_shift_en;
+   reg					xyolo_b_shift_en;
+   reg					xyolo_sig_shift_en;
    reg					xyolo_bias_en;
    reg					xyolo_leaky_en;
    reg					xyolo_sigmoid_en;
@@ -156,6 +158,8 @@ module xyolo_write #(
    reg [`PIXEL_ADDR_W-1:0]		xyolo_iter, xyolo_iter_pip, xyolo_iter_shadow;
    reg [`PIXEL_ADDR_W-1:0]		xyolo_per, xyolo_per_pip, xyolo_per_shadow;
    reg [`SHIFT_W-1:0]			xyolo_shift, xyolo_shift_pip, xyolo_shift_shadow;
+   reg [`SHIFT_W-1:0]			xyolo_b_shift, xyolo_b_shift_pip, xyolo_b_shift_shadow;
+   reg [`SHIFT_W-1:0]			xyolo_sig_shift, xyolo_sig_shift_pip, xyolo_sig_shift_shadow;
    reg 					xyolo_bias, xyolo_bias_pip, xyolo_bias_shadow;
    reg					xyolo_leaky, xyolo_leaky_pip, xyolo_leaky_shadow;
    reg					xyolo_sigmoid, xyolo_sigmoid_pip, xyolo_sigmoid_shadow;
@@ -267,6 +271,8 @@ module xyolo_write #(
       xyolo_iter_en = 1'b0;
       xyolo_per_en = 1'b0;
       xyolo_shift_en = 1'b0;
+      xyolo_b_shift_en = 1'b0;
+      xyolo_sig_shift_en = 1'b0;
       xyolo_bias_en = 1'b0;
       xyolo_leaky_en = 1'b0;
       xyolo_sigmoid_en = 1'b0;
@@ -323,6 +329,8 @@ module xyolo_write #(
 	    `XYOLO_CONF_ITER : xyolo_iter_en = 1'b1;
 	    `XYOLO_CONF_PER : xyolo_per_en = 1'b1;
 	    `XYOLO_CONF_SHIFT : xyolo_shift_en = 1'b1;
+	    `XYOLO_CONF_B_SHIFT : xyolo_b_shift_en = 1'b1;
+	    `XYOLO_CONF_SIG_SHIFT : xyolo_sig_shift_en = 1'b1;
 	    `XYOLO_CONF_BIAS : xyolo_bias_en = 1'b1;
 	    `XYOLO_CONF_LEAKY : xyolo_leaky_en = 1'b1;
 	    `XYOLO_CONF_SIGMOID : xyolo_sigmoid_en = 1'b1;
@@ -384,6 +392,8 @@ module xyolo_write #(
    	 xyolo_iter <= `PIXEL_ADDR_W'b0;
 	 xyolo_per <= `PIXEL_ADDR_W'b0;
 	 xyolo_shift <= {`SHIFT_W{1'b0}};
+	 xyolo_b_shift <= {`SHIFT_W{1'b0}};
+	 xyolo_sig_shift <= {`SHIFT_W{1'b0}};
 	 xyolo_bias <= 1'b0;
 	 xyolo_leaky <= 1'b0;
 	 xyolo_sigmoid <= 1'b0;
@@ -440,6 +450,8 @@ module xyolo_write #(
    	 if(xyolo_iter_en) xyolo_iter <= wdata[`PIXEL_ADDR_W-1:0];
 	 if(xyolo_per_en) xyolo_per <= wdata[`PIXEL_ADDR_W-1:0];
 	 if(xyolo_shift_en) xyolo_shift <= wdata[`SHIFT_W-1:0];
+	 if(xyolo_b_shift_en) xyolo_b_shift <= wdata[`SHIFT_W-1:0];
+	 if(xyolo_sig_shift_en) xyolo_sig_shift <= wdata[`SHIFT_W-1:0];
 	 if(xyolo_bias_en) xyolo_bias <= wdata[0];
 	 if(xyolo_leaky_en) xyolo_leaky <= wdata[0];
 	 if(xyolo_sigmoid_en) xyolo_sigmoid <= wdata[0];
@@ -535,6 +547,10 @@ module xyolo_write #(
 	 xyolo_per_pip <= `PIXEL_ADDR_W'b0;
 	 xyolo_shift_shadow <= {`SHIFT_W{1'b0}};
 	 xyolo_shift_pip <= {`SHIFT_W{1'b0}};
+	 xyolo_b_shift_shadow <= {`SHIFT_W{1'b0}};
+	 xyolo_b_shift_pip <= {`SHIFT_W{1'b0}};
+	 xyolo_sig_shift_shadow <= {`SHIFT_W{1'b0}};
+	 xyolo_sig_shift_pip <= {`SHIFT_W{1'b0}};
 	 xyolo_bias_shadow <= 1'b0;
 	 xyolo_bias_pip <= 1'b0;
 	 xyolo_leaky_shadow <= 1'b0;
@@ -636,6 +652,10 @@ module xyolo_write #(
 	 xyolo_per_shadow <= xyolo_per_pip;
 	 xyolo_shift_pip <= xyolo_shift;
 	 xyolo_shift_shadow <= xyolo_shift_pip;
+	 xyolo_b_shift_pip <= xyolo_b_shift;
+	 xyolo_b_shift_shadow <= xyolo_b_shift_pip;
+	 xyolo_sig_shift_pip <= xyolo_sig_shift;
+	 xyolo_sig_shift_shadow <= xyolo_sig_shift_pip;
 	 xyolo_bias_pip <= xyolo_bias;
 	 xyolo_bias_shadow <= xyolo_bias_pip;
 	 xyolo_leaky_pip <= xyolo_leaky;
@@ -960,6 +980,8 @@ module xyolo_write #(
            .xyolo_bypass(xyolo_bypass_shadow),
            .xyolo_bypass_adder(xyolo_bypass_adder_shadow),
            .xyolo_shift(xyolo_shift_shadow),
+           .xyolo_b_shift(xyolo_b_shift_shadow),
+           .xyolo_sig_shift(xyolo_sig_shift_shadow),
       	   //databus interface
       	   .databus_ready({vwrite_m_resp[`ready((`nSTAGES-1-i))], databus_ready_w}),
            .databus_valid({vwrite_m_req[`valid((`nSTAGES-1-i))], vread_m_req[`valid((`nSTAGES-1-i))]}),
