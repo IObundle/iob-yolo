@@ -269,9 +269,6 @@ class CYolo {
     void setBiasShift(int shift) {
       MEMSET(base, XYOLO_CONF_B_SHIFT, shift);
     }
-    void setSigShift(int shift) {
-      MEMSET(base, XYOLO_CONF_SIG_SHIFT, shift);
-    }
     void setBias(int bias) {
       MEMSET(base, XYOLO_CONF_BIAS, bias);
     }

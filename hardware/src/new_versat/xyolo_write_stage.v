@@ -55,7 +55,6 @@ module xyolo_write_stage #(
 	input                           	     xyolo_bypass_adder,
 	input [`SHIFT_W-1:0]            	     xyolo_shift,
 	input [`SHIFT_W-1:0]            	     xyolo_b_shift,
-	input [`SHIFT_W-1:0]            	     xyolo_sig_shift,
 
     	// databus interface (1 vread + 1 vwrite)
     	input [1:0] 				     databus_ready,
@@ -256,7 +255,6 @@ module xyolo_write_stage #(
 	    .bypass_adder(xyolo_bypass_adder),
 	    .shift(xyolo_shift),
 	    .b_shift(xyolo_b_shift),
-	    .sig_shift(xyolo_sig_shift),
 	    //data interface
 	    .flow_in_pixel(pixel),
 	    .flow_in_weight(flow_in_weight[`nYOLOvect*N_MACS*DATAPATH_W-N_MACS*DATAPATH_W*i-1 -: N_MACS*DATAPATH_W]),

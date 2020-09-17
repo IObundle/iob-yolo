@@ -16,7 +16,7 @@ module xyolo # (
 		input 			      ld_mp,
 		input 			      ld_res,
 		input [N_MACS_W-1:0] 	      ld_nmac,
-	   
+
 		//configuration
 		input                         bias,
                 input                         leaky,
@@ -26,7 +26,6 @@ module xyolo # (
                 input                         bypass_adder,
 		input [`SHIFT_W-1:0]	      shift,
 		input [`SHIFT_W-1:0]	      b_shift,
-		input [`SHIFT_W-1:0]	      sig_shift,
 
                 //data interface
                 input [N_MACS*DATAPATH_W-1:0] flow_in_pixel, //op_a
@@ -35,13 +34,13 @@ module xyolo # (
                 output [DATAPATH_W-1:0]       flow_out
                 );
 
-   //wires for sigmoid linear approximation
-   wire [2*DATAPATH_W-1:0]		fp5 = 'h500 << sig_shift;
-   wire [2*DATAPATH_W-1:0]		fp2375 = 'h260 << sig_shift;
-   wire [2*DATAPATH_W-1:0]		fp1 = 'h100 << sig_shift;
-   wire [2*DATAPATH_W-1:0]		fp084375 = 'hD8 << sig_shift;
-   wire [2*DATAPATH_W-1:0]		fp0625 = 'hA0 << sig_shift;
-   wire [2*DATAPATH_W-1:0]		fp05 = 'h80 << sig_shift;
+   //wires for sigmoid linear approximation -> Q8.24
+   localparam [2*DATAPATH_W-1:0]	fp5 = 'h5000000;
+   localparam [2*DATAPATH_W-1:0]	fp2375 = 'h2600000;
+   localparam [2*DATAPATH_W-1:0]	fp1 = 'h1000000;
+   localparam [2*DATAPATH_W-1:0]	fp084375 = 'hD80000;
+   localparam [2*DATAPATH_W-1:0]	fp0625 = 'hA00000;
+   localparam [2*DATAPATH_W-1:0]	fp05 = 'h800000;
 
    //data interface wires and regs
    wire signed [2*DATAPATH_W-1:0]       shifted, bias_shifted;
