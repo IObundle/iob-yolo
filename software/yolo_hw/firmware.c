@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-//#define TIME_RUN
+#define TIME_RUN
 #define CLK_NS 8
 
 #ifdef SIM
@@ -22,7 +22,7 @@
 #endif
 
 //obj and prob score threshold
-#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<13))) //Q3.13
 
 //define peripheral base addresses
 #ifndef PCSIM
@@ -212,7 +212,8 @@ void layer1() {
   // configure xyolo to perform convolution + maxpool
   versat.ywrite.yolo.setIter(2*LAYER_1_TILE_W);
   versat.ywrite.yolo.setPer(LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C/nYOLOmacs);
-  versat.ywrite.yolo.setShift(10);
+  versat.ywrite.yolo.setShift(LAYER_1_SHIFT);
+  versat.ywrite.yolo.setBiasShift(LAYER_1_B_SHIFT);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);
   versat.ywrite.yolo.setMaxpool(1);
@@ -297,7 +298,7 @@ void layer1() {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // STRATEGY -> Pixel reuse : apply all kernels to current FM tile before moving to next tile
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
+void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start, int shift, int b_shift) {
 
   //local variables
   int j, k, l;
@@ -355,7 +356,8 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
   // configure xyolo to perform convolution + maxpool
   versat.ywrite.yolo.setIter(2*til_w);
   versat.ywrite.yolo.setPer(ker_size*ker_size*c/nYOLOmacs);
-  versat.ywrite.yolo.setShift(10);
+  versat.ywrite.yolo.setShift(shift);
+  versat.ywrite.yolo.setBiasShift(b_shift);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);
   versat.ywrite.yolo.setMaxpool(1);
@@ -444,7 +446,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start) {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // STRATEGY -> Weight reuse : apply current kernel to all tiles before moving to next kernel
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int pp, int inpadd, int zxy, int leaky, int ignorepadd, unsigned int outpos, int upsample) {
+void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int pp, int inpadd, int zxy, int leaky, int ignorepadd, unsigned int outpos, int upsample, int shift, int b_shift) {
 
   //local variables
   int k, l;
@@ -538,7 +540,8 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   // configure xyolo to perform convolution
   versat.ywrite.yolo.setIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
   versat.ywrite.yolo.setPer(ker_size*ker_size*c/nYOLOmacs);
-  versat.ywrite.yolo.setShift(10);
+  versat.ywrite.yolo.setShift(shift);
+  versat.ywrite.yolo.setBiasShift(b_shift);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(leaky);
   versat.ywrite.yolo.setSigmoid(1-leaky);
@@ -785,12 +788,12 @@ void print_results(int w, unsigned int pos) {
         if(arr[k+4] > threshold) {
           //check if prob score is higher than threshold
           for(m = 0; m < 80; m++) {
-            val_32 = (int32_t)((int32_t)arr[k+5+m]*(int32_t)arr[k+4]<<6); //Q8.8 * Q2.14 = Q10.22
-            val_16 = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
-	    if(val_16 > (threshold << 6)) {
-	      val_32 = (uint32_t)((uint32_t)val_16*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
-	      if((val_32&0x3FFF) > 0x2000) uart_printf("%s: %d%%\n", class_names[m], (val_32>>14)+1);
-	      else uart_printf("%s: %d%%\n", class_names[m], (val_32>>14));
+            val_32 = (int32_t)((int32_t)arr[k+5+m]*(int32_t)arr[k+4]); //Q3.13 * Q3.13 = Q6.26
+            val_16 = (int16_t)(val_32 >> 13); //Q6.26 to Q3.13
+	    if(val_16 > threshold) {
+	      val_32 = (uint32_t)((uint32_t)val_16*(uint32_t)100); //Q3.13 * Q16.0 = Q19.13
+	      if((val_32&0x1FFF) > 0x1000) uart_printf("%s: %d%%\n", class_names[m], (val_32>>13)+1);
+	      else uart_printf("%s: %d%%\n", class_names[m], (val_32>>13));
             }
 	  }
         } 
@@ -890,7 +893,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 3 and 4...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 1); //w_start(1)
+  conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 1, LAYER_3_SHIFT, LAYER_3_B_SHIFT); //w_start(1)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
@@ -902,7 +905,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 5 and 6...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0); //w_start(0)
+  conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0, LAYER_5_SHIFT, LAYER_5_B_SHIFT); //w_start(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
@@ -914,7 +917,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 7 and 8...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0); //w_start(0)
+  conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0, LAYER_7_SHIFT, LAYER_7_B_SHIFT); //w_start(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
@@ -926,7 +929,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 9...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_9_PINGPONG, LAYER_7_OUTPADD, LAYER_9_ZXY, LAYER_9_LEAKY, LAYER_9_IGNOREPAD, data_pos_layer9, LAYER_9_UPSAMPLE);
+  conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_9_PINGPONG, LAYER_7_OUTPADD, LAYER_9_ZXY, LAYER_9_LEAKY, LAYER_9_IGNOREPAD, data_pos_layer9, LAYER_9_UPSAMPLE, LAYER_9_SHIFT, LAYER_9_B_SHIFT);
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -950,7 +953,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 11...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE, LAYER_11_PINGPONG, LAYER_10_OUTPADD, LAYER_11_ZXY, LAYER_11_LEAKY, LAYER_11_IGNOREPAD, 0, LAYER_11_UPSAMPLE); //outpos(0)
+  conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE, LAYER_11_PINGPONG, LAYER_10_OUTPADD, LAYER_11_ZXY, LAYER_11_LEAKY, LAYER_11_IGNOREPAD, 0, LAYER_11_UPSAMPLE, LAYER_11_SHIFT, LAYER_11_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -974,7 +977,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 13...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, LAYER_13_PINGPONG, LAYER_12_OUTPADD, LAYER_13_ZXY, LAYER_13_LEAKY, LAYER_13_IGNOREPAD, 0, LAYER_13_UPSAMPLE); //outpos(0)
+  conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, LAYER_13_PINGPONG, LAYER_12_OUTPADD, LAYER_13_ZXY, LAYER_13_LEAKY, LAYER_13_IGNOREPAD, 0, LAYER_13_UPSAMPLE, LAYER_13_SHIFT, LAYER_13_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -986,7 +989,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 14...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_14_PINGPONG, LAYER_13_OUTPADD, LAYER_14_ZXY, LAYER_14_LEAKY, LAYER_14_IGNOREPAD, 0, LAYER_14_UPSAMPLE); //outpos(0)
+  conv2(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_14_PINGPONG, LAYER_13_OUTPADD, LAYER_14_ZXY, LAYER_14_LEAKY, LAYER_14_IGNOREPAD, 0, LAYER_14_UPSAMPLE, LAYER_14_SHIFT, LAYER_14_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -998,7 +1001,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 15...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_15_PINGPONG, LAYER_14_OUTPADD, LAYER_15_ZXY, LAYER_15_LEAKY, LAYER_15_IGNOREPAD, 0, LAYER_15_UPSAMPLE); //outpos(0)
+  conv2(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_15_PINGPONG, LAYER_14_OUTPADD, LAYER_15_ZXY, LAYER_15_LEAKY, LAYER_15_IGNOREPAD, 0, LAYER_15_UPSAMPLE, LAYER_15_SHIFT, LAYER_15_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -1010,7 +1013,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 16 and 17...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_16_PINGPONG, LAYER_15_OUTPADD, LAYER_16_ZXY, LAYER_16_LEAKY, LAYER_16_IGNOREPAD, 0, LAYER_16_UPSAMPLE); //outpos(0)
+  conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_16_PINGPONG, LAYER_15_OUTPADD, LAYER_16_ZXY, LAYER_16_LEAKY, LAYER_16_IGNOREPAD, 0, LAYER_16_UPSAMPLE, LAYER_16_SHIFT, LAYER_16_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
@@ -1023,7 +1026,7 @@ int main(int argc, char **argv) {
   start = timer_time_us(TIMER_BASE);
  #endif
   p_pos = data_pos_layer14;
-  conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, LAYER_19_PINGPONG, 0, LAYER_19_ZXY, LAYER_19_LEAKY, LAYER_19_IGNOREPAD, data_pos_layer19, LAYER_19_UPSAMPLE); //inpadd(0)
+  conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, LAYER_19_PINGPONG, 0, LAYER_19_ZXY, LAYER_19_LEAKY, LAYER_19_IGNOREPAD, data_pos_layer19, LAYER_19_UPSAMPLE, LAYER_19_SHIFT, LAYER_19_B_SHIFT); //inpadd(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + upsample done in %d us\n\n", end-start);
@@ -1035,7 +1038,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layer 22...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, LAYER_22_PINGPONG, LAYER_19_OUTPADD, LAYER_22_ZXY, LAYER_22_LEAKY, LAYER_22_IGNOREPAD, 0, LAYER_22_UPSAMPLE); //outpos(0)
+  conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, LAYER_22_PINGPONG, LAYER_19_OUTPADD, LAYER_22_ZXY, LAYER_22_LEAKY, LAYER_22_IGNOREPAD, 0, LAYER_22_UPSAMPLE, LAYER_22_SHIFT, LAYER_22_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
   end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
@@ -1049,7 +1052,7 @@ int main(int argc, char **argv) {
   uart_printf("\nRunning layers 23 and 24...\n");
   start = timer_time_us(TIMER_BASE);
  #endif
-  conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_23_PINGPONG, LAYER_22_OUTPADD, LAYER_23_ZXY, LAYER_23_LEAKY, LAYER_23_IGNOREPAD, 0, LAYER_23_UPSAMPLE); //outpos(0)
+  conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_23_PINGPONG, LAYER_22_OUTPADD, LAYER_23_ZXY, LAYER_23_LEAKY, LAYER_23_IGNOREPAD, 0, LAYER_23_UPSAMPLE, LAYER_23_SHIFT, LAYER_23_B_SHIFT); //outpos(0)
   // end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
