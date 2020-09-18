@@ -45,7 +45,7 @@ module xyolo # (
    //data interface wires and regs
    wire signed [2*DATAPATH_W-1:0]       shifted, bias_shifted;
    wire signed [DATAPATH_W-1:0]         shifted_half, mp_w, bypass_w;
-   reg signed [DATAPATH_W-1:0]          result, op_a_bypass;
+   reg signed [DATAPATH_W-1:0]          result, op_a_bypass, act_fnc_r;
    reg signed [2*DATAPATH_W-1:0] 	bias_reg;
    wire [DATAPATH_W-1:0] 		result_w;
    reg [DATAPATH_W-1:0] 		op_a_bypass_nmac;
@@ -81,6 +81,7 @@ module xyolo # (
        conv_r2 <= {2*DATAPATH_W{1'b0}};
        sig_t1_r <= {2*DATAPATH_W{1'b0}};
        sig_t2_r <= {2*DATAPATH_W{1'b0}};
+       act_fnc_r <= {DATAPATH_W{1'b0}};
      end else begin
        bias_reg <= {flow_in_bias, `DATAPATH_W'b0};
        op_a_bypass <= op_a_bypass_nmac;
@@ -91,6 +92,7 @@ module xyolo # (
        conv_r2 <= conv_r;
        sig_t1_r <= sig_t1;
        sig_t2_r <= sig_t2;
+       act_fnc_r <= shifted_half;
      end
 
    //double-precision bias
@@ -165,7 +167,7 @@ module xyolo # (
    assign shifted_half = shifted[DATAPATH_W-1:0];
 
    //maxpooling
-   assign bypass_w = bypass ? op_a_bypass : shifted_half;
+   assign bypass_w = bypass ? op_a_bypass : act_fnc_r;
    assign mp_w = ld_mp & result > bypass_w ? result : bypass_w;
 
    //result

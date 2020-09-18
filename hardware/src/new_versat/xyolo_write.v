@@ -199,7 +199,7 @@ module xyolo_write #(
    // xyolo wires and regs
    wire [`PIXEL_ADDR_W-1:0]		xyolo_addr;
    wire                                 ld_acc, ld_mp, ld_res;
-   reg                                  ld_acc0, ld_acc1, ld_acc2, ld_acc3;
+   reg                                  ld_acc0, ld_acc1, ld_acc2, ld_acc3, ld_acc4;
    reg [1:0]                            mp_cnt;
    reg [N_MACS_W-1:0] 			nmac_cnt; 			
 
@@ -816,7 +816,7 @@ module xyolo_write #(
    //compute xyolo load wires
    assign ld_acc = (xyolo_addr == {`PIXEL_ADDR_W{1'd0}});
    assign ld_mp = |mp_cnt;
-   assign ld_res = ld_acc3 || xyolo_bypass_shadow || ~xyolo_leaky_shadow;
+   assign ld_res = ld_acc4 || xyolo_bypass_shadow || ~xyolo_leaky_shadow;
 
    //update xyolo registers
    always @ (posedge clk, posedge rst)
@@ -825,6 +825,7 @@ module xyolo_write #(
          ld_acc1 <= 1'b0;
 	 ld_acc2 <= 1'b0;
 	 ld_acc3 <= 1'b0;
+	 ld_acc4 <= 1'b0;
 	 mp_cnt <= 2'b0;
 	 nmac_cnt <= {N_MACS_W{1'b0}};
       end else if(run_reg) begin
@@ -832,6 +833,7 @@ module xyolo_write #(
          ld_acc1 <= 1'b0;
 	 ld_acc2 <= 1'b0;
 	 ld_acc3 <= 1'b0;
+	 ld_acc4 <= 1'b0;
 	 nmac_cnt <= {N_MACS_W{1'b0}};
          if(xyolo_bypass_shadow)
 	   mp_cnt <= 2'd0;
@@ -842,6 +844,7 @@ module xyolo_write #(
          ld_acc1 <= ld_acc0;
 	 ld_acc2 <= ld_acc1;
 	 ld_acc3 <= ld_acc2;
+	 ld_acc4 <= ld_acc3;
 	 if(ld_res) mp_cnt <= mp_cnt + 1;
 	 if(ld_acc1 && ~ld_acc0) nmac_cnt <= nmac_cnt + 1; 
       end

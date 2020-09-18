@@ -327,7 +327,7 @@ void width_resize() {
 
   // configure xwrite to write results
   versat.ywrite.write.setIntDuty(2*nYOLOvect/LAYER_1_C);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 3);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 4);
   versat.ywrite.write.setIntPer(2*nYOLOvect/LAYER_1_C);
   versat.ywrite.write.setIntIter(NEW_W_PADD/(nYOLOvect/LAYER_1_C));
   versat.ywrite.write.setIntShift(1);
@@ -422,7 +422,7 @@ void height_resize() {
 
   // configure xwrite to write results
   versat.ywrite.write.setIntDuty(2*nYOLOvect/LAYER_1_C);
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 4);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 5);
   versat.ywrite.write.setIntPer(2*nYOLOvect/LAYER_1_C);
   versat.ywrite.write.setIntIter(NEW_W_PADD/(nYOLOvect/LAYER_1_C));
   versat.ywrite.write.setIntShift(1);
