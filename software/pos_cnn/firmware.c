@@ -23,16 +23,19 @@
 //yolo constants
 #define LAYER_16_W 13
 #define LAYER_23_W 26
+#define YOLO_INPUT 416
 
 //constants for bounding boxes
-#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<8))) //Q8.8
-#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<14))) //Q2.14
+#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<13))) //Q3.13
+#define nms_threshold ((int16_t)(((float)0.45)*((int32_t)1<<13))) //Q3.13
 #define yolo1_div ((int16_t)(((float)1/LAYER_16_W)*((int32_t)1<<15))) //Q1.15
 #define yolo2_div ((int16_t)(((float)1/LAYER_23_W)*((int32_t)1<<15))) //Q1.15
-#define y_scales ((int16_t)(((float)NEW_W/NEW_H)*((int32_t)1<<14))) //Q2.14
-#define y_bias ((int16_t)(((float)(NEW_W-NEW_H)/(NEW_H*2))*((int32_t)1<<14))) //Q2.14
-#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<14))) //Q2.14
-#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define x_scales ((int16_t)(((float)YOLO_INPUT/NEW_W)*((int32_t)1<<14))) //Q2.14
+#define x_bias ((int16_t)(((float)(YOLO_INPUT-NEW_W)/(NEW_W*2))*((int32_t)1<<13))) //Q3.13
+#define y_scales ((int16_t)(((float)YOLO_INPUT/NEW_H)*((int32_t)1<<14))) //Q2.14
+#define y_bias ((int16_t)(((float)(YOLO_INPUT-NEW_H)/(NEW_H*2))*((int32_t)1<<13))) //Q3.13
+#define w_scales ((int16_t)(((float)1/NEW_W)*((int32_t)1<<15))) //Q1.15
+#define h_scales ((int16_t)(((float)1/NEW_H)*((int32_t)1<<15))) //Q1.15
 #define c3 ((int16_t)0x0AAA) // pow(2,-3)+pow(2,-5)+pow(2,-7)+pow(2,-9)+pow(2,-11)+pow(2,-13) in Q2.14
 #define c4 ((int16_t)0x02C0) // pow(2,-5)+pow(2,-7)+pow(2,-8) in Q2.14
 #define MAX_NUM_BOXES 10
@@ -128,28 +131,27 @@ void rcv_data() {
 int16_t exp_fnc(int16_t val) {
   int16_t val_16, exp_val_fixed;
   int32_t val_32;
-  exp_val_fixed = val + 0x0100; //1+w -> Q8.8
-  exp_val_fixed = exp_val_fixed << 6; //Q8.8 to Q2.14
-  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q8.8*Q8.8 = Q16.16
-  val_16 = (int16_t)(val_32 >> 2); //w^2 -> Q16.16 to Q2.14
-  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q2.14 = Q4.28
-  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q4.28 to Q2.14
-  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q2.14*Q8.8 = Q10.22
-  val_16 = (int16_t)(val_32 >> 8); //w^3 -> Q10.22 to Q2.14
-  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q2.14 = Q4.28
-  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q4.28 to Q2.14
-  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q2.14*Q8.8 = Q10.22
-  val_16 = (int16_t)(val_32 >> 8); //w^4 -> Q10.22 to Q2.14
-  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q2.14 = Q4.28
-  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q4.28 to Q2.14
-  return exp_val_fixed; //Q2.14
+  exp_val_fixed = val + 0x2000; //1+w -> Q3.13
+  val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q3.13*Q3.13 = Q6.26
+  val_16 = (int16_t)(val_32 >> 13); //w^2 -> Q6.26 to Q3.13
+  val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q3.13 = Q5.27
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q5.27 to Q3.13
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q3.13*Q3.13 = Q6.26
+  val_16 = (int16_t)(val_32 >> 13); //w^3 -> Q6.26 to Q3.13
+  val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q3.13 = Q5.27
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q5.27 to Q3.13
+  val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q3.13*Q3.13 = Q6.26
+  val_16 = (int16_t)(val_32 >> 13); //w^4 -> Q6.26 to Q3.13
+  val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q3.13 = Q5.27
+  exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q5.27 to Q3.13
+  return exp_val_fixed; //Q3.13
 }
 
 // create boxes
 void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
   //local variable
-  int i, j, k, m, n, n_start, n_end;
+  int16_t i, j, k, m, n, n_start, n_end;
   int16_t val_16, obj_score;
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + pos;
   int32_t val_32;
@@ -165,37 +167,41 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
         if(obj_score > threshold) {
 
           //Calculate x
-          val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k] + (j<<8))*(int32_t)xy_div);
- 	  boxes[84*nboxes] = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
+	  val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k] + (j<<13))*(int32_t)xy_div); //Q3.13 *Q1.15 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)x_scales); //Q3.13 * Q2.14 = Q5.27
+	  val_16 = (int16_t)(val_32 >> 14); //Q5.27 to Q3.13
+	  val_16 -= (int16_t)x_bias; //Q3.13
+	  boxes[84*nboxes] = val_16; //x
           
 	  //Calculate y
-	  val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 1] + (i<<8))*(int32_t)xy_div); //Q8.8 *Q1.15 = Q9.23
-	  val_16 = (int16_t)(val_32 >> 9); //Q9.23 to Q2.14
-          val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q2.14 * Q2.14 = Q4.28
-  	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_16 -= (int16_t)y_bias; //Q2.14
-	  boxes[84*nboxes+1] = val_16;
+	  val_32 = (int32_t)((int32_t)(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 1] + (i<<13))*(int32_t)xy_div); //Q3.13 *Q1.15 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q3.13 * Q2.14 = Q5.27
+	  val_16 = (int16_t)(val_32 >> 14); //Q5.27 to Q3.13
+	  val_16 -= (int16_t)y_bias; //Q3.13
+	  boxes[84*nboxes+1] = val_16; //y
 
 	  //Calculate w
-	  val_32 = (int32_t)((int32_t)exp_fnc(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 2])*(int32_t)w_scales); //Q2.14 * Q2.14 = Q4.28
-	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-  	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)]); //Q2.14 * Q10.6 = Q12.20
-	  boxes[84*nboxes+2] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  val_32 = (int32_t)((int32_t)exp_fnc(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 2])*(int32_t)w_scales); //Q3.13 * Q1.15 = Q4.28
+	  val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)]); //Q3.13 * Q10.6 = Q13.19 -> mask 1,2,3
+	  boxes[84*nboxes+2] = (int16_t)(val_32 >> 6); //Q13.19 to Q3.13
 
 	  //Calculate h
 	  val_32 = (int32_t)((int32_t)exp_fnc(fp_data[i*w*256 + j*16 + 5*k*w*16 + 5*k + 3])*(int32_t)h_scales); //Q2.14 * Q2.14 = Q4.28
-	  val_16 = (int16_t)(val_32 >> 14); //Q4.28 to Q2.14
-	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)+1]); //Q2.14 * Q10.6 = Q12.20
-	  boxes[84*nboxes+3] = (int16_t)(val_32 >> 6); //Q12.20 to Q2.14
+	  val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+	  val_32 = (int32_t)((int32_t)val_16*(int32_t)yolo_bias[2*(k+(1-first_yolo)+3*first_yolo)+1]); //Q3.13 * Q10.6 = Q13.19 -> mask 1,2,3
+	  boxes[84*nboxes+3] = (int16_t)(val_32 >> 6); //Q13.19 to Q3.13
 
           //check if prob score is higher than threshold
           n_start = 5*k + 5;
 	  n_end = 16;
           for(m = 0; m < 6; m++) {
             for(n = n_start; n < n_end; n++) {
-              val_32 = (int32_t)((int32_t)fp_data[i*w*256 + j*16 + 5*k*w*16 + m*w*16 + n]*(int32_t)obj_score<<6); //Q8.8 * Q2.14 = Q10.22
-              val_16 = (int16_t)(val_32 >> 8); //Q10.22 to Q2.14
-	      if(val_16 > (threshold << 6)) boxes[84*nboxes+4+m*16+n-(5*k+5)] = val_16;
+              val_32 = (int32_t)((int32_t)fp_data[i*w*256 + j*16 + 5*k*w*16 + m*w*16 + n]*(int32_t)obj_score); //Q3.13 * Q3.13 = Q6.26
+              val_16 = (int16_t)(val_32 >> 13); //Q6.26 to Q3.13
+	      if(val_16 > threshold) boxes[84*nboxes+4+m*16+n-(5*k+5)] = val_16;
  	      n_start = 0;
 	    }
 	    if(m == 4) n_end = 5*k + 5;
@@ -277,16 +283,16 @@ void filter_boxes() {
 	  h2 = boxes[84*box_IDs[k]+3];
 						
 	  //Calculate IoU (intersection over union)
-	  w = overlap(x1, w1, x2, w2); //Q2.14
-	  h = overlap(y1, h1, y2, h2); //Q2.14
+	  w = overlap(x1, w1, x2, w2); //Q3.13
+	  h = overlap(y1, h1, y2, h2); //Q3.13
 	  if(w > 0 && h > 0) {
-	    b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q2.14 * Q2.14 = Q4.28
-	    mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q2.14 * Q2.14 = Q4.28
-	    b_union = (int16_t)(mul_32 >> 14); //w1*h1 -> Q4.28 to Q2.14
-	    mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q2.14 * Q2.14 = Q4.28
-	    b_union += (int16_t)(mul_32 >> 14); //w1*h1+w2*h2 -> Q4.28 to Q2.14
-	    b_union -= (int16_t)(b_inter >> 14); //w1*h1+w2*h2-inter -> Q4.28 to Q2.14
-	    b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q4.28 / Q2.14 = Q2.14						
+	    b_inter = (int32_t)((int32_t)w*(int32_t)h); //Q3.13 * Q3.13 = Q6.26
+	    mul_32 = (int32_t)((int32_t)w1*(int32_t)h1); //Q3.13 * Q3.13 = Q6.26
+	    b_union = (int16_t)(mul_32 >> 13); //w1*h1 -> Q6.26 to Q3.13
+	    mul_32 = (int32_t)((int32_t)w2*(int32_t)h2); //Q3.13 * Q3.13 = Q6.26
+	    b_union += (int16_t)(mul_32 >> 13); //w1*h1+w2*h2 -> Q6.26 to Q3.13
+	    b_union -= (int16_t)(b_inter >> 13); //w1*h1+w2*h2-inter -> Q6.26 to Q3.13
+	    b_iou = (int16_t)((int32_t)b_inter/(int32_t)b_union); //Q6.26 / Q3.13 = Q3.13
 	    if(b_iou > nms_threshold) boxes[84*box_IDs[k]+4+i] = 0;
 	  }
 	}
@@ -384,18 +390,18 @@ void draw_detections() {
           blue = (mul_16 >> 6); //Q10.6 to Q8.0
 
           //Calculate box coordinates in image frame
-          mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
-          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
-          left = (mul_32 >> 14);
-          mul_16 = boxes[84*i] + (boxes[84*i+2]>>1); //Q2.14
-          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
-          right = (mul_32 >> 14);
-          mul_16 = boxes[84*i+1] - (boxes[84*i+3]>>1); //Q2.14
-          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
-          top = (mul_32 >> 14);
-          mul_16 = boxes[84*i+1] + (boxes[84*i+3]>>1); //Q2.14
-          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q2.14 * Q16.0 = Q18.14
-          bot = (mul_32 >> 14);
+          mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q3.13
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q3.13 * Q16.0 = Q19.13
+          left = (mul_32 >> 13);
+          mul_16 = boxes[84*i] + (boxes[84*i+2]>>1); //Q3.13
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q3.13 * Q16.0 = Q19.13
+          right = (mul_32 >> 13);
+          mul_16 = boxes[84*i+1] - (boxes[84*i+3]>>1); //Q3.13
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q3.13 * Q16.0 = Q19.13
+          top = (mul_32 >> 13);
+          mul_16 = boxes[84*i+1] + (boxes[84*i+3]>>1); //Q3.13
+          mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_H); //Q3.13 * Q16.0 = Q19.13
+          bot = (mul_32 >> 13);
 
           //Draw box
           for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue);
