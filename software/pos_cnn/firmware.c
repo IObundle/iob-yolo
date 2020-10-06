@@ -434,6 +434,50 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
 
 /* } */
 
+//Verify class label in input image
+void verify_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
+  uart_printf("Verifying class: %d\n", j);
+  int l, k, err_cnt=0;
+  uint8_t label;
+  uint16_t red_val, green_val, blue_val;
+  uint16_t red_im, green_im, blue_im;
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
+      label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
+      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
+      red_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C];
+      //green
+      green_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1];
+      //blue
+      blue_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2];
+
+      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
+      red_val = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      //green
+      green_val = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
+      //blue
+      blue_val = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+
+      //check fp_image for correct values
+      if(red_val != red_im){
+	err_cnt++;
+	uart_printf("Exp: %d | Act: %d\n", red_val, red_im);
+      }
+      if(green_val != green_im){
+	err_cnt++;
+	uart_printf("Exp: %d | Act: %d\n", green_val, green_im);
+      }
+      if(blue_val != blue_im){
+	err_cnt++;
+	uart_printf("Exp: %d | Act: %d\n", blue_val, blue_im);
+      }
+    }
+  }
+  uart_printf("Label with %d errors\n", err_cnt);
+
+  return;
+}
+
 
 //Draw class label in input image
 void draw_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
@@ -525,12 +569,14 @@ void draw_detections() {
         } else {
           label_w = fp_labels[80];
           draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
+          verify_class(label_w, 80, top_width, left, previous_w, red, green, blue);
           previous_w += label_w;
         }
 
         //Draw class labels
         label_w = fp_labels[j];
         draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
+        verify_class(label_w, j, top_width, left, previous_w, red, green, blue);
         previous_w += label_w;
       }
     }
@@ -610,14 +656,15 @@ int main(int argc, char **argv) {
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
-#ifndef SIM
+/* #ifndef SIM */
   //draw boxes and labels
   uart_printf("\nDrawing boxes and labels...\n");
   start = timer_time_us(TIMER_BASE);
   draw_detections();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
-#else
+/* #else */
+#ifdef SIM
   //verify results
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += 256*13*13 + 256*26*26;
@@ -629,7 +676,6 @@ int main(int argc, char **argv) {
 #endif
 
 #ifndef SIM
-  uart_printf("Sending data 1\n");
   send_data();
 #endif
 
