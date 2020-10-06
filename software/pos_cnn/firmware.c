@@ -106,7 +106,7 @@ void rcv_data() {
   //Local variables
   int i, j;
   count_bytes = 0;
-  char * data_p = (char *) LABEL_BASE_ADDRESS;
+  char * data_p = (char *) RGB_BASE_ADDRESS;
   uart_printf("\nReady to receive yolo layers output...\n");
 
   //Loop to receive intermediate data frames
@@ -341,21 +341,98 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
 }
 
 //draw class using versat
-void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b){
-  int l, k;
-  uint8_t label;
-  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
-    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
-      label = fp_labels[LABEL_W_OFF+MAX_LABEL_SIZE*j+l*label_w+k];
-      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
-      //green
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
-      //blue
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
-    }
-  }
-}
+/* void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b){ */
+/*   int l, k; */
+/*   uint8_t label; */
+/*   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) { */
+/*     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) { */
+/*       label = fp_labels[LABEL_W_OFF+MAX_LABEL_SIZE*j+l*label_w+k]; */
+/*       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red */
+/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8; */
+/*       //green */
+/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8; */
+/*       //blue */
+/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8; */
+/*     } */
+/*   } */
+/*   // VERSAT CONFIGURATIONS */
+
+/*   // yread ext: read 1 rgb line for the j class */
+/*   versat.yread.setExtAddr(&(fp_rgb[16*j])); //16x2Bytes to jump a line */
+/*   versat.yread.setOffset(0); // read same line to all yread memories */
+/*   versat.yread.PingPong(0); */
+/*   versat.yread.IntAddr(0); */
+/*   versat.yread.setExtIter(1); */
+/*   versat.yread.setExtPer(1); // only one MIG_BUS_W transfer */
+/*   versat.yread.setExtShift(0); */
+/*   versat.yread.setExtIncr(16); // does this really matter? */
+
+/*   // yread int: send first line to xyolo */
+/*   versat.yread.setIntIter((label_w*IMG_C)/nYOLOmacs); */
+/*   versat.yread.setIntPer(2); */
+/*   versat.yread.setIntShift(0); */
+/*   versat.yread.setIntStart(0); */
+/*   versat.yread.setIntIncr(0); */
+/*   versat.yread.setIntDelay(0); */
+
+/*   // ywrite read ext: read label line */
+/*   versat.ywrite.read.setExtAddr(&(fp_labels[LABEL_W_OFF + LABEL_SIZE*j + LABEL_LINE_SIZE*l])); // start of each label line */
+/*   versat.ywrite.read.setOffset(0); // only use 1st stage */
+/*   versat.ywrite.read.setPingPong(1); */
+/*   versat.ywrite.read.setIntAddr(0); */
+/*   versat.ywrite.read.setExtIter(1); */
+/*   versat.ywrite.read.setExtPer((label_w*IMG_C)/16); // TODO: what about when remainder == 0? */
+/*   versat.ywrite.read.setExtShift(0); */
+/*   versat.ywrite.read.setExtIncr(16); */
+
+/*   // ywrite read int: sent 1 line every 2 cycles */
+/*   versat.ywrite.read.setIntStart(0); */
+/*   versat.ywrite.read.setIntIter((label_w*IMG_C)/nYOLOmacs); */
+/*   versat.ywrite.read.setIntPer(2); */
+/*   versat.ywrite.read.setIntShift(1); */
+/*   versat.ywrite.read.setIntIncr(0); */
+/*   versat.ywrite.read.setIntIter2(1); */
+/*   versat.ywrite.read.setIntPer2(1); */
+/*   versat.ywrite.read.setIntShift2(0); */
+/*   versat.ywrite.read.setIntIncr2(0); */
+/*   versat.ywrite.read.setIntIter3(1); */
+/*   versat.ywrite.read.setIntPer3(0); */
+/*   versat.ywrite.read.setIntShift3(0); */
+/*   versat.ywrite.read.setIntIncr3(0); */
+
+/*   // xyolo: multiply and bypass adder */
+/*   versat.ywrite.yolo.setIter((label_w*IMG_C)/nYOLOmacs); */
+/*   versat.ywrite.yolo.setPer(2); */
+/*   versat.ywrite.yolo.setShift(8); */
+/*   versat.ywrite.yolo.setBias(0); */
+/*   versat.ywrite.yolo.setLeaky(0); */
+/*   versat.ywrite.yolo.setSigmoid(0); */
+/*   versat.ywrite.yolo.setSigMask(0); */
+/*   versat.ywrite.yolo.setMaxpool(0); */
+/*   versat.ywrite.yolo.setBypass(0); */
+/*   versat.ywrite.yolo.setBypassAdder(1); */
+
+/*   // ywrite int: write results from xyolo */
+/*   versat.ywrite.write.setIntStart(0); */
+/*   versat.ywrite.write.setIntDuty(2); */
+/*   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2); */
+/*   versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs); */
+/*   versat.ywrite.write.setIntPer(2); */
+/*   versat.ywrite.write.setIntShift(1); */
+/*   versat.ywrite.write.setIntIncr(0); */
+
+/*   // ywrite ext: write result burst */
+/*   versat.ywrite.write.setExtAddr(&(fp_image[(l+top_width)*IMG_W*IMG_C+(left+previous_w)*IMG_C])); */
+/*   versat.ywrite.write.setOffset(0); */
+/*   versat.ywrite.write.setIntAddr(0); */
+/*   versat.ywrite.write.setExtIter(1); */
+/*   versat.ywrite.write.setExtPer((label_w*IMG_C)/16); */
+/*   versat.ywrite.write.setExtShift(0); */
+/*   versat.ywrite.write.setExtIncr(16); */
+
+/*   //NOTE need to add dma configurations also */
+
+/* } */
 
 
 //Draw class label in input image
@@ -552,6 +629,7 @@ int main(int argc, char **argv) {
 #endif
 
 #ifndef SIM
+  uart_printf("Sending data 1\n");
   send_data();
 #endif
 
