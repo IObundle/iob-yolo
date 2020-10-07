@@ -340,116 +340,153 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
   }
 }
 
-//draw class using versat
-/* void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint8_t r, uint8_t g, uint8_t b){ */
-/*   int l, k; */
-/*   uint8_t label; */
-/*   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) { */
-/*     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) { */
-/*       label = fp_labels[LABEL_W_OFF+MAX_LABEL_SIZE*j+l*label_w+k]; */
-/*       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red */
-/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8; */
-/*       //green */
-/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8; */
-/*       //blue */
-/*       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8; */
-/*     } */
-/*   } */
-/*   // VERSAT CONFIGURATIONS */
+// draw class using versat
+void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint16_t r, uint16_t g, uint16_t b){
+  int l, k;
+  uint8_t label;
+  
+  uart_printf("draw_class_versat %d\n", j);
 
-/*   // yread ext: read 1 rgb line for the j class */
-/*   versat.yread.setExtAddr(&(fp_rgb[16*j])); //16x2Bytes to jump a line */
-/*   versat.yread.setOffset(0); // read same line to all yread memories */
-/*   versat.yread.PingPong(0); */
-/*   versat.yread.IntAddr(0); */
-/*   versat.yread.setExtIter(1); */
-/*   versat.yread.setExtPer(1); // only one MIG_BUS_W transfer */
-/*   versat.yread.setExtShift(0); */
-/*   versat.yread.setExtIncr(16); // does this really matter? */
+  //clear configurations
+  versat.clear();
+  // VERSAT CONFIGURATIONS
 
-/*   // yread int: send first line to xyolo */
-/*   versat.yread.setIntIter((label_w*IMG_C)/nYOLOmacs); */
-/*   versat.yread.setIntPer(2); */
-/*   versat.yread.setIntShift(0); */
-/*   versat.yread.setIntStart(0); */
-/*   versat.yread.setIntIncr(0); */
-/*   versat.yread.setIntDelay(0); */
+  // yread ext: read 1 rgb line for the j class
+  versat.yread.setExtAddr((int) (&(fp_rgb[16*j]))); //16x2Bytes to jump a line
+  versat.yread.setOffset(0); // read same line to all yread memories
+  versat.yread.setPingPong(0);
+  versat.yread.setIntAddr(0);
+  versat.yread.setExtIter(1);
+  versat.yread.setExtPer(1); // only one MIG_BUS_W transfer
+  versat.yread.setExtShift(0);
+  versat.yread.setExtIncr(16); // does this really matter?
+  versat.dma.yread_setLen(0);
 
-/*   // ywrite read ext: read label line */
-/*   versat.ywrite.read.setExtAddr(&(fp_labels[LABEL_W_OFF + LABEL_SIZE*j + LABEL_LINE_SIZE*l])); // start of each label line */
-/*   versat.ywrite.read.setOffset(0); // only use 1st stage */
-/*   versat.ywrite.read.setPingPong(1); */
-/*   versat.ywrite.read.setIntAddr(0); */
-/*   versat.ywrite.read.setExtIter(1); */
-/*   versat.ywrite.read.setExtPer((label_w*IMG_C)/16); // TODO: what about when remainder == 0? */
-/*   versat.ywrite.read.setExtShift(0); */
-/*   versat.ywrite.read.setExtIncr(16); */
+  // yread int: send first line to xyolo
+  versat.yread.setIntIter((label_w*IMG_C)/nYOLOmacs);
+  versat.yread.setIntPer(2);
+  versat.yread.setIntShift(0);
+  versat.yread.setIntStart(0);
+  versat.yread.setIntIncr(0);
+  versat.yread.setIntDelay(0);
 
-/*   // ywrite read int: sent 1 line every 2 cycles */
-/*   versat.ywrite.read.setIntStart(0); */
-/*   versat.ywrite.read.setIntIter((label_w*IMG_C)/nYOLOmacs); */
-/*   versat.ywrite.read.setIntPer(2); */
-/*   versat.ywrite.read.setIntShift(1); */
-/*   versat.ywrite.read.setIntIncr(0); */
-/*   versat.ywrite.read.setIntIter2(1); */
-/*   versat.ywrite.read.setIntPer2(1); */
-/*   versat.ywrite.read.setIntShift2(0); */
-/*   versat.ywrite.read.setIntIncr2(0); */
-/*   versat.ywrite.read.setIntIter3(1); */
-/*   versat.ywrite.read.setIntPer3(0); */
-/*   versat.ywrite.read.setIntShift3(0); */
-/*   versat.ywrite.read.setIntIncr3(0); */
+  // ywrite read ext: read label line
+  versat.ywrite.read.setOffset(0); // only use 1st stage
+  versat.ywrite.read.setPingPong(1);
+  versat.ywrite.read.setIntAddr(0);
+  versat.ywrite.read.setExtIter(1);
+  versat.ywrite.read.setExtPer((label_w*IMG_C)/16+1);
+  versat.ywrite.read.setExtShift(0);
+  versat.ywrite.read.setExtIncr(16);
+  versat.dma.ywrite_read_setLen((label_w*IMG_C)/16);
 
-/*   // xyolo: multiply and bypass adder */
-/*   versat.ywrite.yolo.setIter((label_w*IMG_C)/nYOLOmacs); */
-/*   versat.ywrite.yolo.setPer(2); */
-/*   versat.ywrite.yolo.setShift(8); */
-/*   versat.ywrite.yolo.setBias(0); */
-/*   versat.ywrite.yolo.setLeaky(0); */
-/*   versat.ywrite.yolo.setSigmoid(0); */
-/*   versat.ywrite.yolo.setSigMask(0); */
-/*   versat.ywrite.yolo.setMaxpool(0); */
-/*   versat.ywrite.yolo.setBypass(0); */
-/*   versat.ywrite.yolo.setBypassAdder(1); */
+  // ywrite read int: send 1 line every 2 cycles
+  versat.ywrite.read.setIntStart(0);
+  versat.ywrite.read.setIntIter((label_w*IMG_C)/nYOLOmacs);
+  versat.ywrite.read.setIntPer(2);
+  versat.ywrite.read.setIntShift(1);
+  versat.ywrite.read.setIntIncr(0);
+  versat.ywrite.read.setIntIter2(0);
+  versat.ywrite.read.setIntPer2(0);
+  versat.ywrite.read.setIntShift2(0);
+  versat.ywrite.read.setIntIncr2(0);
+  versat.ywrite.read.setIntIter3(0);
+  versat.ywrite.read.setIntPer3(0);
+  versat.ywrite.read.setIntShift3(0);
+  versat.ywrite.read.setIntIncr3(0);
 
-/*   // ywrite int: write results from xyolo */
-/*   versat.ywrite.write.setIntStart(0); */
-/*   versat.ywrite.write.setIntDuty(2); */
-/*   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2); */
-/*   versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs); */
-/*   versat.ywrite.write.setIntPer(2); */
-/*   versat.ywrite.write.setIntShift(1); */
-/*   versat.ywrite.write.setIntIncr(0); */
+  // xyolo: multiply and bypass adder
+  versat.ywrite.yolo.setIter((label_w*IMG_C)/nYOLOmacs);
+  versat.ywrite.yolo.setPer(2);
+  versat.ywrite.yolo.setShift(8);
+  versat.ywrite.yolo.setBias(0);
+  versat.ywrite.yolo.setLeaky(0);
+  versat.ywrite.yolo.setSigmoid(0);
+  versat.ywrite.yolo.setSigMask(0);
+  versat.ywrite.yolo.setMaxpool(0);
+  versat.ywrite.yolo.setBypass(0);
+  versat.ywrite.yolo.setBypassAdder(1);
 
-/*   // ywrite ext: write result burst */
-/*   versat.ywrite.write.setExtAddr(&(fp_image[(l+top_width)*IMG_W*IMG_C+(left+previous_w)*IMG_C])); */
-/*   versat.ywrite.write.setOffset(0); */
-/*   versat.ywrite.write.setIntAddr(0); */
-/*   versat.ywrite.write.setExtIter(1); */
-/*   versat.ywrite.write.setExtPer((label_w*IMG_C)/16); */
-/*   versat.ywrite.write.setExtShift(0); */
-/*   versat.ywrite.write.setExtIncr(16); */
+  // ywrite int: write results from xyolo
+  versat.ywrite.write.setIntStart(0);
+  versat.ywrite.write.setIntDuty(2);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs);
+  versat.ywrite.write.setIntPer(2);
+  versat.ywrite.write.setIntShift(1);
+  versat.ywrite.write.setIntIncr(0);
 
-/*   //NOTE need to add dma configurations also */
+  // ywrite ext: write result burst
+  versat.ywrite.write.setOffset(0);
+  versat.ywrite.write.setIntAddr(0);
+  versat.ywrite.write.setExtIter(1);
+  versat.ywrite.write.setExtPer((label_w*IMG_C)/16);
+  versat.ywrite.write.setExtShift(0);
+  versat.ywrite.write.setExtIncr(16);
+  versat.dma.ywrite_write_setNBytesW(2*label_w*IMG_C);
 
-/* } */
+  // each run writes a label line to fp_image
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    versat.ywrite.read.setExtAddr((int) (&(fp_labels[LABEL_W_OFF + LABEL_SIZE*j + LABEL_LINE_SIZE*l]))); // start of each label line
+    versat.ywrite.write.setExtAddr((int)(&(fp_image[(l+top_width)*IMG_W*IMG_C+(left+previous_w)*IMG_C]))); //fp_image position
+    
+    //wait until done
+    while(versat.done() == 0);
+    /* uart_printf("line %d\n", l); */
+    //run configuration
+    versat.run();
+    
+    //stop yread transfers
+    versat.yread.setExtIter(0);
+  }
+
+  //clear configurations
+  versat.clear();
+
+  //final runs
+  versat_end();
+
+}
+
+//DEBUG: directly copy resulting boxes from memory
+void copy_boxes(){
+  int NBOXES = 8;
+  int16_t * box_sol = (int16_t *) DATA_BASE_ADDRESS;
+  box_sol += 256*13*13 + 256*26*26;
+
+  nboxes = NBOXES;
+  int i;
+  for(i = 0; i < 84*nboxes; i++)
+    boxes[i] = box_sol[i];
+
+}
+
 
 //Verify class label in input image
 void verify_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
   uart_printf("Verifying class: %d\n", j);
   int l, k, err_cnt=0;
-  uint8_t label;
+  uint16_t label;
   uint16_t red_val, green_val, blue_val;
   uint16_t red_im, green_im, blue_im;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    uart_printf("Label line %d\n", l);
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
-      label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
+      /* uart_printf("Label col %d\n", k); */
+      label = (uint16_t) fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
+      
+      /* uart_printf("\tlabel\n"); */
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
       red_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C];
+      /* uart_printf("\tred_im\n"); */
+      
       //green
       green_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1];
+      /* uart_printf("\tblue_im\n"); */
+
       //blue
       blue_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2];
+      /* uart_printf("\tgreen_im\n"); */
 
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
       red_val = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
@@ -458,31 +495,35 @@ void verify_class(int label_w, int j, int top_width, int left, int previous_w, i
       //blue
       blue_val = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
 
+      /* uart_printf("\tval\n"); */
       //check fp_image for correct values
       if(red_val != red_im){
 	err_cnt++;
-	uart_printf("Exp: %d | Act: %d\n", red_val, red_im);
+	/* uart_printf("Exp: %d | Act: %d\n", red_val, red_im); */
       }
+      /* uart_printf("\tred\n"); */
       if(green_val != green_im){
 	err_cnt++;
-	uart_printf("Exp: %d | Act: %d\n", green_val, green_im);
+	/* uart_printf("Exp: %d | Act: %d\n", green_val, green_im); */
       }
+      /* uart_printf("\tgreen\n"); */
       if(blue_val != blue_im){
 	err_cnt++;
-	uart_printf("Exp: %d | Act: %d\n", blue_val, blue_im);
+	/* uart_printf("Exp: %d | Act: %d\n", blue_val, blue_im); */
       }
+
+      /* uart_printf("\tchecks\n"); */
     }
   }
-  uart_printf("Label with %d errors\n", err_cnt);
+  /* uart_printf("Label with %d errors\n", err_cnt); */
 
   return;
 }
 
-
 //Draw class label in input image
 void draw_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
   int l, k;
-  uint8_t label;
+  uint16_t label;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
       label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
@@ -542,6 +583,8 @@ void draw_detections() {
 	  green = fp_rgb[RGB_LINE*j + 1];
 	  blue = fp_rgb[RGB_LINE*j + 2];
 
+	  /* uart_printf("Class %d | R: %d | G: %d | B: %d\n", j, red, green, blue); */
+
           //Calculate box coordinates in image frame
           mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
           mul_32 = (int32_t)((int32_t)mul_16 * (int32_t)IMG_W); //Q2.14 * Q16.0 = Q18.14
@@ -565,18 +608,31 @@ void draw_detections() {
           top_width = top + box_width;
           if(top_width - label_height >= 0) top_width -= label_height;
 
+	  //DEBUG: print first label values
+	  /* int x, y; */
+	  /* uint16_t label; */
+	  /* uart_printf("Some label values\n"); */
+	  /* for(x = 0; x < 6; x++) { */
+	  /*   for(y = 0; y < 12; y++) { */
+	  /*     label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+x*LABEL_LINE_SIZE+y]; */
+	  /*     uart_printf("\tlabel[%d][%d][%d]: %d\n", j, x, y, label); */
+	  /*   } */
+	  /* } */
+
         //Otherwise, add comma and space
         } else {
           label_w = fp_labels[80];
-          draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
-          verify_class(label_w, 80, top_width, left, previous_w, red, green, blue);
+          /* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
+          draw_class_versat(label_w, 80, top_width, left, previous_w, red, green, blue);
+          /* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
           previous_w += label_w;
         }
 
         //Draw class labels
         label_w = fp_labels[j];
-        draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
-        verify_class(label_w, j, top_width, left, previous_w, red, green, blue);
+        /* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
+        draw_class_versat(label_w, j, top_width, left, previous_w, red, green, blue);
+        /* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); */
         previous_w += label_w;
       }
     }
@@ -625,6 +681,9 @@ int main(int argc, char **argv) {
   //send init message
   uart_printf("\nPOS CNN\n\n");
 
+  //init versat
+  versat_init(VERSAT_BASE);
+
 #ifndef SIM
 
   //init ETHERNET
@@ -635,26 +694,29 @@ int main(int argc, char **argv) {
   rcv_data();
 #endif
 
-  //create boxes from 1st yolo layer
-  uart_printf("\nCreating boxes from first yolo layer\n");
-  start = timer_time_us(TIMER_BASE);
-  create_boxes(LAYER_16_W, 0, yolo1_div, 1);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  /* //create boxes from 1st yolo layer */
+  /* uart_printf("\nCreating boxes from first yolo layer\n"); */
+  /* start = timer_time_us(TIMER_BASE); */
+  /* create_boxes(LAYER_16_W, 0, yolo1_div, 1); */
+  /* end = timer_time_us(TIMER_BASE); */
+  /* uart_printf("Done in %d us\n\n", end-start); */
 
-  //create boxes from 2nd yolo layer
-  uart_printf("\nCreating boxes from second yolo layer\n");
-  start = timer_time_us(TIMER_BASE);
-  create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  /* //create boxes from 2nd yolo layer */
+  /* uart_printf("\nCreating boxes from second yolo layer\n"); */
+  /* start = timer_time_us(TIMER_BASE); */
+  /* create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0); */
+  /* end = timer_time_us(TIMER_BASE); */
+  /* uart_printf("Done in %d us\n\n", end-start); */
 
-  //filter boxes
-  uart_printf("\nFiltering boxes...\n");
-  start = timer_time_us(TIMER_BASE);
-  filter_boxes();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  /* //filter boxes */
+  /* uart_printf("\nFiltering boxes...\n"); */
+  /* start = timer_time_us(TIMER_BASE); */
+  /* filter_boxes(); */
+  /* end = timer_time_us(TIMER_BASE); */
+  /* uart_printf("Done in %d us\n\n", end-start); */
+
+  //DEBUG: copy solution to boxes
+  copy_boxes();
 
 /* #ifndef SIM */
   //draw boxes and labels

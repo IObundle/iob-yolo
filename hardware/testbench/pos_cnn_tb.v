@@ -88,6 +88,11 @@ module pos_cnn_tb;
    //
    initial begin
 
+`ifdef VCD
+      $dumpfile("system.vcd");
+      $dumpvars();
+`endif
+      
       //init cpu bus signals
       uart_valid = 0;
       uart_wstrb = 0;
