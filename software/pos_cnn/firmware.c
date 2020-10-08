@@ -342,17 +342,16 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
 
 // draw class using versat
 void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint16_t r, uint16_t g, uint16_t b){
-  int l, k;
-  uint8_t label;
+  int l;
   
-  uart_printf("draw_class_versat %d\n", j);
+  /* uart_printf("draw_class_versat %d\n", j); */
 
   //clear configurations
   versat.clear();
   // VERSAT CONFIGURATIONS
 
   // yread ext: read 1 rgb line for the j class
-  versat.yread.setExtAddr((int) (&(fp_rgb[16*j]))); //16x2Bytes to jump a line
+  versat.yread.setExtAddr((int) (&(fp_rgb[16*j]))); //16x2Bytes to jump a 32Byte line
   versat.yread.setOffset(0); // read same line to all yread memories
   versat.yread.setPingPong(0);
   versat.yread.setIntAddr(0);
@@ -409,10 +408,10 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
 
   // ywrite int: write results from xyolo
   versat.ywrite.write.setIntStart(0);
-  versat.ywrite.write.setIntDuty(2);
+  versat.ywrite.write.setIntDuty(2*(nYOLOvect/IMG_C));
   versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
   versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs);
-  versat.ywrite.write.setIntPer(2);
+  versat.ywrite.write.setIntPer(2*(nYOLOvect/IMG_C));
   versat.ywrite.write.setIntShift(1);
   versat.ywrite.write.setIntIncr(0);
 
@@ -550,6 +549,36 @@ void draw_detections() {
   int offset, ratio_min, ratio_max;
   int left, right, top, bot, top_width, previous_w;
 
+
+  /* //write random labels */
+  /* top_width = 30; */
+  /* left = 0;  */
+  /* previous_w = 0; */
+  /* for(j=0; j<10; j++) { */
+  /*   // pick generated colors based on class value */
+  /*   red = fp_rgb[RGB_LINE*j + 0]; */
+  /*   green = fp_rgb[RGB_LINE*j + 1]; */
+  /*   blue = fp_rgb[RGB_LINE*j + 2]; */
+
+  /*   if(previous_w == 0) { */
+  /*     top_width = 30; */
+  /*   } else { */
+  /*     label_w = fp_labels[80]; */
+  /*     draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
+  /*     draw_class_versat(label_w, 80, top_width+30, left, previous_w, red, green, blue); */
+  /*     /\* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
+  /*     previous_w += label_w; */
+  /*   } */
+    
+  /*   //Draw class labels */
+  /*   label_w = fp_labels[j]; */
+  /*   draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
+  /*   /\* draw_class_versat(label_w, j, top_width+30, left, previous_w, red, green, blue); *\/ */
+  /*   /\* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
+  /*   previous_w += label_w; */
+      
+  /* } */
+
   //Check valid detections
   for(i = 0; i < nboxes; i++) {
 
@@ -578,12 +607,12 @@ void draw_detections() {
           /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6 */
           /* blue = (mul_16 >> 6); //Q10.6 to Q8.0 */
 
-	  // pick generated colors based on class value
-	  red = fp_rgb[RGB_LINE*j + 0];
-	  green = fp_rgb[RGB_LINE*j + 1];
-	  blue = fp_rgb[RGB_LINE*j + 2];
+  	  // pick generated colors based on class value
+  	  red = fp_rgb[RGB_LINE*j + 0];
+  	  green = fp_rgb[RGB_LINE*j + 1];
+  	  blue = fp_rgb[RGB_LINE*j + 2];
 
-	  /* uart_printf("Class %d | R: %d | G: %d | B: %d\n", j, red, green, blue); */
+  	  /* uart_printf("Class %d | R: %d | G: %d | B: %d\n", j, red, green, blue); */
 
           //Calculate box coordinates in image frame
           mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q2.14
@@ -608,16 +637,16 @@ void draw_detections() {
           top_width = top + box_width;
           if(top_width - label_height >= 0) top_width -= label_height;
 
-	  //DEBUG: print first label values
-	  /* int x, y; */
-	  /* uint16_t label; */
-	  /* uart_printf("Some label values\n"); */
-	  /* for(x = 0; x < 6; x++) { */
-	  /*   for(y = 0; y < 12; y++) { */
-	  /*     label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+x*LABEL_LINE_SIZE+y]; */
-	  /*     uart_printf("\tlabel[%d][%d][%d]: %d\n", j, x, y, label); */
-	  /*   } */
-	  /* } */
+  	  //DEBUG: print first label values
+  	  /* int x, y; */
+  	  /* uint16_t label; */
+  	  /* uart_printf("Some label values\n"); */
+  	  /* for(x = 0; x < 6; x++) { */
+  	  /*   for(y = 0; y < 12; y++) { */
+  	  /*     label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+x*LABEL_LINE_SIZE+y]; */
+  	  /*     uart_printf("\tlabel[%d][%d][%d]: %d\n", j, x, y, label); */
+  	  /*   } */
+  	  /* } */
 
         //Otherwise, add comma and space
         } else {
@@ -694,29 +723,29 @@ int main(int argc, char **argv) {
   rcv_data();
 #endif
 
-  /* //create boxes from 1st yolo layer */
-  /* uart_printf("\nCreating boxes from first yolo layer\n"); */
-  /* start = timer_time_us(TIMER_BASE); */
-  /* create_boxes(LAYER_16_W, 0, yolo1_div, 1); */
-  /* end = timer_time_us(TIMER_BASE); */
-  /* uart_printf("Done in %d us\n\n", end-start); */
+  //create boxes from 1st yolo layer
+  uart_printf("\nCreating boxes from first yolo layer\n");
+  start = timer_time_us(TIMER_BASE);
+  create_boxes(LAYER_16_W, 0, yolo1_div, 1);
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
 
-  /* //create boxes from 2nd yolo layer */
-  /* uart_printf("\nCreating boxes from second yolo layer\n"); */
-  /* start = timer_time_us(TIMER_BASE); */
-  /* create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0); */
-  /* end = timer_time_us(TIMER_BASE); */
-  /* uart_printf("Done in %d us\n\n", end-start); */
+  //create boxes from 2nd yolo layer
+  uart_printf("\nCreating boxes from second yolo layer\n");
+  start = timer_time_us(TIMER_BASE);
+  create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
 
-  /* //filter boxes */
-  /* uart_printf("\nFiltering boxes...\n"); */
-  /* start = timer_time_us(TIMER_BASE); */
-  /* filter_boxes(); */
-  /* end = timer_time_us(TIMER_BASE); */
-  /* uart_printf("Done in %d us\n\n", end-start); */
+  //filter boxes
+  uart_printf("\nFiltering boxes...\n");
+  start = timer_time_us(TIMER_BASE);
+  filter_boxes();
+  end = timer_time_us(TIMER_BASE);
+  uart_printf("Done in %d us\n\n", end-start);
 
-  //DEBUG: copy solution to boxes
-  copy_boxes();
+  /* //DEBUG: copy solution to boxes */
+  /* copy_boxes(); */
 
 /* #ifndef SIM */
   //draw boxes and labels
