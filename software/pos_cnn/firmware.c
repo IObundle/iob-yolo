@@ -341,7 +341,7 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
 }
 
 // draw class using versat
-void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, uint16_t r, uint16_t g, uint16_t b){
+void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, int rgb){
   int l;
   
   /* uart_printf("draw_class_versat %d\n", j); */
@@ -351,7 +351,7 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
   // VERSAT CONFIGURATIONS
 
   // yread ext: read 1 rgb line for the j class
-  versat.yread.setExtAddr((int) (&(fp_rgb[16*j]))); //16x2Bytes to jump a 32Byte line
+  versat.yread.setExtAddr((int) (&(fp_rgb[16*rgb]))); //16x2Bytes to jump a 32Byte line
   versat.yread.setOffset(0); // read same line to all yread memories
   versat.yread.setPingPong(0);
   versat.yread.setIntAddr(0);
@@ -551,34 +551,39 @@ void draw_detections() {
 
 
   /* //write random labels */
-  /* top_width = 30; */
-  /* left = 0;  */
+  /* top_width = 0; */
+  /* left = 0; */
   /* previous_w = 0; */
-  /* for(j=0; j<10; j++) { */
-  /*   // pick generated colors based on class value */
-  /*   red = fp_rgb[RGB_LINE*j + 0]; */
-  /*   green = fp_rgb[RGB_LINE*j + 1]; */
-  /*   blue = fp_rgb[RGB_LINE*j + 2]; */
 
-  /*   if(previous_w == 0) { */
-  /*     top_width = 30; */
-  /*   } else { */
-  /*     label_w = fp_labels[80]; */
-  /*     draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
-  /*     draw_class_versat(label_w, 80, top_width+30, left, previous_w, red, green, blue); */
-  /*     /\* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
-  /*     previous_w += label_w; */
-  /*   } */
-    
-  /*   //Draw class labels */
-  /*   label_w = fp_labels[j]; */
-  /*   draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
-  /*   /\* draw_class_versat(label_w, j, top_width+30, left, previous_w, red, green, blue); *\/ */
-  /*   /\* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
-  /*   previous_w += label_w; */
+  /* for(i=0; i<8; i++) { */
+  /*   previous_w = 0; */
+
+  /*   for(j=i*10; j<10+(i*10); j++) { */
+  /*     // pick generated colors based on class value */
+  /*     red = fp_rgb[RGB_LINE*j + 0]; */
+  /*     green = fp_rgb[RGB_LINE*j + 1]; */
+  /*     blue = fp_rgb[RGB_LINE*j + 2]; */
       
+  /*     if(previous_w == 0) { */
+  /*     /\* top_width = 30; *\/ */
+  /*     } else { */
+  /* 	label_w = fp_labels[80]; */
+  /* 	/\* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
+  /* 	draw_class_versat(label_w, 80, top_width+25, left, previous_w, j); */
+  /* 	/\* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
+  /* 	previous_w += label_w; */
+  /*     } */
+      
+  /*     //Draw class labels */
+  /*     label_w = fp_labels[j]; */
+  /*     /\* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
+  /*     draw_class_versat(label_w, j, top_width+25, left, previous_w, j); */
+  /*     /\* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
+  /*     previous_w += label_w; */
+      
+  /*   } */
+  /*   top_width += 50; */
   /* } */
-
   //Check valid detections
   for(i = 0; i < nboxes; i++) {
 
@@ -652,7 +657,7 @@ void draw_detections() {
         } else {
           label_w = fp_labels[80];
           /* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
-          draw_class_versat(label_w, 80, top_width, left, previous_w, red, green, blue);
+          draw_class_versat(label_w, 80, top_width, left, previous_w, j);
           /* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
           previous_w += label_w;
         }
@@ -660,7 +665,7 @@ void draw_detections() {
         //Draw class labels
         label_w = fp_labels[j];
         /* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
-        draw_class_versat(label_w, j, top_width, left, previous_w, red, green, blue);
+        draw_class_versat(label_w, j, top_width, left, previous_w, j);
         /* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); */
         previous_w += label_w;
       }
