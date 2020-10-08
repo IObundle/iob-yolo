@@ -374,10 +374,10 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
   versat.ywrite.read.setPingPong(1);
   versat.ywrite.read.setIntAddr(0);
   versat.ywrite.read.setExtIter(1);
-  versat.ywrite.read.setExtPer((label_w*IMG_C)/16+1);
+  versat.ywrite.read.setExtPer((label_w*IMG_C+15)/16); // ceil(x/y) = (x+y-1)/y
   versat.ywrite.read.setExtShift(0);
   versat.ywrite.read.setExtIncr(16);
-  versat.dma.ywrite_read_setLen((label_w*IMG_C)/16);
+  versat.dma.ywrite_read_setLen((label_w*IMG_C+15)/16-1); //ceil(x/y)-1
 
   // ywrite read int: send 1 line every 2 cycles
   versat.ywrite.read.setIntStart(0);
@@ -419,7 +419,7 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
   versat.ywrite.write.setOffset(0);
   versat.ywrite.write.setIntAddr(0);
   versat.ywrite.write.setExtIter(1);
-  versat.ywrite.write.setExtPer((label_w*IMG_C)/16);
+  versat.ywrite.write.setExtPer((label_w*IMG_C+15)/16); //ceil(x/y) = (x+y-1)/y
   versat.ywrite.write.setExtShift(0);
   versat.ywrite.write.setExtIncr(16);
   versat.dma.ywrite_write_setNBytesW(2*label_w*IMG_C);
