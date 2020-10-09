@@ -217,6 +217,7 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
 	  //Update number of candidate boxes
 	  nboxes++;
+	  uart_printf("nboxes: %d\n", nboxes);
         }
       }
     }
@@ -616,7 +617,7 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
   // ywrite int: write results from xyolo
   versat.ywrite.write.setIntStart(0);
   versat.ywrite.write.setIntDuty(2*(nYOLOvect/IMG_C));
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT -2 - 2);
   versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs);
   versat.ywrite.write.setIntPer(2*(nYOLOvect/IMG_C));
   versat.ywrite.write.setIntShift(1);
@@ -730,15 +731,27 @@ void verify_class(int label_w, int j, int top_width, int left, int previous_w, i
 void draw_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
   int l, k;
   uint16_t label;
+  uint16_t val=0;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    /* uart_printf("line: %x\n", l); */
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
       label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      val = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
+      /* uart_printf("\t%x", val); */
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = val;
+      /* fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8; */
       //green
+      val = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
+      /* uart_printf("\t%x", val); */
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = val;
       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
       //blue
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+      val = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
+      /* uart_printf("\t%x", val); */
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = val;
+      /* fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8; */
+      /* uart_printf("\t%x\n", 0); */
     }
   }
 }
@@ -949,6 +962,8 @@ int main(int argc, char **argv) {
   create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
+
+  uart_printf("NUMBER OF BOXES: %d\n", nboxes);
 
   //filter boxes
   uart_printf("\nFiltering boxes...\n");
