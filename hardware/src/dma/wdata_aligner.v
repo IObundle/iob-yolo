@@ -47,10 +47,10 @@ module wdata_aligner #(
    
    
    // aux registers
-   reg 						   cfg_en, buffer_en, len_cnt_en;
+   reg 						   cfg_en, buffer_en, len_cnt_en, wdata_offset_en;
    reg [DATA_W/8-1:0] 				   first_wstrb, last_wstrb;
    reg [ADDR_W-1:0] 				   len, len_cnt;
-   reg [(OFFSET_W+3)-1:0] 			   wdata_offset;
+   reg [(OFFSET_W+3)-1:0] 			   wdata_offset;   
    
    //register dbus
    reg 						   buffer_r0_valid, buffer_r1_valid;
@@ -72,6 +72,7 @@ module wdata_aligner #(
 	len_cnt <= {ADDR_W{1'b0}};
 	first_wstrb <= {DATA_W/8{1'b0}};
 	last_wstrb <= {DATA_W/8{1'b0}};
+	wdata_offset <= {(OFFSET_W+3){1'b0}};
      end else begin
 	state <= state_nxt;
 	if(cfg_en) begin
@@ -86,7 +87,7 @@ module wdata_aligner #(
 	   first_wstrb <= first_wstrb;
 	   last_wstrb <= last_wstrb;
 	   if(dma_w_ready) begin
-	      len_cnt = len_cnt - 1;
+	      len_cnt <= len_cnt - 1;
 	   end else begin
 	      len_cnt <= len_cnt;
 	   end
@@ -95,7 +96,10 @@ module wdata_aligner #(
 	   len_cnt <= len_cnt;
 	   first_wstrb <= first_wstrb;
 	   last_wstrb <= last_wstrb;
-	end
+	end // else: !if(len_cnt_en)
+
+	if(wdata_offset_en)
+	  wdata_offset <= {~dbus_addr[0+:OFFSET_W], 3'b0};
 	
      end
    
@@ -106,13 +110,14 @@ module wdata_aligner #(
       buffer_en = 1'b0;
       w_align_valid = 1'b0;
       w_align_wstrb = {DATA_W/8{1'b0}};
-      wdata_offset = wdata_offset;
+      wdata_offset_en = 1'b0;
+      len_cnt_en = 1'b0;
       case (state)
 	`ALGN_IDLE: begin //wait for dbus_valid
 	   if(dbus_valid) begin
 	      state_nxt = `ALGN_CONFIG;
 	      buffer_en = 1'b1; //register first write request
-	      wdata_offset = {~dbus_addr[0+:OFFSET_W], 3'b0};
+	      wdata_offset_en = 1'b1;
 	   end
 	end
 	`ALGN_CONFIG: begin //set len, offset, first and last wstrbs
@@ -133,13 +138,14 @@ module wdata_aligner #(
 	      if(dma_w_ready) begin
 		 if(len=={{(DATA_W/8-1){1'b0}}, 1'b1}) begin
 		 state_nxt = `ALGN_LAST;
+		 end else begin
+		    state_nxt = `ALGN_TRANSFER;
 		 end
-	      end else begin
-		 state_nxt = `ALGN_TRANSFER;
 	      end
 	   end
 	end
 	`ALGN_TRANSFER: begin
+	   len_cnt_en = 1'b1;
 	   w_align_valid = buffer_r1_valid;
 	   w_align_wstrb = buffer_r1_wstrb;	
 	   if(dma_w_ready && len_cnt == {{(DATA_W/8-1){1'b0}}, 1'b1}) begin // check for last transfer
