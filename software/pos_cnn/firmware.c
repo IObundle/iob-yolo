@@ -623,7 +623,7 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
   // ywrite int: write results from xyolo
   versat.ywrite.write.setIntStart(0);
   versat.ywrite.write.setIntDuty(2*(nYOLOvect/IMG_C));
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT -2 - 2);
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT -4 - 2);
   versat.ywrite.write.setIntIter((label_w*IMG_C)/nYOLOmacs);
   versat.ywrite.write.setIntPer(2*(nYOLOvect/IMG_C));
   versat.ywrite.write.setIntShift(1);
