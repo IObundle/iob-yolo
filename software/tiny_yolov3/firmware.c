@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 //print time of each run
-#define TIME_RUN
+/* #define TIME_RUN */
 #define CLK_NS 8
 #ifdef SIM
   int k_delta;
@@ -333,7 +333,7 @@ void width_resize() {
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(NEW_W_PADD*LAYER_1_C/nYOLOvect-1);
+  versat.dma.ywrite_write_setNBytesW(2*NEW_W_PADD*LAYER_1_C);
   versat.ywrite.write.setOffset(2*(NEW_W_PADD*LAYER_1_C));
   versat.ywrite.write.setExtPer(NEW_W_PADD*LAYER_1_C/nYOLOvect);
   versat.ywrite.write.setExtIter(1);
@@ -428,7 +428,7 @@ void height_resize() {
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(NEW_W_PADD*LAYER_1_C/nYOLOvect-1);
+  versat.dma.ywrite_write_setNBytesW(2*NEW_W_PADD*LAYER_1_C);
   versat.ywrite.write.setExtPer(NEW_W_PADD*LAYER_1_C/nYOLOvect);
   versat.ywrite.write.setExtIter(1);
 
@@ -544,7 +544,7 @@ void layer1() {
   versat.ywrite.write.setIntIter(LAYER_1_TILE_W/2);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(LAYER_1_TILE_W/2-1);
+  versat.dma.ywrite_write_setNBytesW(LAYER_1_TILE_W*LAYER_1_NUM_KER);
   versat.ywrite.write.setOffset(2*((LAYER_1_W/2+2)*LAYER_1_NUM_KER));
   versat.ywrite.write.setExtPer(1);
   versat.ywrite.write.setExtIncr(nYOLOvect);
@@ -689,7 +689,7 @@ void conv(int w, int c, int num_ker, int ker_size, int til_w, int w_start, int s
   versat.ywrite.write.setIntIter(til_w/2);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(((til_w/2)*(num_ker/nYOLOvect))-1);
+  versat.dma.ywrite_write_setNBytesW(til_w*num_ker);
   versat.ywrite.write.setOffset(2*((w/2+2)*num_ker));
   versat.ywrite.write.setExtPer(1);
 
@@ -873,7 +873,7 @@ void conv2(int w, int c, int num_ker, int ker_size, int outpadd, int stride, int
   versat.ywrite.write.setIntIter(w*(1+upsample)+upsample); //+upsample to use duty of 2
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen((1+upsample)*w-1);
+  versat.dma.ywrite_write_setNBytesW(32*(1+upsample)*w); //32 NBytes ter burst
   if(outpos == 0) versat.ywrite.write.setOffset(2*((w+2*outpadd+stride)*num_ker));
   else versat.ywrite.write.setOffset(2*((1+upsample)*(w*(1+upsample)+2*outpadd+stride)*(LAYER_9_NUM_KER+LAYER_19_NUM_KER)));
   versat.ywrite.write.setExtPer(w*(1+upsample));
@@ -1047,7 +1047,7 @@ void maxpool(int w, int c, int inpadd, int stride, unsigned int outpos) {
   versat.ywrite.write.setIntShift(1);
 
   // configure xyolo_write vwrite to write result back to DDR
-  versat.dma.ywrite_write_setLen(c/16-1);
+  versat.dma.ywrite_write_setNBytesW(2*c); //x2 for 16bit
   versat.ywrite.write.setOffset(2*((w/(1+inpadd)+2)*c));
   versat.ywrite.write.setExtPer(c/16);
   versat.ywrite.write.setExtIter(1);

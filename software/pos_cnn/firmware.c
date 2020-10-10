@@ -223,7 +223,6 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
 	  //Update number of candidate boxes
 	  nboxes++;
-	  uart_printf("nboxes: %d\n", nboxes);
         }
       }
     }
@@ -417,7 +416,6 @@ void draw_box_versat(int left, int top, int right, int bot, int rgb, int box_w) 
     
     //wait until done
     while(versat.done() == 0);
-    /* uart_printf("line %d\n", l); */
     //run configuration
     versat.run();
     
@@ -430,7 +428,6 @@ void draw_box_versat(int left, int top, int right, int bot, int rgb, int box_w) 
 
     //wait until done
     while(versat.done() == 0);
-    /* uart_printf("line %d\n", l); */
     //run configuration
     versat.run();
 
@@ -498,22 +495,18 @@ void draw_box_versat(int left, int top, int right, int bot, int rgb, int box_w) 
     
     //wait until done
     while(versat.done() == 0);
-    /* uart_printf("line %d\n", l); */
     //run configuration
     versat.run();
     
-    //bottom line
+    //right line
     versat.ywrite.write.setExtAddr((int) (&(fp_image[l*IMG_W*IMG_C+h_right*IMG_C])));
 
     //wait until done
     while(versat.done() == 0);
-    /* uart_printf("line %d\n", l); */
     //run configuration
     versat.run();
 
   }
-
-  
 
   //clear configurations
   versat.clear();
@@ -558,10 +551,6 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
 void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, int rgb){
   int l;
   
-  /* uart_printf("draw_class_versat %d\n", j); */
-
-  //clear configurations
-  versat.clear();
   // VERSAT CONFIGURATIONS
 
   // yread ext: read 1 rgb line for the j class
@@ -645,7 +634,6 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
     
     //wait until done
     while(versat.done() == 0);
-    /* uart_printf("line %d\n", l); */
     //run configuration
     versat.run();
     
@@ -661,103 +649,19 @@ void draw_class_versat(int label_w, int j, int top_width, int left, int previous
 
 }
 
-//DEBUG: directly copy resulting boxes from memory
-void copy_boxes(){
-  int NBOXES = 8;
-  int16_t * box_sol = (int16_t *) DATA_BASE_ADDRESS;
-  box_sol += 256*13*13 + 256*26*26;
-
-  nboxes = NBOXES;
-  int i;
-  for(i = 0; i < 84*nboxes; i++)
-    boxes[i] = box_sol[i];
-
-}
-
-
-//Verify class label in input image
-void verify_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
-  uart_printf("Verifying class: %d\n", j);
-  int l, k, err_cnt=0;
-  uint16_t label;
-  uint16_t red_val, green_val, blue_val;
-  uint16_t red_im, green_im, blue_im;
-  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
-    uart_printf("Label line %d\n", l);
-    for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
-      /* uart_printf("Label col %d\n", k); */
-      label = (uint16_t) fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
-      
-      /* uart_printf("\tlabel\n"); */
-      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      red_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C];
-      /* uart_printf("\tred_im\n"); */
-      
-      //green
-      green_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1];
-      /* uart_printf("\tblue_im\n"); */
-
-      //blue
-      blue_im = fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2];
-      /* uart_printf("\tgreen_im\n"); */
-
-      //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      red_val = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
-      //green
-      green_val = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
-      //blue
-      blue_val = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
-
-      /* uart_printf("\tval\n"); */
-      //check fp_image for correct values
-      if(red_val != red_im){
-	err_cnt++;
-	/* uart_printf("Exp: %d | Act: %d\n", red_val, red_im); */
-      }
-      /* uart_printf("\tred\n"); */
-      if(green_val != green_im){
-	err_cnt++;
-	/* uart_printf("Exp: %d | Act: %d\n", green_val, green_im); */
-      }
-      /* uart_printf("\tgreen\n"); */
-      if(blue_val != blue_im){
-	err_cnt++;
-	/* uart_printf("Exp: %d | Act: %d\n", blue_val, blue_im); */
-      }
-
-      /* uart_printf("\tchecks\n"); */
-    }
-  }
-  /* uart_printf("Label with %d errors\n", err_cnt); */
-
-  return;
-}
-
 //Draw class label in input image
 void draw_class(int label_w, int j, int top_width, int left, int previous_w, int16_t r, int16_t g, int16_t b) {
   int l, k;
   uint16_t label;
-  uint16_t val=0;
   for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
-    /* uart_printf("line: %x\n", l); */
     for(k = 0; k < label_w && (k+left+previous_w) < IMG_W; k++) {
       label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+l*LABEL_LINE_SIZE+4*k];
       //Q8.0*Q8.0=Q16.0 to Q8.0 -> red
-      val = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
-      /* uart_printf("\t%x", val); */
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = val;
-      /* fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8; */
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C] = ((uint16_t)((uint16_t)r*(uint16_t)label)) >> 8;
       //green
-      val = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
-      /* uart_printf("\t%x", val); */
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = val;
       fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 1] = ((uint16_t)((uint16_t)g*(uint16_t)label)) >> 8;
       //blue
-      val = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
-      /* uart_printf("\t%x", val); */
-      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = val;
-      /* fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8; */
-      /* uart_printf("\t%x\n", 0); */
+      fp_image[(l+top_width)*IMG_W*IMG_C+(k+left+previous_w)*IMG_C + 2] = ((uint16_t)((uint16_t)b*(uint16_t)label)) >> 8;
     }
   }
 }
@@ -776,40 +680,6 @@ void draw_detections() {
   int left, right, top, bot, top_width, previous_w;
 
 
-  /* //write random labels */
-  /* top_width = 0; */
-  /* left = 0; */
-  /* previous_w = 0; */
-
-  /* for(i=0; i<8; i++) { */
-  /*   previous_w = 0; */
-
-  /*   for(j=i*10; j<10+(i*10); j++) { */
-  /*     // pick generated colors based on class value */
-  /*     red = fp_rgb[RGB_LINE*j + 0]; */
-  /*     green = fp_rgb[RGB_LINE*j + 1]; */
-  /*     blue = fp_rgb[RGB_LINE*j + 2]; */
-      
-  /*     if(previous_w == 0) { */
-  /*     /\* top_width = 30; *\/ */
-  /*     } else { */
-  /* 	label_w = fp_labels[80]; */
-  /* 	/\* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
-  /* 	draw_class_versat(label_w, 80, top_width+25, left, previous_w, j); */
-  /* 	/\* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); *\/ */
-  /* 	previous_w += label_w; */
-  /*     } */
-      
-  /*     //Draw class labels */
-  /*     label_w = fp_labels[j]; */
-  /*     /\* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
-  /*     draw_class_versat(label_w, j, top_width+25, left, previous_w, j); */
-  /*     /\* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); *\/ */
-  /*     previous_w += label_w; */
-      
-  /*   } */
-  /*   top_width += 50; */
-  /* } */
   //Check valid detections
   for(i = 0; i < nboxes; i++) {
 
@@ -821,29 +691,10 @@ void draw_detections() {
         //Check if this was the first class detected for given box
         if(previous_w == 0) {
 
-          //Randomly pick rgb colors for the box
-          /* offset = j*123457 % 80; */
-          /* mul_16 = (uint16_t)((uint16_t)offset*(uint16_t)((uint8_t)0x10)); //Q8.0 *Q0.8 = Q8.8 */
-          /* ratio = (uint8_t)(mul_16>>2); //Q8.8 to Q2.6 */
-          /* ratio_min = (ratio >> 6); */
-          /* ratio_max = ratio_min + 1; */
-          /* ratio = ratio & 0x3F; //Q2.6 */
-          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][2]); //Q2.6 *Q8.0 = Q10.6 */
-          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][2]); //Q2.6 *Q8.0 = Q10.6 */
-          /* red = (mul_16 >> 6); //Q10.6 to Q8.0 */
-          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][1]); //Q2.6 *Q8.0 = Q10.6 */
-          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][1]); //Q2.6 *Q8.0 = Q10.6 */
-          /* green = (mul_16 >> 6); //Q10.6 to Q8.0 */
-          /* mul_16 = (uint16_t)((uint16_t)(0x40-ratio)*(uint16_t)colors[ratio_min][0]); //Q2.6 *Q8.0 = Q10.6 */
-          /* mul_16 += (uint16_t)((uint16_t)ratio*(uint16_t)colors[ratio_max][0]); //Q2.6 *Q8.0 = Q10.6 */
-          /* blue = (mul_16 >> 6); //Q10.6 to Q8.0 */
-
   	  // pick generated colors based on class value
   	  /* red = fp_rgb[RGB_LINE*j + 0]; */
   	  /* green = fp_rgb[RGB_LINE*j + 1]; */
   	  /* blue = fp_rgb[RGB_LINE*j + 2]; */
-
-  	  /* uart_printf("Class %d | R: %d | G: %d | B: %d\n", j, red, green, blue); */
 
           //Calculate box coordinates in image frame
           mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q3.13
@@ -869,23 +720,11 @@ void draw_detections() {
           top_width = top + box_width;
           if(top_width - label_height >= 0) top_width -= label_height;
 
-  	  //DEBUG: print first label values
-  	  /* int x, y; */
-  	  /* uint16_t label; */
-  	  /* uart_printf("Some label values\n"); */
-  	  /* for(x = 0; x < 6; x++) { */
-  	  /*   for(y = 0; y < 12; y++) { */
-  	  /*     label = fp_labels[LABEL_W_OFF+LABEL_SIZE*j+x*LABEL_LINE_SIZE+y]; */
-  	  /*     uart_printf("\tlabel[%d][%d][%d]: %d\n", j, x, y, label); */
-  	  /*   } */
-  	  /* } */
-
         //Otherwise, add comma and space
         } else {
           label_w = fp_labels[80];
           /* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
           draw_class_versat(label_w, 80, top_width, left, previous_w, j);
-          /* verify_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
           previous_w += label_w;
         }
 
@@ -893,7 +732,6 @@ void draw_detections() {
         label_w = fp_labels[j];
         /* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
         draw_class_versat(label_w, j, top_width, left, previous_w, j);
-        /* verify_class(label_w, j, top_width, left, previous_w, red, green, blue); */
         previous_w += label_w;
       }
     }
@@ -978,18 +816,14 @@ int main(int argc, char **argv) {
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
-  /* //DEBUG: copy solution to boxes */
-  /* copy_boxes(); */
-
-/* #ifndef SIM */
+#ifndef SIM
   //draw boxes and labels
   uart_printf("\nDrawing boxes and labels...\n");
   start = timer_time_us(TIMER_BASE);
   draw_detections();
   end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
-/* #else */
-#ifdef SIM
+#else
   //verify results
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += 256*13*13 + 256*26*26;
