@@ -50,9 +50,12 @@
 #define NTW_IN_NUM_KER 16
 #define WEIGHT_SIZE (NTW_IN_NUM_KER*(1 + NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*NTW_IN_C + NTW_IN_W_OFF)) //+W_OFF to be 32 byte aligned
 #define DATA_LAYER_1 ((NTW_IN_W+2)*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)) //+P_OFF to be 32 byte aligned
-
 #define DATA_LAYER_3 ((NTW_IN_W/2+2)*(NTW_IN_W/2+2)*NTW_IN_NUM_KER)
 #define TILE_W 208 //any value divisor of 416
+
+//shifts
+#define LAYER_1_SHIFT 17
+#define LAYER_1_B_SHIFT (16-14)
 
 //define ethernet constants
 #define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
@@ -163,7 +166,8 @@ void conv() {
   // configure xyolo to perform convolution + maxpool
   versat.ywrite.yolo.setIter(2*TILE_W); //x2 due to maxpool // 8
   versat.ywrite.yolo.setPer(NTW_IN_KER_SIZE*NTW_IN_KER_SIZE*(NTW_IN_C/nYOLOmacs)); // 27
-  versat.ywrite.yolo.setShift(10);
+  versat.ywrite.yolo.setShift(LAYER_1_SHIFT);
+  versat.ywrite.yolo.setBiasShift(LAYER_1_B_SHIFT);
   versat.ywrite.yolo.setBias(1);
   versat.ywrite.yolo.setLeaky(1);
   versat.ywrite.yolo.setMaxpool(1);
@@ -205,7 +209,6 @@ void conv() {
 	versat.ywrite.read.setExtAddr(LAYER_1_BASE_ADDRESS + 2*(k*2*((NTW_IN_W+2)*NTW_IN_C+NTW_IN_P_OFF)*nSTAGES));
 
 	for(j = 0; j < NTW_IN_W/TILE_W; j++) {
-	  //for(j = 0; j < 1; j++) {
 
 	  // configure xyolo_write vread start
 	  versat.ywrite.read.setIntStart(j*TILE_W*(NTW_IN_C/nYOLOmacs));

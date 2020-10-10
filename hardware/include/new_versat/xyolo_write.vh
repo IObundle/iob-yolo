@@ -1,5 +1,5 @@
 // Latency
-`define XYOLO_WRITE_LAT        	6
+`define XYOLO_WRITE_LAT        	8
 `define XYOLO_WRITE_BYPASS_LAT  2
 
 //define vread mem write address width
@@ -60,13 +60,14 @@
 `define XYOLO_CONF_ITER  	40
 `define XYOLO_CONF_PER   	41
 `define XYOLO_CONF_SHIFT   	42
-`define XYOLO_CONF_BIAS   	43
-`define XYOLO_CONF_LEAKY   	44
-`define XYOLO_CONF_SIGMOID   	45
-`define XYOLO_CONF_SIG_MASK   	46
-`define XYOLO_CONF_MAXPOOL   	47
-`define XYOLO_CONF_BYPASS   	48
-`define XYOLO_CONF_BYPASS_ADD  	49
+`define XYOLO_CONF_B_SHIFT   	43
+`define XYOLO_CONF_BIAS   	44
+`define XYOLO_CONF_LEAKY   	45
+`define XYOLO_CONF_SIGMOID   	46
+`define XYOLO_CONF_SIG_MASK   	47
+`define XYOLO_CONF_MAXPOOL   	48
+`define XYOLO_CONF_BYPASS   	49
+`define XYOLO_CONF_BYPASS_ADD  	50
 
 // Address
 `define XYOLO_WRITE_ADDR_W 	($clog2(`XYOLO_CONF_BYPASS_ADD+1))
