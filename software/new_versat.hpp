@@ -334,8 +334,9 @@ class CDma {
     void ywrite_read_setLen(int len) {
       MEMSET(base, DMA_XYOLO_WRITE_READ_CONF_LEN, len);
     }
-    void ywrite_write_setLen(int len) {
-      MEMSET(base, DMA_XYOLO_WRITE_WRITE_CONF_LEN, len);
+    void ywrite_write_setNBytesW(int nBytesW) {
+      // Write data [startAddr : NBytesW-1] - total of NBytesW bytes
+      MEMSET(base, DMA_XYOLO_WRITE_WRITE_CONF_NBYTESW, nBytesW-1);
     }  
 };//end class CDma
   

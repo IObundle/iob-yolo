@@ -82,15 +82,16 @@ module axi_dma_w # (
 
    // Data write constants
    assign m_axi_wdata = wdata;
-
+   assign m_axi_wstrb = wstrb;
+   
    // delays
    always @ (posedge rst, posedge clk)
      if (rst) begin
-       m_axi_wstrb <= {`MIG_BUS_W/8{1'b0}};
+       // m_axi_wstrb <= {`MIG_BUS_W/8{1'b0}};
        m_axi_wlast <= 0;
        m_axi_wvalid <= 0;
      end else begin
-       m_axi_wstrb <= wstrb;
+       // m_axi_wstrb <= wstrb;
        m_axi_wlast <= m_axi_wlast_int;
        m_axi_wvalid <= m_axi_wvalid_int;
      end

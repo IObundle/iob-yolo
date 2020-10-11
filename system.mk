@@ -160,7 +160,7 @@ endif
 
 DEFINE+=$(defmacro)BAUD=$(BAUD)
 ifeq ($(FREQ),)
-DEFINE+=$(defmacro)FREQ=125000000
+DEFINE+=$(defmacro)FREQ=100000000
 else
 DEFINE+=$(defmacro)FREQ=$(FREQ)
 endif
