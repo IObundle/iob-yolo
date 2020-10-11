@@ -19,11 +19,11 @@ BOOTROM_ADDR_W:=12
 
 #Init memory (only works in simulation or FPGA not running DDR)
 ifeq ($(INIT_MEM),)
-	INIT_MEM:=1
+	INIT_MEM:=0
 endif
 
 #Choose Firmware (in SW_DIR)
-TEST:=pos_cnn
+TEST:=tiny_yolov3
 
 #Ethernet
 RMAC_ADDR:=00e04c690ba0 #Baba
@@ -160,7 +160,7 @@ endif
 
 DEFINE+=$(defmacro)BAUD=$(BAUD)
 ifeq ($(FREQ),)
-DEFINE+=$(defmacro)FREQ=125000000
+DEFINE+=$(defmacro)FREQ=100000000
 else
 DEFINE+=$(defmacro)FREQ=$(FREQ)
 endif
