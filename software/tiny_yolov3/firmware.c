@@ -1267,6 +1267,206 @@ void filter_boxes() {
     }
   }
 }
+//Draw bounding box in input image using versat
+void draw_box_versat(int left, int top, int right, int bot, int rgb, int box_w) {
+
+  int l=0;
+  int line_w = 0, h_right=0;
+  
+  //Limit box coordinates
+  if(left < 0) left = 0; else if(left >= IMG_W) left = IMG_W-1;
+  if(right < 0) right = 0; else if(right >= IMG_W) right = IMG_W-1;
+  if(top < 0) top = 0; else if(top >= IMG_H) top = IMG_H-1;
+  if(bot < 0) bot = 0; else if(bot >= IMG_H) bot = IMG_H-1;
+
+  line_w = right - left + 1;
+  h_right = right - box_w +1;
+
+  //clear configurations
+  versat.clear();
+  // VERSAT CONFIGURATIONS
+
+  // yread ext: read 1 rgb line with 1's
+  versat.yread.setExtAddr((int) (&(fp_rgb[16*80]))); //16x2Bytes to jump a 32Byte line
+  versat.yread.setOffset(0); // read same line to all yread memories
+  versat.yread.setPingPong(0);
+  versat.yread.setIntAddr(0);
+  versat.yread.setExtIter(1);
+  versat.yread.setExtPer(1); // only one MIG_BUS_W transfer
+  versat.yread.setExtShift(0);
+  versat.yread.setExtIncr(16); // does this really matter?
+  versat.dma.yread_setLen(0);
+
+  // yread int: send first line to xyolo
+  versat.yread.setIntIter((line_w*LAYER_1_C)/nYOLOmacs);
+  versat.yread.setIntPer(2);
+  versat.yread.setIntShift(0);
+  versat.yread.setIntStart(0);
+  versat.yread.setIntIncr(0);
+  versat.yread.setIntDelay(0);
+
+  // yread ext: read 1 rgb line with 1's
+  versat.ywrite.read.setExtAddr((int) (&(fp_rgb[16*rgb]))); //16x2Bytes to jump a 32Byte line
+  versat.ywrite.read.setOffset(0); // read same line to all yread memories
+  versat.ywrite.read.setPingPong(0);
+  versat.ywrite.read.setIntAddr(0);
+  versat.ywrite.read.setExtIter(1);
+  versat.ywrite.read.setExtPer(1); // only one MIG_BUS_W transfer
+  versat.ywrite.read.setExtShift(0);
+  versat.ywrite.read.setExtIncr(16); // does this really matter?
+  versat.dma.ywrite_read_setLen(0);
+
+  // ywrite read int: send 1 line every 2 cycles
+  versat.ywrite.read.setIntStart(0);
+  versat.ywrite.read.setIntIter((line_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.read.setIntPer(2);
+  versat.ywrite.read.setIntShift(0);
+  versat.ywrite.read.setIntIncr(0);
+  versat.ywrite.read.setIntIter2(0);
+  versat.ywrite.read.setIntPer2(0);
+  versat.ywrite.read.setIntShift2(0);
+  versat.ywrite.read.setIntIncr2(0);
+  versat.ywrite.read.setIntIter3(0);
+  versat.ywrite.read.setIntPer3(0);
+  versat.ywrite.read.setIntShift3(0);
+  versat.ywrite.read.setIntIncr3(0);
+
+  // xyolo: multiply and bypass adder
+  versat.ywrite.yolo.setIter((line_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.yolo.setPer(2);
+  versat.ywrite.yolo.setShift(0);
+  versat.ywrite.yolo.setBias(0);
+  versat.ywrite.yolo.setLeaky(0);
+  versat.ywrite.yolo.setSigmoid(0);
+  versat.ywrite.yolo.setSigMask(0);
+  versat.ywrite.yolo.setMaxpool(0);
+  versat.ywrite.yolo.setBypass(0);
+  versat.ywrite.yolo.setBypassAdder(1);
+
+  // ywrite int: write results from xyolo
+  versat.ywrite.write.setIntStart(0);
+  versat.ywrite.write.setIntDuty(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntIter((line_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.write.setIntPer(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntShift(1);
+  versat.ywrite.write.setIntIncr(0);
+
+  // ywrite ext: write result burst
+  versat.ywrite.write.setOffset(0);
+  versat.ywrite.write.setIntAddr(0);
+  versat.ywrite.write.setExtIter(1);
+  versat.ywrite.write.setExtPer((line_w*LAYER_1_C+15)/16); //ceil(x/y) = (x+y-1)/y
+  versat.ywrite.write.setExtShift(0);
+  versat.ywrite.write.setExtIncr(16);
+  versat.dma.ywrite_write_setNBytesW(2*line_w*LAYER_1_C);
+
+  // draw horizontal lines
+  for(l = 0; l < box_w; l++) {
+    //top line
+    versat.ywrite.write.setExtAddr((int)(&(fp_image[(top+l)*IMG_W*LAYER_1_C+left*LAYER_1_C]))); //fp_image position
+    
+    //wait until done
+    while(versat.done() == 0);
+    //run configuration
+    versat.run();
+    
+    //stop yread transfers
+    versat.yread.setExtIter(0);
+    versat.ywrite.read.setExtIter(0);
+
+    //bottom line
+    versat.ywrite.write.setExtAddr((int) (&(fp_image[(bot-l)*IMG_W*LAYER_1_C+left*LAYER_1_C])));
+
+    //wait until done
+    while(versat.done() == 0);
+    //run configuration
+    versat.run();
+
+  }
+
+  //vertical lines
+  //VERSAT CONFIGURATIONS
+  // yread int: send first line to xyolo
+  versat.yread.setIntIter((box_w*LAYER_1_C)/nYOLOmacs);
+  versat.yread.setIntPer(2);
+  versat.yread.setIntShift(0);
+  versat.yread.setIntStart(0);
+  versat.yread.setIntIncr(0);
+  versat.yread.setIntDelay(0);
+
+  // ywrite read int: send 1 line every 2 cycles
+  versat.ywrite.read.setIntStart(0);
+  versat.ywrite.read.setIntIter((box_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.read.setIntPer(2);
+  versat.ywrite.read.setIntShift(0);
+  versat.ywrite.read.setIntIncr(0);
+  versat.ywrite.read.setIntIter2(0);
+  versat.ywrite.read.setIntPer2(0);
+  versat.ywrite.read.setIntShift2(0);
+  versat.ywrite.read.setIntIncr2(0);
+  versat.ywrite.read.setIntIter3(0);
+  versat.ywrite.read.setIntPer3(0);
+  versat.ywrite.read.setIntShift3(0);
+  versat.ywrite.read.setIntIncr3(0);
+
+  // xyolo: multiply and bypass adder
+  versat.ywrite.yolo.setIter((box_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.yolo.setPer(2);
+  versat.ywrite.yolo.setShift(0);
+  versat.ywrite.yolo.setBias(0);
+  versat.ywrite.yolo.setLeaky(0);
+  versat.ywrite.yolo.setSigmoid(0);
+  versat.ywrite.yolo.setSigMask(0);
+  versat.ywrite.yolo.setMaxpool(0);
+  versat.ywrite.yolo.setBypass(0);
+  versat.ywrite.yolo.setBypassAdder(1);
+
+  // ywrite int: write results from xyolo
+  versat.ywrite.write.setIntStart(0);
+  versat.ywrite.write.setIntDuty(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT - 2);
+  versat.ywrite.write.setIntIter((box_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.write.setIntPer(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntShift(1);
+  versat.ywrite.write.setIntIncr(0);
+
+  // ywrite ext: write result burst
+  versat.ywrite.write.setOffset(0);
+  versat.ywrite.write.setIntAddr(0);
+  versat.ywrite.write.setExtIter(1);
+  versat.ywrite.write.setExtPer((box_w*LAYER_1_C+15)/16); //ceil(x/y) = (x+y-1)/y
+  versat.ywrite.write.setExtShift(0);
+  versat.ywrite.write.setExtIncr(16);
+  versat.dma.ywrite_write_setNBytesW(2*box_w*LAYER_1_C);
+
+  // all vertical lines
+  for(l = top+box_w; l <= bot-box_w; l++) {
+    //left line
+    versat.ywrite.write.setExtAddr((int)(&(fp_image[l*IMG_W*LAYER_1_C+left*LAYER_1_C]))); //fp_image position
+    
+    //wait until done
+    while(versat.done() == 0);
+    //run configuration
+    versat.run();
+    
+    //right line
+    versat.ywrite.write.setExtAddr((int) (&(fp_image[l*IMG_W*LAYER_1_C+h_right*LAYER_1_C])));
+
+    //wait until done
+    while(versat.done() == 0);
+    //run configuration
+    versat.run();
+
+  }
+
+  //clear configurations
+  versat.clear();
+
+  //final runs
+  versat_end();
+
+}
 
 //Draw bounding box in input image
 void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green, int16_t blue) {
@@ -1297,6 +1497,107 @@ void draw_box(int left, int top, int right, int bot, int16_t red, int16_t green,
     fp_image[i*IMG_W*LAYER_1_C + right*LAYER_1_C + 1] = green;
     fp_image[i*IMG_W*LAYER_1_C + right*LAYER_1_C + 2] = blue;
   }
+}
+// draw class using versat
+void draw_class_versat(int label_w, int j, int top_width, int left, int previous_w, int rgb){
+  int l;
+  
+  // VERSAT CONFIGURATIONS
+
+  // yread ext: read 1 rgb line for the j class
+  versat.yread.setExtAddr((int) (&(fp_rgb[16*rgb]))); //16x2Bytes to jump a 32Byte line
+  versat.yread.setOffset(0); // read same line to all yread memories
+  versat.yread.setPingPong(0);
+  versat.yread.setIntAddr(0);
+  versat.yread.setExtIter(1);
+  versat.yread.setExtPer(1); // only one MIG_BUS_W transfer
+  versat.yread.setExtShift(0);
+  versat.yread.setExtIncr(16); // does this really matter?
+  versat.dma.yread_setLen(0);
+
+  // yread int: send first line to xyolo
+  versat.yread.setIntIter((label_w*LAYER_1_C)/nYOLOmacs);
+  versat.yread.setIntPer(2);
+  versat.yread.setIntShift(0);
+  versat.yread.setIntStart(0);
+  versat.yread.setIntIncr(0);
+  versat.yread.setIntDelay(0);
+
+  // ywrite read ext: read label line
+  versat.ywrite.read.setOffset(0); // only use 1st stage
+  versat.ywrite.read.setPingPong(1);
+  versat.ywrite.read.setIntAddr(0);
+  versat.ywrite.read.setExtIter(1);
+  versat.ywrite.read.setExtPer((label_w*LAYER_1_C+15)/16); // ceil(x/y) = (x+y-1)/y
+  versat.ywrite.read.setExtShift(0);
+  versat.ywrite.read.setExtIncr(16);
+  versat.dma.ywrite_read_setLen((label_w*LAYER_1_C+15)/16-1); //ceil(x/y)-1
+
+  // ywrite read int: send 1 line every 2 cycles
+  versat.ywrite.read.setIntStart(0);
+  versat.ywrite.read.setIntIter((label_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.read.setIntPer(2);
+  versat.ywrite.read.setIntShift(1);
+  versat.ywrite.read.setIntIncr(0);
+  versat.ywrite.read.setIntIter2(0);
+  versat.ywrite.read.setIntPer2(0);
+  versat.ywrite.read.setIntShift2(0);
+  versat.ywrite.read.setIntIncr2(0);
+  versat.ywrite.read.setIntIter3(0);
+  versat.ywrite.read.setIntPer3(0);
+  versat.ywrite.read.setIntShift3(0);
+  versat.ywrite.read.setIntIncr3(0);
+
+  // xyolo: multiply and bypass adder
+  versat.ywrite.yolo.setIter((label_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.yolo.setPer(2);
+  versat.ywrite.yolo.setShift(8);
+  versat.ywrite.yolo.setBias(0);
+  versat.ywrite.yolo.setLeaky(0);
+  versat.ywrite.yolo.setSigmoid(0);
+  versat.ywrite.yolo.setSigMask(0);
+  versat.ywrite.yolo.setMaxpool(0);
+  versat.ywrite.yolo.setBypass(0);
+  versat.ywrite.yolo.setBypassAdder(1);
+
+  // ywrite int: write results from xyolo
+  versat.ywrite.write.setIntStart(0);
+  versat.ywrite.write.setIntDuty(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT -4 - 2);
+  versat.ywrite.write.setIntIter((label_w*LAYER_1_C)/nYOLOmacs);
+  versat.ywrite.write.setIntPer(2*(nYOLOvect/LAYER_1_C));
+  versat.ywrite.write.setIntShift(1);
+  versat.ywrite.write.setIntIncr(0);
+
+  // ywrite ext: write result burst
+  versat.ywrite.write.setOffset(0);
+  versat.ywrite.write.setIntAddr(0);
+  versat.ywrite.write.setExtIter(1);
+  versat.ywrite.write.setExtPer((label_w*LAYER_1_C+15)/16); //ceil(x/y) = (x+y-1)/y
+  versat.ywrite.write.setExtShift(0);
+  versat.ywrite.write.setExtIncr(16);
+  versat.dma.ywrite_write_setNBytesW(2*label_w*LAYER_1_C);
+
+  // each run writes a label line to fp_image
+  for(l = 0; l < label_height && (l+top_width) < IMG_H; l++) {
+    versat.ywrite.read.setExtAddr((int) (&(fp_labels[LABEL_W_OFF + LABEL_SIZE*j + LABEL_LINE_SIZE*l]))); // start of each label line
+    versat.ywrite.write.setExtAddr((int)(&(fp_image[(l+top_width)*IMG_W*LAYER_1_C+(left+previous_w)*LAYER_1_C]))); //fp_image position
+    
+    //wait until done
+    while(versat.done() == 0);
+    //run configuration
+    versat.run();
+    
+    //stop yread transfers
+    versat.yread.setExtIter(0);
+  }
+
+  //clear configurations
+  versat.clear();
+
+  //final runs
+  versat_end();
+
 }
 
 //Draw class label in input image
@@ -1342,9 +1643,9 @@ void draw_detections() {
         if(previous_w == 0) {
 
   	  // pick generated colors based on class value
-  	  red = fp_rgb[RGB_LINE*j + 0];
-  	  green = fp_rgb[RGB_LINE*j + 1];
-  	  blue = fp_rgb[RGB_LINE*j + 2];
+  	  /* red = fp_rgb[RGB_LINE*j + 0]; */
+  	  /* green = fp_rgb[RGB_LINE*j + 1]; */
+  	  /* blue = fp_rgb[RGB_LINE*j + 2]; */
 
           //Calculate box coordinates in image frame
           mul_16 = boxes[84*i] - (boxes[84*i+2]>>1); //Q3.13
@@ -1361,8 +1662,8 @@ void draw_detections() {
           bot = (mul_32 >> 13);
 
           //Draw box
-          for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue);
-	  /* draw_box_versat(left, top, right, bot, j, box_width); */
+          /* for(k = 0; k < box_width; k++) draw_box(left+k, top+k, right-k, bot-k, red, green, blue); */
+	  draw_box_versat(left, top, right, bot, j, box_width);
 
           //Limit top and left box coordinates
           if(top < 0) top = 0;
@@ -1373,15 +1674,15 @@ void draw_detections() {
         //Otherwise, add comma and space
         } else {
           label_w = fp_labels[80];
-          draw_class(label_w, 80, top_width, left, previous_w, red, green, blue);
-          /* draw_class_versat(label_w, 80, top_width, left, previous_w, j); */
+          /* draw_class(label_w, 80, top_width, left, previous_w, red, green, blue); */
+          draw_class_versat(label_w, 80, top_width, left, previous_w, j);
           previous_w += label_w;
         }
 
         //Draw class labels
         label_w = fp_labels[j];
-        draw_class(label_w, j, top_width, left, previous_w, red, green, blue);
-        /* draw_class_versat(label_w, j, top_width, left, previous_w, j); */
+        /* draw_class(label_w, j, top_width, left, previous_w, red, green, blue); */
+        draw_class_versat(label_w, j, top_width, left, previous_w, j);
         previous_w += label_w;
       }
     }
