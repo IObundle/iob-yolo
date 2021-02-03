@@ -2,6 +2,9 @@
 `include "system.vh"
 `include "interconnect.vh"
 
+//param. list - generated from system/core.mk TODO
+`include "export.vh"
+
 //do not remove line below
 //PHEADER
 
@@ -10,7 +13,11 @@
 `endif   
 
 module system 
-  (
+  #(
+    parameter CORE_PARAM1 = `PARAM1_VAL, //Core parameter 1 description
+    parameter CORE_PARAM2 = `PARAM2_VAL //Core parameter 2 description
+    )
+   (
    //do not remove line below
    //PIO
 
@@ -139,7 +146,8 @@ module system
    // data cat bus
    wire [`REQ_W-1:0]         cpu_d_req;
    wire [`RESP_W-1:0]        cpu_d_resp;
-   
+
+//BLOCK Core CPU & RISC-V CPU core that executes the Tiny Yolo V3 program. The CPU controls the remaining modules. The CPU accesses main memory via cache for both data and instructions.    
    //instantiate the cpu
    iob_picorv32 cpu
        (
@@ -295,6 +303,8 @@ module system
    //
    // EXTERNAL DDR MEMORY
    //
+
+//BLOCK Cache & Single level cache system controlled by the Core CPU. The cache provides connection between the Core CPU and main memory through an AXI4 interface. 
    ext_mem 
      ext_mem0 
        (
@@ -356,5 +366,11 @@ module system
         );
 `endif
 
+   //
+   // Other block descriptions
+   //
+//BLOCK UART & Serial communication module used to output Tiny Yolo V3 Core runtime messages.
+
+//BLOCK VersatCNN & Runtime configurable accelerator. The VersatCNN is composed of a matrix of computational Functional Units (FUs), which are connected to arrays of input and output buffers. The data transfers between VersatCNN and main memory are mediated by a DMA. The VersatCNN is configured during runtime by the Core CPU. The configurations enable execution of CNN layer dataflows and other Tiny Yolo V3 routines.
    
 endmodule
