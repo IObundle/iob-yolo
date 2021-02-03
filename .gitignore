@@ -1,0 +1,6 @@
+# ignore Document aux files
+document/pb/pb.pdf
+document/pb/xil_results.tex
+
+document/figures/Logo.png
+document/figures/bg.odg

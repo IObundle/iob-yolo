@@ -10,3 +10,6 @@
 [submodule "submodules/VERSAT"]
 	path = submodules/VERSAT
 	url = git@github.com:IObundle/iob-versat
+[submodule "submodules/TEX"]
+	path = submodules/TEX
+	url = git@github.com:IObundle/iob-tex.git

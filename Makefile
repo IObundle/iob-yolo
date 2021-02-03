@@ -140,7 +140,21 @@ ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
 	@display $(FIRM_DIR)/detections.png
 endif
 
-clean: clean-sw sim-clean
+#
+# DOCUMENT
+#
+
+doc:
+	make -C document/$(DOC_TYPE) $(DOC_TYPE).pdf
+
+doc-clean:
+	make -C document/$(DOC_TYPE) clean
+
+doc-pdfclean:
+	make -C document/$(DOC_TYPE) pdfclean
+
+
+clean: clean-sw sim-clean doc-clean
 	make -C $(CONSOLE_DIR) clean
 
 
