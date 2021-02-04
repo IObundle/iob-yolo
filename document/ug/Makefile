@@ -2,24 +2,22 @@ YOLO_DIR:=../..
 ROOT_DIR:=$(YOLO_DIR)
 include $(YOLO_DIR)/system.mk
 
-#IS_TAB:=gen_is_tab.tex cpu_nat_s_is_tab.tex cpu_axi4lite_s_is_tab.tex cpu_axi4_m_is_tab.tex rx_is_tab.tex tx_is_tab.tex 
+IS_TAB:=gen_is_tab.tex axi4_m_is_tab.tex uart_is_tab.tex #cpu_nat_s_is_tab.tex cpu_axi4lite_s_is_tab.tex cpu_axi4_m_is_tab.tex
 
-#REG_TAB:=sw_rxdmareg_tab.tex sw_txdmareg_tab.tex sw_rxreg_tab.tex sw_txreg_tab.tex sw_rxfiforeg_tab.tex sw_txfiforeg_tab.tex
+REG_TAB:=sw_yoloreg_tab.tex
 
 BD_TAB:=bd_tab.tex
 
 PARAM_TAB:=sp_tab.tex
 
-SRC:=ug.tex $(wildcard ./*.tex) $(wildcard ../*.tex) $(BD_TAB) $(PARAM_TAB)
-
-#$(IS_TAB) $(REG_TAB) $(BD_TAB) $(PARAM_TAB)
+SRC:=ug.tex $(wildcard ./*.tex) $(wildcard ../*.tex) $(BD_TAB) $(PARAM_TAB) $(IS_TAB) $(REG_TAB)
 
 #TD_FIGS:=datadelay_3.pdf fsync_w_2.pdf i2s.pdf inverted_bclk.pdf inverted_fsync.pdf n_channel_3.pdf sample_w_16.pdf rx_master.pdf
 
 include $(YOLO_DIR)/submodules/TEX/document/document.mk
 
-#gen_is_tab.tex: $(I2S_HW_DIR)/include/gen_if.v
-#	$(TEX_SW_DIR)/io2tex.py $< $@
+gen_is_tab.tex: $(YOLO_HW_DIR)/include/gen_if.v
+	$(TEX_SW_DIR)/io2tex.py $< $@
 
 #cpu_nat_s_is_tab.tex: $(INTERCON_DIR)/hardware/include/cpu_nat_s_if.v
 #	$(TEX_SW_DIR)/io2tex.py $< $@
@@ -27,17 +25,14 @@ include $(YOLO_DIR)/submodules/TEX/document/document.mk
 #cpu_axi4lite_s_is_tab.tex: $(INTERCON_DIR)/hardware/include/cpu_axi4lite_s_if.v
 #	$(TEX_SW_DIR)/io2tex.py $< $@
 
-#cpu_axi4_m_is_tab.tex: $(INTERCON_DIR)/hardware/include/cpu_axi4_m_if.v
-#	$(TEX_SW_DIR)/io2tex.py $< $@
+axi4_m_is_tab.tex: $(YOLO_HW_DIR)/include/axi4_m_if.v
+	$(TEX_SW_DIR)/io2tex.py $< $@
 
-#rx_is_tab.tex: $(I2S_HW_DIR)/include/rx_if.v
-#	$(TEX_SW_DIR)/io2tex.py $< $@
+uart_is_tab.tex: $(YOLO_HW_DIR)/include/uart_if.v
+	$(TEX_SW_DIR)/io2tex.py $< $@
 
-#tx_is_tab.tex: $(I2S_HW_DIR)/include/tx_if.v
-#	$(TEX_SW_DIR)/io2tex.py $< $@
-
-#sw_rxdmareg_tab.tex: $(I2S_HW_DIR)/include/sw_reg.v
-#	$(TEX_SW_DIR)/swreg2tex.py $<
+sw_yoloreg_tab.tex: $(YOLO_HW_DIR)/include/sw_reg.v
+	$(TEX_SW_DIR)/swreg2tex.py $<
 
 bd_tab.tex: $(YOLO_HW_DIR)/src/system_core.v
 	$(TEX_SW_DIR)/block2tex.py $@ $(YOLO_HW_DIR)/src/system_core.v
