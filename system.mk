@@ -190,9 +190,9 @@ MICRO:=micro7.lx.it.pt
 
 #user list
 MICRO_USER=user14
-SIM_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
+SIM_ROOT_DIR=./$(USER)/sandbox/iob-yolo
 
-REMOTE_ROOT_DIR=./sandbox/iob-soc-yolo
+REMOTE_ROOT_DIR=./sandbox/iob-yolo
 
 #
 # CORE DEFINITIONS
