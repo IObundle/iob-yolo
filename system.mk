@@ -190,8 +190,34 @@ MICRO:=micro7.lx.it.pt
 
 #user list
 MICRO_USER=user14
-SIM_ROOT_DIR=./$(USER)/sandbox/iob-soc-yolo
+SIM_ROOT_DIR=./$(USER)/sandbox/iob-yolo
 
-REMOTE_ROOT_DIR=./sandbox/iob-soc-yolo
+REMOTE_ROOT_DIR=./sandbox/iob-yolo
+
+#
+# CORE DEFINITIONS
+#
+
+CORE_NAME:=YOLO
+IS_CORE:=0
+
+
+# PATHS
+YOLO_HW_DIR:=$(YOLO_DIR)/hardware
+YOLO_SUBMODULES_DIR:=$(YOLO_DIR)/submodules
+TEX_DIR ?= $(YOLO_SUBMODULES_DIR)/TEX
+
+# DOCUMENT
+#DOC_TYPE:=pb
+DOC_TYPE:=ug
+INTEL ?=0
+XILINX ?=1
+
+VLINE:="V$(VERSION)"
+$(CORE_NAME)_version.txt:
+ifeq ($(VERSION),)
+	$(error "veriable VERSION is not set")
+endif
+	echo $(VLINE) > $@
 
 .PHONY: all

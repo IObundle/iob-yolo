@@ -1,0 +1,22 @@
+\label{sec:re}
+The software accessible registers of the Tiny Yolo V3 core are described in
+Table~\ref{tab:rgyolo}. The table gives
+information on the name, read/write capability, word aligned addresses, used
+word bits and a textual description.
+\clearpage
+
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{|l|c|c|r|P{0.8cm}|p{6cm}|}
+    \hline
+    \rowcolor{iob-green}
+    
+    {\bf Name} & {\bf R/W} & {\bf Addr} & {\bf Bits} & {\bf Initial Value} & {\bf Description} \\ \hline
+
+    \input{sw_yoloreg_tab}
+    
+  \end{tabular}
+  \caption{Software accessible registers for the Yolo Core.}
+  \label{tab:rgyolo}
+\end{table}
