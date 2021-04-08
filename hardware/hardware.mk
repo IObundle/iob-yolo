@@ -10,6 +10,11 @@ ifeq ($(USE_DDR),1)
 include $(CACHE_DIR)/hardware/hardware.mk
 endif
 
+#versat-cnn
+ifeq ($(USE_VERSAT_CNN),1)
+include $(VERSAT_CNN_DIR)/hardware/hardware.mk
+endif
+
 ifneq ($(ASIC),1)
 #rom
 SUBMODULES+=SPROM
@@ -31,8 +36,13 @@ SRC_DIR:=$(HW_DIR)/src
 #INCLUDES
 INCLUDE+=$(incdir). $(incdir)$(INC_DIR)
 
+#Check for versat.json
+ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
+	INCLUDE+=$(incdir)$(FIRM_DIR)
+endif
+
 #HEADERS
-VHDR+=$(INC_DIR)/system.vh
+VHDR+=$(INC_DIR)/system.vh export.vh
 
 #SOURCES
 #testbench
@@ -57,6 +67,17 @@ system.v:
 	$(foreach p, $(PERIPHERALS), if test -f $(SUBMODULES_DIR)/$p/hardware/include/pio.v; then sed -i '/PIO/r $(SUBMODULES_DIR)/$p/hardware/include/pio.v' $@; fi;) #insert system IOs for peripheral
 	$(foreach p, $(PERIPHERALS), if test -f $(SUBMODULES_DIR)/$p/hardware/include/inst.v; then sed -i '/endmodule/e cat $(SUBMODULES_DIR)/$p/hardware/include/inst.v' $@; fi;) # insert peripheral instances
 
+# export parameters
+# dummy macro list
+PARAM1_VAL:=1
+PARAM2_VAL:=2
+MACRO_LIST:= PARAM1_VAL PARAM2_VAL
+export.vh: $(MACRO_LIST)
+	mv export_tmp.vh export.vh
+
+$(MACRO_LIST):
+	echo "\`define $@ $($@) " >> export_tmp.vh
+
 # make and copy memory init files
 firmware: $(FIRM_DIR)/firmware.bin
 ifeq ($(INIT_MEM),1)
@@ -75,6 +96,6 @@ boot.hex: $(BOOT_DIR)/boot.bin
 
 #clean general hardware files
 hw-clean: gen-clean
-	@rm -f *.v *.hex *.bin $(SRC_DIR)/system.v $(TB_DIR)/system_tb.v
+	@rm -f *.v *.vh *.hex *.bin $(SRC_DIR)/system.v $(TB_DIR)/system_tb.v
 
 .PHONY: firmware hw-clean

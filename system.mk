@@ -31,7 +31,7 @@ INIT_MEM ?=1
 #must match respective submodule or folder name in the submodules directory
 #and CORE_NAME in the core.mk file of the submodule
 #PERIPHERALS:=UART
-PERIPHERALS ?=UART
+PERIPHERALS ?=UART TIMER ETHERNET
 
 #
 #SOFTWARE COMPILATION
@@ -40,11 +40,22 @@ PERIPHERALS ?=UART
 # risc-v compressed instructions
 USE_COMPRESSED ?=1
 
+#Choose Firmware (in SW_DIR)
+TEST ?=tiny_yolov3
+
+#Ethernet
+RMAC_ADDR:=00e04c690ba0 #Baba
+#RMAC_ADDR:=309c231e624b #Pudim
+
+#Versat-CNN
+USE_VERSAT_CNN ?=1
+USE_NEW_VERSAT ?=1
+
 
 #
 #ROOT DIR ON REMOTE MACHINES
 #
-REMOTE_ROOT_DIR ?=sandbox/iob-soc
+REMOTE_ROOT_DIR ?=sandbox/iob-yolo
 
 
 #
@@ -167,8 +178,11 @@ TEX_DIR=$(UART_DIR)/submodules/TEX
 
 #submodule paths
 SUBMODULES_DIR:=$(ROOT_DIR)/submodules
-SUBMODULES=CPU CACHE $(PERIPHERALS)
+SUBMODULES=CPU CACHE VERSAT_CNN $(PERIPHERALS)
 $(foreach p, $(SUBMODULES), $(eval $p_DIR:=$(SUBMODULES_DIR)/$p))
+
+#MIG Bus
+MIG_BUS_W:=256
 
 #defmacros
 DEFINE+=$(defmacro)BOOTROM_ADDR_W=$(BOOTROM_ADDR_W)
@@ -178,12 +192,17 @@ DEFINE+=$(defmacro)DCACHE_ADDR_W=$(DCACHE_ADDR_W)
 
 ifeq ($(USE_DDR),1)
 DEFINE+=$(defmacro)USE_DDR
+#DEFINE+=$(defmacro)DDR_ADDR_W=$(DDR_ADDR_W)
+DEFINE+=$(defmacro)MIG_BUS_W=$(MIG_BUS_W)
 ifeq ($(RUN_DDR),1)
 DEFINE+=$(defmacro)RUN_DDR
 endif
 endif
 ifeq ($(INIT_MEM),1)
 DEFINE+=$(defmacro)INIT_MEM
+endif
+ifeq ($(USE_NEW_VERSAT),1)
+DEFINE+=$(defmacro)USE_NEW_VERSAT
 endif
 DEFINE+=$(defmacro)N_SLAVES=$(N_SLAVES)
 

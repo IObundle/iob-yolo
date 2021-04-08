@@ -21,7 +21,7 @@ pc-clean:
 #
 
 sim: sim-clean
-	make -C $(FIRM_DIR) run BAUD=$(SIM_BAUD)
+	make -C $(FIRM_DIR) run BAUD=$(SIM_BAUD) SIM=1
 	make -C $(BOOT_DIR) run BAUD=$(SIM_BAUD)
 ifeq ($(SIM_HOST),)
 	make -C $(SIM_DIR) run BAUD=$(SIM_BAUD)
@@ -112,6 +112,21 @@ kill-remote-console:
 	@echo "INFO: Remote console will be killed; ignore following errors"
 	ssh $(BOARD_USER)@$(BOARD_SERVER) 'cd $(REMOTE_ROOT_DIR); kill -9 `pgrep -a console`'
 
+#Run on FPGA_BOARD_SERVER
+# for PCSIM: make ld-eth SIM=1
+ld-eth:
+	$(eval RMAC := $(shell ethtool -P $(RMAC_INTERFACE) | awk '{print $$3}' | sed 's/://g'))
+ifneq ($(SIM),1)
+	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
+else
+	python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR) PCsim
+endif
+ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
+	@echo "Creating image file with detections...\n"
+	@python $(FIRM_DIR)/write_image.py $(FIRM_DIR)/detections.bin
+	@echo "Opening image file...\n"
+	@display $(FIRM_DIR)/detections.png
+endif
 
 board_clean:
 ifeq ($(BOARD_HOST),)
@@ -142,6 +157,10 @@ console:
 
 console-clean:
 	make -C $(CONSOLE_DIR) clean
+
+pcsim:
+	make -C $(FIRM_DIR) clean
+	make -C $(FIRM_DIR) pcsim BAUD=$(BAUD) PCSIM=1
 
 sw-clean: firmware-clean bootloader-clean console-clean
 
@@ -293,7 +312,7 @@ clean-all: sim-clean fpga-clean asic-clean board-clean doc-clean
 .PHONY: pc-emul pc-clean \
 	sim sim-waves sim-clean \
 	fpga fpga-clean fpga-clean-ip \
-	board-load board-run board-clean \
+	board-load board-run ld-eth board-clean \
 	firmware firmware-clean bootloader bootloader-clean sw-clean \
 	console console-clean \
 	doc doc-clean doc-pdfclean \

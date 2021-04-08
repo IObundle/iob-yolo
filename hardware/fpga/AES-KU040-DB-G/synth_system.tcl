@@ -11,6 +11,8 @@ set DEFINE [lindex $argv 1]
 set VSRC [lindex $argv 2]
 
 set USE_DDR [string last "USE_DDR" $DEFINE]
+set DDR_ADDR_W [string last "DDR_ADDR_W" $DEFINE]
+set MIG_BUS_W [string last "MIG_BUS_W" $DEFINE]
 
 #verilog sources
 foreach file [split $VSRC \ ] {
@@ -42,16 +44,22 @@ if { $USE_DDR < 0 } {
 
         set_property -dict \
             [list \
-                 CONFIG.NUM_SLAVE_PORTS {1}\
-                 CONFIG.AXI_ADDR_WIDTH {30}\
+                 CONFIG.NUM_SLAVE_PORTS {2}\
+                 CONFIG.AXI_ADDR_WIDTH {$DDR_ADDR_W}\
                  CONFIG.ACLK_PERIOD {5000} \
-                 CONFIG.INTERCONNECT_DATA_WIDTH {32}\
+                 CONFIG.INTERCONNECT_DATA_WIDTH {$MIG_BUS_W}\
+                 CONFIG.S00_AXI_DATA_WIDTH {$MIG_BUS_W}\
+                 CONFIG.S01_AXI_DATA_WIDTH {$MIG_BUS_W}\
+                 CONFIG.M00_AXI_DATA_WIDTH {$MIG_BUS_W}\
                  CONFIG.M00_AXI_IS_ACLK_ASYNC {1}\
                  CONFIG.M00_AXI_WRITE_FIFO_DEPTH {32}\
                  CONFIG.M00_AXI_READ_FIFO_DEPTH {32}\
                  CONFIG.S00_AXI_IS_ACLK_ASYNC {1}\
+                 CONFIG.S01_AXI_IS_ACLK_ASYNC {1}\
                  CONFIG.S00_AXI_READ_FIFO_DEPTH {32}\
-                 CONFIG.S00_AXI_WRITE_FIFO_DEPTH {32}] [get_ips axi_interconnect_0]
+                 CONFIG.S01_AXI_READ_FIFO_DEPTH {32}\
+                 CONFIG.S00_AXI_WRITE_FIFO_DEPTH {32}\
+                 CONFIG.S01_AXI_WRITE_FIFO_DEPTH {32}] [get_ips axi_interconnect_0]
 
         generate_target all [get_files ./ip/axi_interconnect_0/axi_interconnect_0.xci]
 
@@ -79,8 +87,8 @@ if { $USE_DDR < 0 } {
              CONFIG.C0.DDR4_AxiSelection {true} \
              CONFIG.C0.DDR4_CasLatency {11} \
              CONFIG.C0.DDR4_CasWriteLatency {11} \
-             CONFIG.C0.DDR4_AxiDataWidth {32} \
-             CONFIG.C0.DDR4_AxiAddressWidth {30} \
+             CONFIG.C0.DDR4_AxiDataWidth {$MIG_BUS_W} \
+             CONFIG.C0.DDR4_AxiAddressWidth {$DDR_ADDR_W} \
              CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {100} \
              CONFIG.C0.BANK_GROUP_WIDTH {1}] [get_ips ddr4_0]
 	

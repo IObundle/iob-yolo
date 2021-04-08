@@ -2,16 +2,74 @@
 `include "system.vh"
 `include "interconnect.vh"
 
+//param. list - generated from system/core.mk TODO
+`include "export.vh"
+
 //do not remove line below
 //PHEADER
 
+`ifdef USE_NEW_VERSAT
+`include "xversat.vh"
+`endif
+
 module system 
-  (
+  #(
+    parameter CORE_PARAM1 = `PARAM1_VAL, //Core parameter 1 description
+    parameter CORE_PARAM2 = `PARAM2_VAL //Core parameter 2 description
+    )
+   (
    //do not remove line below
    //PIO
 
 `ifdef USE_DDR //AXI MASTER INTERFACE
+`ifdef USE_NEW_VERSAT
+   //address write
+   output [2*1-1:0] 	     m_axi_awid,
+   output [2*`DDR_ADDR_W-1:0]  m_axi_awaddr,
+   output [2*8-1:0] 	     m_axi_awlen,
+   output [2*3-1:0] 	     m_axi_awsize,
+   output [2*2-1:0] 	     m_axi_awburst,
+   output [2*1-1:0] 	     m_axi_awlock,
+   output [2*4-1:0] 	     m_axi_awcache,
+   output [2*3-1:0] 	     m_axi_awprot,
+   output [2*4-1:0] 	     m_axi_awqos,
+   output [2*1-1:0]	     m_axi_awvalid,
+   input [2*1-1:0]	     m_axi_awready,
 
+   //write
+   output [2*`MIG_BUS_W-1:0]   m_axi_wdata,
+   output [2*`MIG_BUS_W/8-1:0] m_axi_wstrb,
+   output [2*1-1:0]	     m_axi_wlast,
+   output [2*1-1:0]	     m_axi_wvalid,
+   input [2*1-1:0]	     m_axi_wready,
+
+   //write response
+   // input [2*1-1:0]	     m_axi_bid,
+   input [2*2-1:0]	     m_axi_bresp,
+   input [2*1-1:0]	     m_axi_bvalid,
+   output [2*1-1:0]	     m_axi_bready,
+
+   //address read
+   output [2*1-1:0] 	     m_axi_arid,
+   output [2*`DDR_ADDR_W-1:0]  m_axi_araddr,
+   output [2*8-1:0] 	     m_axi_arlen,
+   output [2*3-1:0] 	     m_axi_arsize,
+   output [2*2-1:0] 	     m_axi_arburst,
+   output [2*1-1:0] 	     m_axi_arlock,
+   output [2*4-1:0] 	     m_axi_arcache,
+   output [2*3-1:0] 	     m_axi_arprot,
+   output [2*4-1:0] 	     m_axi_arqos,
+   output [2*1-1:0]	     m_axi_arvalid,
+   input [2*1-1:0]	     m_axi_arready,
+
+   //read
+   // input [2*1-1:0]	     m_axi_rid,
+   input [2*`MIG_BUS_W-1:0]  m_axi_rdata,
+   input [2*2-1:0]	     m_axi_rresp,
+   input [2*1-1:0]	     m_axi_rlast,
+   input [2*1-1:0]	     m_axi_rvalid,
+   output [2*1-1:0]	     m_axi_rready,
+`else
    //address write
    output [0:0]             m_axi_awid, 
    output [`DDR_ADDR_W-1:0] m_axi_awaddr,
@@ -26,8 +84,8 @@ module system
    input                    m_axi_awready,
 
    //write
-   output [`DATA_W-1:0]     m_axi_wdata,
-   output [`DATA_W/8-1:0]   m_axi_wstrb,
+   output [`MIG_BUS_W-1:0]   m_axi_wdata,
+   output [`MIG_BUS_W/8-1:0] m_axi_wstrb,
    output                   m_axi_wlast,
    output                   m_axi_wvalid, 
    input                    m_axi_wready,
@@ -53,11 +111,12 @@ module system
 
    //read
    //input [0:0]              m_axi_rid,
-   input [`DATA_W-1:0]      m_axi_rdata,
+   input [`MIG_BUS_W-1:0]   m_axi_rdata,
    input [1:0]              m_axi_rresp,
    input                    m_axi_rlast, 
    input                    m_axi_rvalid, 
    output                   m_axi_rready,
+`endif // ifdef USE_NEW_VERSAT
 `endif //  `ifdef USE_DDR
    input                    clk,
    input                    reset,
@@ -258,47 +317,47 @@ module system
 
       //AXI INTERFACE 
       //address write
-      .axi_awid(m_axi_awid), 
-      .axi_awaddr(m_axi_awaddr), 
-      .axi_awlen(m_axi_awlen), 
-      .axi_awsize(m_axi_awsize), 
-      .axi_awburst(m_axi_awburst), 
-      .axi_awlock(m_axi_awlock), 
-      .axi_awcache(m_axi_awcache), 
-      .axi_awprot(m_axi_awprot),
-      .axi_awqos(m_axi_awqos), 
-      .axi_awvalid(m_axi_awvalid), 
-      .axi_awready(m_axi_awready), 
+      .axi_awid(m_axi_awid[1*1+:1]), 
+      .axi_awaddr(m_axi_awaddr[1*`DDR_ADDR_W+:`DDR_ADDR_W]), 
+      .axi_awlen(m_axi_awlen[1*8+:8]), 
+      .axi_awsize(m_axi_awsize[1*3+:3]), 
+      .axi_awburst(m_axi_awburst[1*2+:2]), 
+      .axi_awlock(m_axi_awlock[1*1+:1]), 
+      .axi_awcache(m_axi_awcache[1*4+:4]), 
+      .axi_awprot(m_axi_awprot[1*3+:3]),
+      .axi_awqos(m_axi_awqos[1*4+:4]), 
+      .axi_awvalid(m_axi_awvalid[1*1+:1]), 
+      .axi_awready(m_axi_awready[1*1+:1]), 
         //write
-      .axi_wdata(m_axi_wdata), 
-      .axi_wstrb(m_axi_wstrb), 
-      .axi_wlast(m_axi_wlast), 
-      .axi_wvalid(m_axi_wvalid), 
-      .axi_wready(m_axi_wready), 
+      .axi_wdata(m_axi_wdata[1*`MIG_BUS_W+:`MIG_BUS_W]), 
+      .axi_wstrb(m_axi_wstrb[1*`MIG_BUS_W/8+:`MIG_BUS_W/8]), 
+      .axi_wlast(m_axi_wlast[1*1+:1]), 
+      .axi_wvalid(m_axi_wvalid[1*1+:1]), 
+      .axi_wready(m_axi_wready[1*1+:1]), 
       //write response
       //.axi_bid(m_axi_bid), 
-      .axi_bresp(m_axi_bresp), 
-      .axi_bvalid(m_axi_bvalid), 
-      .axi_bready(m_axi_bready), 
+      .axi_bresp(m_axi_bresp[1*2+:2]), 
+      .axi_bvalid(m_axi_bvalid[1*1+:1]), 
+      .axi_bready(m_axi_bready[1*1+:1]), 
       //address read
-      .axi_arid(m_axi_arid), 
-      .axi_araddr(m_axi_araddr), 
-      .axi_arlen(m_axi_arlen), 
-      .axi_arsize(m_axi_arsize), 
-      .axi_arburst(m_axi_arburst), 
-      .axi_arlock(m_axi_arlock), 
-      .axi_arcache(m_axi_arcache), 
-      .axi_arprot(m_axi_arprot), 
-      .axi_arqos(m_axi_arqos), 
-      .axi_arvalid(m_axi_arvalid), 
-      .axi_arready(m_axi_arready), 
+      .axi_arid(m_axi_arid[1*1+:1]), 
+      .axi_araddr(m_axi_araddr[1*`DDR_ADDR_W+:`DDR_ADDR_W]), 
+      .axi_arlen(m_axi_arlen[1*8+:8]), 
+      .axi_arsize(m_axi_arsize[1*3+:3]), 
+      .axi_arburst(m_axi_arburst[1*2+:2]), 
+      .axi_arlock(m_axi_arlock[1*1+:1]), 
+      .axi_arcache(m_axi_arcache[1*4+:4]), 
+      .axi_arprot(m_axi_arprot[1*3+:3]), 
+      .axi_arqos(m_axi_arqos[1*4+:4]), 
+      .axi_arvalid(m_axi_arvalid[1*1+:1]), 
+      .axi_arready(m_axi_arready[1*1+:1]), 
       //read 
       //.axi_rid(m_axi_rid), 
-      .axi_rdata(m_axi_rdata), 
-      .axi_rresp(m_axi_rresp), 
-      .axi_rlast(m_axi_rlast), 
-      .axi_rvalid(m_axi_rvalid),  
-      .axi_rready(m_axi_rready)
+      .axi_rdata(m_axi_rdata[1*`MIG_BUS_W+:`MIG_BUS_W]), 
+      .axi_rresp(m_axi_rresp[1*2+:2]), 
+      .axi_rlast(m_axi_rlast[1*1+:1]), 
+      .axi_rvalid(m_axi_rvalid[1*1+:1]),  
+      .axi_rready(m_axi_rready[1*1+:1])
       );
 `endif
 
