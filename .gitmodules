@@ -1,0 +1,3 @@
+[submodule "submodules/UART"]
+	path = submodules/UART
+	url = git@github.com:IObundle/iob-uart.git
