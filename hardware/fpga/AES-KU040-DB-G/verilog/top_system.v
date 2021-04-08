@@ -42,7 +42,7 @@ module top_system(
             	  output ENET_TX_D2,
             	  output ENET_TX_D3,
             	  output ENET_TX_EN,
-                  
+
 		  output        trap
 		  );
 
@@ -53,7 +53,7 @@ module top_system(
    wire            locked;
 
    //MII
-   wire [3:0]      TX_DATA;   
+   wire [3:0]      TX_DATA;
    wire [3:0]      RX_DATA;
 
    assign {ENET_TX_D3, ENET_TX_D2, ENET_TX_D1, ENET_TX_D0} = TX_DATA;
@@ -72,9 +72,9 @@ module top_system(
 		       .SR (~ENET_RESETN)
 		       );
 
-   assign locked = 1'b1; 
+   assign locked = 1'b1;
 
-   
+
 `ifdef USE_DDR
    //
    // AXI INTERCONNECT
@@ -119,8 +119,8 @@ module top_system(
    wire [2*1-1:0] 	     sys_arready;
    //read
    wire [2*1-1:0] 	     sys_rid;
-   wire [2*`MIG_BUS_W-1:0]   sys_rdata;   
-   wire [2*2-1:0] 	     sys_rresp;   
+   wire [2*`MIG_BUS_W-1:0]   sys_rdata;
+   wire [2*2-1:0] 	     sys_rresp;
    wire [2*1-1:0] 	     sys_rlast;
    wire [2*1-1:0] 	     sys_rvalid;
    wire [2*1-1:0] 	     sys_rready;
@@ -129,45 +129,45 @@ module top_system(
    // address write
    wire [1-1:0]			sys_awid;
    wire [`DDR_ADDR_W-1:0]       sys_awaddr;
-   wire [8-1:0] 		sys_awlen;
-   wire [3-1:0] 		sys_awsize;
-   wire [2-1:0] 		sys_awburst;
-   wire [1-1:0] 		sys_awlock;
-   wire [4-1:0] 		sys_awcache;
-   wire [3-1:0] 		sys_awprot;
-   wire [4-1:0] 		sys_awqos;
-   wire [1-1:0] 		sys_awvalid;
-   wire [1-1:0] 		sys_awready;
+   wire [7:0] 			sys_awlen;
+   wire [2:0] 			sys_awsize;
+   wire [1:0] 			sys_awburst;
+   wire 			sys_awlock;
+   wire [3:0]			sys_awcache;
+   wire [2:0] 			sys_awprot;
+   wire [3:0] 			sys_awqos;
+   wire 			sys_awvalid;
+   wire 			sys_awready;
    //write
    wire [`MIG_BUS_W-1:0]        sys_wdata;
    wire [`MIG_BUS_W/8-1:0] 	sys_wstrb;
-   wire [1-1:0]			sys_wlast;
-   wire [1-1:0]			sys_wvalid;
-   wire [1-1:0]			sys_wready;
+   wire 			sys_wlast;
+   wire 			sys_wvalid;
+   wire 			sys_wready;
    //write response
-   wire [1-1:0]			sys_bid;
-   wire [2-1:0] 		sys_bresp;
-   wire [1-1:0]			sys_bvalid;
-   wire [1-1:0]			sys_bready;
+   wire [0:0]			sys_bid;
+   wire [1:0] 			sys_bresp;
+   wire 			sys_bvalid;
+   wire 			sys_bready;
    //address read
-   wire [1-1:0]			sys_arid;
+   wire [0:0]			sys_arid;
    wire [`DDR_ADDR_W-1:0]       sys_araddr;
-   wire [8-1:0] 		sys_arlen;
-   wire [3-1:0] 		sys_arsize;
-   wire [2-1:0] 		sys_arburst;
-   wire [1-1:0]			sys_arlock;
-   wire [4-1:0] 		sys_arcache;
-   wire [3-1:0] 		sys_arprot;
-   wire [4-1:0] 		sys_arqos;
-   wire [1-1:0]			sys_arvalid;
-   wire [1-1:0]			sys_arready;
+   wire [7:0] 			sys_arlen;
+   wire [2:0] 			sys_arsize;
+   wire [1:0] 			sys_arburst;
+   wire 			sys_arlock;
+   wire [3:0] 			sys_arcache;
+   wire [2:0] 			sys_arprot;
+   wire [3:0] 			sys_arqos;
+   wire 			sys_arvalid;
+   wire 			sys_arready;
    //read
-   wire [1-1:0]			sys_rid;
+   wire [0:0]			sys_rid;
    wire [`MIG_BUS_W-1:0]        sys_rdata;   
-   wire [2-1:0]                   sys_rresp;   
-   wire [1-1:0]			sys_rlast;
-   wire [1-1:0]			sys_rvalid;
-   wire [1-1:0]			sys_rready;
+   wire [1:0]                   sys_rresp;   
+   wire 			sys_rlast;
+   wire 			sys_rvalid;
+   wire 			sys_rready;
 `endif // ifdef USE_NEW_VERSAT
    // DDR/MASTER SIDE
    //Write address
@@ -395,13 +395,13 @@ module top_system(
       .S00_AXI_WLAST        (sys_wlast[0*1+:1]),
       .S00_AXI_WVALID       (sys_wvalid[0*1+:1]),
       .S00_AXI_WREADY       (sys_wready[0*1+:1]),
-      
+
       //Write response
       .S00_AXI_BID           (sys_bid[0*1+:1]),
       .S00_AXI_BRESP         (sys_bresp[0*2+:2]),
       .S00_AXI_BVALID        (sys_bvalid[0*1+:1]),
       .S00_AXI_BREADY        (sys_bready[0*1+:1]),
-      
+
       //Read address
       .S00_AXI_ARID         (sys_arid[0*1+:1]),
       .S00_AXI_ARADDR       (sys_araddr[0*`DDR_ADDR_W+:`DDR_ADDR_W]),
@@ -414,7 +414,7 @@ module top_system(
       .S00_AXI_ARQOS        (sys_arqos[0*4+:4]),
       .S00_AXI_ARVALID      (sys_arvalid[0*1+:1]),
       .S00_AXI_ARREADY      (sys_arready[0*1+:1]),
-      
+
       //Read data
       .S00_AXI_RID          (sys_rid[0*1+:1]),
       .S00_AXI_RDATA        (sys_rdata[0*`MIG_BUS_W+:`MIG_BUS_W]),
@@ -427,7 +427,7 @@ module top_system(
       // Use only from slave 0 -> clock and reset for System
       .S01_AXI_ARESET_OUT_N (),
       .S01_AXI_ACLK         (sys_clk),
-      
+
       //Write address
       .S01_AXI_AWID         (sys_awid[1*1+:1]),
       .S01_AXI_AWADDR       (sys_awaddr[1*`DDR_ADDR_W+:`DDR_ADDR_W]),
@@ -563,7 +563,7 @@ module top_system(
       .m_axi_wready  (sys_wready),
       
       //write response
-      // .m_axi_bid     (sys_bid),
+      //.m_axi_bid     (sys_bid),
       .m_axi_bresp   (sys_bresp),
       .m_axi_bvalid  (sys_bvalid),
       .m_axi_bready  (sys_bready),
@@ -582,7 +582,7 @@ module top_system(
       .m_axi_arready (sys_arready),
 
       //read   
-      // .m_axi_rid     (sys_rid),
+      //.m_axi_rid     (sys_rid),
       .m_axi_rdata   (sys_rdata),
       .m_axi_rresp   (sys_rresp),
       .m_axi_rlast   (sys_rlast),

@@ -1,10 +1,13 @@
-YOLO_DIR:=../..
-ROOT_DIR:=$(YOLO_DIR)
-include $(YOLO_DIR)/system.mk
+ROOT_DIR:=../..
+include ../../system.mk
 
-CORE_DIR:=$(YOLO_DIR)
-include $(YOLO_DIR)/submodules/TEX/document/document.mk
+INTEL = 1
+XILINX = 1
+
+CORE_DIR:=$(ROOT_DIR)
+include $(TEX_DIR)/document/document.mk
 
 clean: texclean
 
-.PHONY: clean 
+.PHONY: clean
+
