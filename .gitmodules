@@ -13,3 +13,6 @@
 [submodule "ETHERNET"]
 	path = submodules/ETHERNET
 	url = git@github.com:IObundle/iob-eth.git
+[submodule "VERSAT_CNN"]
+	path = submodules/VERSAT_CNN
+	url = git@github.com:IObundle/iob-versat-cnn.git
