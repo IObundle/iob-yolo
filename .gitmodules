@@ -1,3 +1,6 @@
 [submodule "submodules/UART"]
 	path = submodules/UART
 	url = git@github.com:IObundle/iob-uart.git
+[submodule "submodules/CPU"]
+	path = submodules/CPU
+	url = git@github.com:IObundle/iob-picorv32.git
