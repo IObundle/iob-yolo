@@ -1,18 +1,18 @@
-[submodule "submodules/iob-soc"]
-	path = submodules/iob-soc
-	url = git@github.com:IObundle/iob-soc
-[submodule "submodules/TIMER"]
+[submodule "submodules/UART"]
+	path = submodules/UART
+	url = git@github.com:IObundle/iob-uart.git
+[submodule "submodules/CPU"]
+	path = submodules/CPU
+	url = git@github.com:IObundle/iob-picorv32.git
+[submodule "submodules/CACHE"]
+	path = submodules/CACHE
+	url = git@github.com:IObundle/iob-cache.git
+[submodule "TIMER"]
 	path = submodules/TIMER
-	url = git@github.com:IObundle/iob-timer
-[submodule "submodules/ETHERNET"]
+	url = git@github.com:IObundle/iob-timer.git
+[submodule "ETHERNET"]
 	path = submodules/ETHERNET
-	url = git@github.com:IObundle/iob-eth
-[submodule "submodules/VERSAT"]
-	path = submodules/VERSAT
-	url = git@github.com:IObundle/iob-versat
-[submodule "submodules/TEX"]
-	path = submodules/TEX
-	url = git@github.com:IObundle/iob-tex.git
-[submodule "submodules/LIB"]
-	path = submodules/LIB
-	url = git@github.com:IObundle/iob-lib.git
+	url = git@github.com:IObundle/iob-eth.git
+[submodule "VERSAT_CNN"]
+	path = submodules/VERSAT_CNN
+	url = git@github.com:IObundle/iob-versat-cnn.git
