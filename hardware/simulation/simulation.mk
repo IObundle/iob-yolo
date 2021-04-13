@@ -62,5 +62,12 @@ sim_xtop.cpp:
 
 VSRC+=$(foreach p, $(PERIPHERALS), $(shell if test -f $(SUBMODULES_DIR)/$p/hardware/testbench/module_tb.sv; then echo $(SUBMODULES_DIR)/$p/hardware/testbench/module_tb.sv; fi;)) #add test cores to list of sources
 
+input.txt:
+	cp $(TB_DIR)/$(TEST).txt input.txt
+	$(eval input_file_bytes:=$(shell wc -c input.hex | head -n1 | cut -d " " -f1))
+	$(eval input_file_lines:=$(shell wc -l input.hex | head -n1 | cut -d " " -f1))
+	$(eval input_file_size:=$(shell expr \( $(input_file_bytes) \- $(input_file_lines) \) / 2))
+	$(eval DEFINE+=$(defmacro)FILE_SIZE=$(input_file_size))
+
 
 .PRECIOUS: system.vcd

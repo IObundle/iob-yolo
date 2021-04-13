@@ -52,6 +52,9 @@ module system_tb;
    //iterator
    integer                i;
 
+   //define parameters
+   parameter file_size = `FILE_SIZE;
+
    //got enquiry (connect request)
    reg                    gotENQ;
    
@@ -453,7 +456,7 @@ module system_tb;
  `ifdef DDR_INIT
        .FILE("firmware.hex"),
  `else
-       .FILE(file_ddr),
+       .FILE("input.hex"),
  `endif
        .FILE_SIZE(file_size),
        .DATA_WIDTH (`MIG_BUS_W),
