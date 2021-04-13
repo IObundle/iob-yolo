@@ -13,7 +13,7 @@ SFLAGS = -errormax 15 -status -CMDFILE $(ROOT_DIR)/hardware/testbench
 export VSRC CFLAGS EFLAGS SFLAGS 
 
 #simulate
-run: $(VSRC) $(VHDR) firmware boot.hex input.txt
+run: $(VSRC) $(VHDR) firmware boot.hex input_file
 	./run_ncsim.sh
 	grep -v xcelium xmsim.log | grep -v xmsim $(LOG)
 

@@ -68,7 +68,7 @@ VCD ?=0
 #set for running (remote) simulators
 #servers and respective users should be environment variables
 #default simulator
-SIMULATOR ?=icarus
+SIMULATOR ?=ncsim
 #select according simulators
 ifeq ($(SIMULATOR),icarus)
 	SIM_SERVER=$(IVSIM_SERVER)
