@@ -9,7 +9,8 @@ int main()
 {
   //init uart
   uart_init(UART_BASE,FREQ/BAUD);   
-  uart_puts("\n\n\nHello world!\n\n\n");
-  printf("Value of Pi = %f\n\n", 3.1415);
+
+  run_test();
+
   uart_finish();
 }

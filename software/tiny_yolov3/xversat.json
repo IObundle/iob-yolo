@@ -1,0 +1,13 @@
+{
+	"nYOLOvect":		16,
+	"nSTAGES":		13,
+	"nYOLOmacs":		4,
+	"IO_ADDR_W":		32,
+	"DATAPATH_W":		16,
+        "BIAS_ADDR_W":          3,
+	"WEIGHT_ADDR_W":	14,
+	"PIXEL_ADDR_W":		15,
+	"IX_ADDR_W":		10,
+	"EXT_ADDR_W":		15,
+        "VWRITE_ADDR_W":        8
+}
