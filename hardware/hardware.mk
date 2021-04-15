@@ -37,8 +37,8 @@ SRC_DIR:=$(HW_DIR)/src
 INCLUDE+=$(incdir). $(incdir)$(INC_DIR)
 
 #Check for versat.json
-ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
-	INCLUDE+=$(incdir)$(FIRM_DIR)
+ifneq (,$(wildcard $(SW_DIR)/$(TEST)/xversat.json))
+INCLUDE+=$(incdir)$(SW_DIR)/$(TEST)
 endif
 
 #HEADERS

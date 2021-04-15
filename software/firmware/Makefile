@@ -15,6 +15,11 @@ ifeq ($(USE_DDR),1)
 include $(CACHE_DIR)/software/software.mk
 endif
 
+#versat-cnn
+ifeq ($(USE_VERSAT_CNN),1)
+include $(VERSAT_CNN_DIR)/software/embedded/embedded.mk
+endif
+
 #peripherals
 ifeq ($(PCSIM),1)
 $(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/pc/pc.mk))
@@ -42,8 +47,8 @@ pcsim: $(HDR) $(SRC)
 	./$@
 
 versat:
-	python $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py . .
-	python $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(HW_DIR)/include/new_versat $(HW_DIR)/include/dma .
+	python $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py ../$(TEST) .
+	python $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(VERSAT_CNN_INC_DIR)/new_versat $(VERSAT_CNN_INC_DIR)/dma .
 
 #peripherals' base addresses
 periphs.h: periphs_tmp.h
