@@ -191,7 +191,6 @@ DEFINE+=$(defmacro)DCACHE_ADDR_W=$(DCACHE_ADDR_W)
 
 ifeq ($(USE_DDR),1)
 DEFINE+=$(defmacro)USE_DDR
-#DEFINE+=$(defmacro)DDR_ADDR_W=$(DDR_ADDR_W)
 DEFINE+=$(defmacro)MIG_BUS_W=$(MIG_BUS_W)
 ifeq ($(RUN_DDR),1)
 DEFINE+=$(defmacro)RUN_DDR
