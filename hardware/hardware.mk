@@ -10,11 +10,6 @@ ifeq ($(USE_DDR),1)
 include $(CACHE_DIR)/hardware/hardware.mk
 endif
 
-#versat-cnn
-ifeq ($(USE_VERSAT_CNN),1)
-include $(VERSAT_CNN_DIR)/hardware/hardware.mk
-endif
-
 ifneq ($(ASIC),1)
 #rom
 SUBMODULES+=SPROM

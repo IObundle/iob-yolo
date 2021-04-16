@@ -15,11 +15,6 @@ ifeq ($(USE_DDR),1)
 include $(CACHE_DIR)/software/software.mk
 endif
 
-#versat-cnn
-ifeq ($(USE_VERSAT_CNN),1)
-include $(VERSAT_CNN_DIR)/software/embedded/embedded.mk
-endif
-
 #peripherals
 ifeq ($(PCSIM),1)
 $(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/pc/pc.mk))
