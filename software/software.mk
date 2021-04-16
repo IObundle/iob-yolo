@@ -17,12 +17,19 @@ MFLAGS=rv32im
 endif
 
 #defines
+DDR_ADDR_W=$(FPGA_DDR_ADDR_W)
+
 ifeq ($(PCSIM),1)
 DEFINE+=$(defmacro)PCSIM
+else
 ifeq ($(SIM),1)
 DEFINE+=$(defmacro)SIM
+DDR_ADDR_W=24
 endif
 endif
+
+#ddr controller address width
+DEFINE+=$(defmacro)DDR_ADDR_W=$(DDR_ADDR_W)
 
 #INCLUDE
 INCLUDE+=$(incdir)$(SW_DIR) $(incdir).
