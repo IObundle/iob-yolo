@@ -10,11 +10,6 @@ ifeq ($(USE_DDR),1)
 include $(CACHE_DIR)/hardware/hardware.mk
 endif
 
-#versat-cnn
-ifeq ($(USE_VERSAT_CNN),1)
-include $(VERSAT_CNN_DIR)/hardware/hardware.mk
-endif
-
 ifneq ($(ASIC),1)
 #rom
 SUBMODULES+=SPROM
@@ -37,8 +32,8 @@ SRC_DIR:=$(HW_DIR)/src
 INCLUDE+=$(incdir). $(incdir)$(INC_DIR)
 
 #Check for versat.json
-ifneq (,$(wildcard $(FIRM_DIR)/xversat.json))
-	INCLUDE+=$(incdir)$(FIRM_DIR)
+ifneq (,$(wildcard $(SW_DIR)/$(TEST)/xversat.json))
+INCLUDE+=$(incdir)$(SW_DIR)/$(TEST)
 endif
 
 #HEADERS

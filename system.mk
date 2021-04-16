@@ -31,7 +31,7 @@ INIT_MEM ?=1
 #must match respective submodule or folder name in the submodules directory
 #and CORE_NAME in the core.mk file of the submodule
 #PERIPHERALS:=UART
-PERIPHERALS ?=UART TIMER ETHERNET
+PERIPHERALS ?=UART TIMER ETHERNET VERSAT_CNN
 
 #
 #SOFTWARE COMPILATION
@@ -48,7 +48,6 @@ RMAC_ADDR:=00e04c690ba0 #Baba
 #RMAC_ADDR:=309c231e624b #Pudim
 
 #Versat-CNN
-USE_VERSAT_CNN ?=1
 USE_NEW_VERSAT ?=1
 
 
@@ -178,7 +177,7 @@ TEX_DIR=$(UART_DIR)/submodules/TEX
 
 #submodule paths
 SUBMODULES_DIR:=$(ROOT_DIR)/submodules
-SUBMODULES=CPU CACHE VERSAT_CNN $(PERIPHERALS)
+SUBMODULES=CPU CACHE $(PERIPHERALS)
 $(foreach p, $(SUBMODULES), $(eval $p_DIR:=$(SUBMODULES_DIR)/$p))
 
 #MIG Bus
@@ -192,7 +191,6 @@ DEFINE+=$(defmacro)DCACHE_ADDR_W=$(DCACHE_ADDR_W)
 
 ifeq ($(USE_DDR),1)
 DEFINE+=$(defmacro)USE_DDR
-#DEFINE+=$(defmacro)DDR_ADDR_W=$(DDR_ADDR_W)
 DEFINE+=$(defmacro)MIG_BUS_W=$(MIG_BUS_W)
 ifeq ($(RUN_DDR),1)
 DEFINE+=$(defmacro)RUN_DDR

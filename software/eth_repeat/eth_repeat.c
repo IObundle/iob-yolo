@@ -8,10 +8,10 @@
 
 #define ETH_NBYTES (256-18) //minimum ethernet payload excluding FCS
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nETHERNET TEST\n");
+  printf("\nETHERNET TEST\n");
 
   //init ETHERNET
   eth_init(ETHERNET_BASE);
@@ -26,10 +26,10 @@ void run_test() {
   //receive frame
   uart_puts("Waiting to receive data\n");
   while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
-  uart_printf("Data received: %s\n", &data_rcv[14]);
+  printf("Data received: %s\n", &data_rcv[14]);
 
   //send frame
-  uart_printf("Data to be sent: %s\n", data_to_send);
+  printf("Data to be sent: %s\n", data_to_send);
   eth_send_frame (data_to_send, ETH_NBYTES);
   uart_puts("Data Sent\n");
 

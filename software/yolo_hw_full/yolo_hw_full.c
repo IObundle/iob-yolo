@@ -4,7 +4,7 @@
 #include "iob-uart.h"
 #include "iob-eth.h"
 #include "iob_timer.h"
-#include "firmware.h"
+#include "yolo_hw_full.h"
 /* #include "iob-cache.h" */
 #include "versat.hpp"
 
@@ -154,8 +154,8 @@ void reset_DDR() {
   unsigned int i, pos;
 
   //measure initial time
-  uart_printf("\nSetting DDR positions to zero\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nSetting DDR positions to zero\n");
+  start = timer_time_us();
 
   //resized image
   for(i = 0; i < IMAGE_INPUT; i++) fp_image[i] = 0;
@@ -201,8 +201,8 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_20 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
 void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data_p) {
@@ -218,7 +218,7 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      // start timer
-     if(j == 0) start = timer_time_us(TIMER_BASE);   
+     if(j == 0) start = timer_time_us();   
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_DATA_FRAMES) bytes_to_receive = DATA_SIZE - count_bytes;
@@ -243,17 +243,17 @@ void rcv_frame(unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, char * data
 void receive_data() {
 
   //Receive input image
-  uart_printf("\nReady to receive input image and weights...\n");
+  printf("\nReady to receive input image and weights...\n");
   char * fp_image_char = (char *) DATA_BASE_ADDRESS;
   rcv_frame(NUM_INPUT_FRAMES, INPUT_FILE_SIZE, fp_image_char);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Image received in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Image received in %d ms\n", (end-start)/1000);
 
   //Receive weights
   char * fp_weights_char = (char *) WEIGHTS_BASE_ADDRESS;
   rcv_frame(NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, fp_weights_char);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("weights transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("weights transferred in %d ms\n", (end-start)/1000);
 }
 
 //fill resized image region with grey (0.5 = 0x0080 in Q8.8)
@@ -314,14 +314,14 @@ void resize_image() {
   ///////////////////////////////////////////////////////////////////////////////
   
   //load ix and dx to versat mem0 and mem2
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   for(i = 0; i < ix_size; i++) stage[0].memA[0].write(i, ix[i]);
   for(i = 0; i < dx_size; i++) stage[0].memA[2].write(i, dx[i]);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   data_time = end - start;
 
   //configure mem0 to read: ix, ix+1, ix+2*NEW_W, ix+2*NEW_W+1 sequence
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -366,7 +366,7 @@ void resize_image() {
   stage[0].memA[3].setIter(2*NEW_W);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   config_time = end - start;
 
   //loops for performing resizing 1st step
@@ -380,33 +380,33 @@ void resize_image() {
 
       //Store 2 lines of pixels in mem1
       //Extra pixel is necessary to be multiplied by zero
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       for(i = 0; i < IMG_W*2+1; i++)
         stage[0].memA[1].write(i, fp_image[k*IMG_W*IMG_H + iy[j]*IMG_W + i]);
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       data_time += (end - start);
 
       //Wait until done
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       run();
       while(done() == 0);
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       run_time += (end - start);
 
       //store result in DDR
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       for(i = 0; i < NEW_W*2; i++)
       #ifdef SIM
         if(fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i] != stage[0].memA[3].read(i)) num_err++;
       #else
         fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i] = stage[0].memA[3].read(i);
       #endif
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       data_time += (end - start);
     }
   }
 #ifdef SIM
-  uart_printf("Resize 1st step done with %d errors\n", num_err);
+  printf("Resize 1st step done with %d errors\n", num_err);
   num_err = 0;
 #endif
 
@@ -418,13 +418,13 @@ void resize_image() {
   globalClearConf();
 
   //load dy to versat mem1
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   for(i = 0; i < dy_size; i++) stage[0].memA[1].write(i, dy[i]);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   data_time += end - start;
 
   //configure mem0 to read res0
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -453,7 +453,7 @@ void resize_image() {
   stage[0].memA[3].setIter(NEW_W);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   config_time += end - start;
 
   //loops for performing resizing 2nd step
@@ -466,14 +466,14 @@ void resize_image() {
 #endif
 
       //Store res1 in mem0
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       for(i = 0; i < 2*NEW_W; i++)
         stage[0].memA[0].write(i, fp_data[k*2*NEW_W*NEW_H + j*2*NEW_W + i]);
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       data_time += (end - start);
 
       //run
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       run();
 
       //configure mem1 start
@@ -488,28 +488,28 @@ void resize_image() {
 
       //Wait until done
       while(done() == 0);
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       run_time += (end - start);
 
       //store result in DDR
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       for(i = 0; i < NEW_W; i++)
       #ifdef SIM
         if(fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H) + NETWORK_INPUT_AUX] != stage[0].memA[3].read(i)) num_err++;
       #else
         fp_data[k*(YOLO_INPUT+2)*(YOLO_INPUT+2) + (j+1)*(YOLO_INPUT+2) + (i+1) + EXTRA_W + ((YOLO_INPUT+2)*EXTRA_H) + NETWORK_INPUT_AUX] = stage[0].memA[3].read(i);
       #endif
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       data_time += (end - start);
     }
   }
 #ifdef SIM
-  uart_printf("Resize 2nd step done with %d errors\n", num_err);
+  printf("Resize 2nd step done with %d errors\n", num_err);
 #endif
-  uart_printf("FU config time = %d us\n", config_time);
-  uart_printf("FU run time = %d us\n", run_time);
-  uart_printf("FU load/store data time = %d us\n", data_time);
-  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  printf("FU config time = %d us\n", config_time);
+  printf("FU run time = %d us\n", run_time);
+  printf("FU load/store data time = %d us\n", data_time);
+  printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
   total_config_time = config_time;
   total_run_time = run_time;
   total_data_time = data_time;
@@ -540,7 +540,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read ker_size*ker_size*c blocks from tiled FM
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   stage[0].memA[0].setDuty(ker_size*c);
   stage[0].memA[0].setPer(ker_size*c);
   stage[0].memA[0].setIncr(1);
@@ -592,7 +592,7 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
   stage[0].memA[3].setIter(til_w*til_h/(1+3*maxpool));
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   config_time = end - start;
 
   //loops for performing convolution
@@ -605,12 +605,12 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
 #endif
 
       //Send input FM tile (z-x-y format)
-      start = timer_time_us(TIMER_BASE);
+      start = timer_time_us();
       for(i = 0; i < c; i++)
 	for(j = 0; j < til_h+2*inpadd; j++)
           for(k = 0; k < til_w+2*inpadd; k++)
 	    stage[0].memA[0].write((j*(til_w+2*inpadd)+k)*c + i, input[i*(w+2*inpadd+2*ignorepadd)*(w+2*inpadd+2*ignorepadd) + (l*til_h+j+ignorepadd)*(w+2*inpadd+2*ignorepadd) + (k+m*til_w+ignorepadd)]);
-      end = timer_time_us(TIMER_BASE);
+      end = timer_time_us();
       data_time += (end - start);
 
 #ifdef SIM
@@ -620,25 +620,25 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
     #endif
 
         //load weights (z-x-y format)
-        start = timer_time_us(TIMER_BASE);
+        start = timer_time_us();
         for(j = 0; j < c; j++)
           for(i = 0; i < ker_size*ker_size; i++)
             stage[0].memA[1].write(i*c + j, weights[k*c*ker_size*ker_size + j*ker_size*ker_size + i]);
         stage[0].memA[2].write(0, bias[k]);
-        end = timer_time_us(TIMER_BASE);
+        end = timer_time_us();
         data_time += end - start;
 
         //run
-        start = timer_time_us(TIMER_BASE);
+        start = timer_time_us();
         run();
 
         //Wait until done
         while(done() == 0);
-        end = timer_time_us(TIMER_BASE);
+        end = timer_time_us();
         run_time += (end - start);
 
         //store result in DDR
-        start = timer_time_us(TIMER_BASE);
+        start = timer_time_us();
 	for(i = 0; i < til_h/(1+maxpool); i++)
           for(j = 0; j < til_w/(1+maxpool); j++)
           #ifdef SIM
@@ -648,18 +648,18 @@ void conv_layer(int w, int c, int num_ker, int ker_size, int til_w, int til_h, i
           #endif
 
         //end measuring data load/store time
-        end = timer_time_us(TIMER_BASE);
+        end = timer_time_us();
         data_time += (end - start);
       }
     }
   }
 #ifdef SIM
-  uart_printf("Layer done with %d errors\n", num_err);
+  printf("Layer done with %d errors\n", num_err);
 #endif
-  uart_printf("FU config time = %d us\n", config_time);
-  uart_printf("FU run time = %d us\n", run_time);
-  uart_printf("FU load/store data time = %d us\n", data_time);
-  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  printf("FU config time = %d us\n", config_time);
+  printf("FU run time = %d us\n", run_time);
+  printf("FU load/store data time = %d us\n", data_time);
+  printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
   total_config_time += config_time;
   total_run_time += run_time;
   total_data_time += data_time;
@@ -687,7 +687,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read input FMs
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   stage[0].memA[0].setDuty(2);
   stage[0].memA[0].setPer(2);
   stage[0].memA[0].setIncr(1);
@@ -714,7 +714,7 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT-1);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   config_time = end - start;
 
 #ifdef SIM
@@ -724,24 +724,24 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
 #endif
 
     //Send input FM tile (x-y-z format)
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     for(j = 0; j < w+stride; j++)
       for(i = 0; i < w+stride; i++)
         stage[0].memA[0].write(j*(w+stride) + i, input[k*(w+2*inpadd+stride)*(w+2*inpadd+stride) + (j+inpadd)*(w+2*inpadd+stride) + i+inpadd]);
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     data_time += (end - start);
 
     //run
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     run();
 
     //Wait until done
     while(done() == 0);
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     run_time += (end - start);
 
     //store result in DDR
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     for(j = 0; j < w/(1+inpadd); j++)
       for(i = 0; i < w/(1+inpadd); i++)
       #ifdef SIM
@@ -749,16 +749,16 @@ void maxpool_layer(int w, int c, int inpadd, int stride, unsigned int outpos) {
       #else
         output[k*(w/(1+inpadd)+2)*(w/(1+inpadd)+2) + (j+1)*(w/(1+inpadd)+2) + i+1] = stage[0].memA[3].read(j*(w/(1+inpadd)) + i);
       #endif
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     data_time += (end - start);
   }
 #ifdef SIM
-  uart_printf("Layer done with %d errors\n", num_err);
+  printf("Layer done with %d errors\n", num_err);
 #endif
-  uart_printf("FU config time = %d us\n", config_time);
-  uart_printf("FU run time = %d us\n", run_time);
-  uart_printf("FU load/store data time = %d us\n", data_time);
-  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  printf("FU config time = %d us\n", config_time);
+  printf("FU run time = %d us\n", run_time);
+  printf("FU load/store data time = %d us\n", data_time);
+  printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
   total_config_time += config_time;
   total_run_time += run_time;
   total_data_time += data_time;
@@ -784,7 +784,7 @@ void upsample() {
   unsigned int data_time = 0, config_time, run_time = 0;
 
   //configure mem0 to read same pixel 4 times
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   stage[0].memA[0].setDuty(4);
   stage[0].memA[0].setPer(4);
   stage[0].memA[0].setIter(1);
@@ -810,7 +810,7 @@ void upsample() {
   stage[0].memA[3].setDelay(MEMP_LAT+YOLO_BYPASS_LAT);
   stage[0].memA[3].setSel(sYOLO[0]);
   stage[0].memA[3].setInWr(1);
-  end = timer_time_us(TIMER_BASE);
+  end = timer_time_us();
   config_time = end - start;
 
 #ifdef SIM
@@ -820,24 +820,24 @@ void upsample() {
 #endif
 
     //Send input FM tile (x-y-z format)
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     for(j = 0; j < 13; j++)
       for(i = 0; i < 13; i++)
         stage[0].memA[0].write(j*13 + i, input[k*13*13 + j*13 + i]);
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     data_time += (end - start);
 
     //run
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     run();
 
     //Wait until done
     while(done() == 0);
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     run_time += (end - start);
 
     //store result in DDR
-    start = timer_time_us(TIMER_BASE);
+    start = timer_time_us();
     for(j = 0; j < 26; j++)
       for(i = 0; i < 26; i++)
       #ifdef SIM
@@ -845,16 +845,16 @@ void upsample() {
       #else
         output[k*28*28 + (j+1)*28 + i+1] = stage[0].memA[3].read(j*26 + i);
       #endif
-    end = timer_time_us(TIMER_BASE);
+    end = timer_time_us();
     data_time += (end - start);
   }
 #ifdef SIM
-  uart_printf("Layer done with %d errors\n", num_err);
+  printf("Layer done with %d errors\n", num_err);
 #endif
-  uart_printf("FU config time = %d us\n", config_time);
-  uart_printf("FU run time = %d us\n", run_time);
-  uart_printf("FU load/store data time = %d us\n", data_time);
-  uart_printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
+  printf("FU config time = %d us\n", config_time);
+  printf("FU run time = %d us\n", run_time);
+  printf("FU load/store data time = %d us\n", data_time);
+  printf("Total time = %d ms\n", (config_time + run_time + data_time)/1000);
   total_config_time += config_time;
   total_run_time += run_time;
   total_data_time += data_time;
@@ -978,7 +978,7 @@ void yolo_layer(int w, int16_t xy_div, int first_yolo, unsigned int in_pos, unsi
     }
   }
 #ifdef SIM
-  uart_printf("Layer done with %d errors\n", num_err);
+  printf("Layer done with %d errors\n", num_err);
 #endif
 }
 
@@ -992,7 +992,7 @@ void send_data(unsigned int pos) {
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
      // start timer
-     if(j == 0) start = timer_time_us(TIMER_BASE);
+     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
@@ -1012,14 +1012,14 @@ void send_data(unsigned int pos) {
   }
 
   //measure transference time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nYOLO HW FULL\n\n");
+  printf("\nYOLO HW FULL\n\n");
 
 #ifndef SIM
   //init ETHERNET
@@ -1050,95 +1050,95 @@ void run_test() {
   prepare_resize();
 
   //resize input image
-  uart_printf("\nResizing input image...\n");
+  printf("\nResizing input image...\n");
   resize_image();
 #endif
 
   //layer1,2 (conv + maxpool)
-  uart_printf("\nRunning layers 1 and 2...\n");
+  printf("\nRunning layers 1 and 2...\n");
   conv_layer(YOLO_INPUT, IMG_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_TILING_W, LAYER_1_TILING_H, LAYER_1_MAXPOOL, LAYER_1_OUTPADD, LAYER_1_STRIDE, 1, LAYER_1_IGNOREPAD, 0);
 
   //layer3,4 (conv + maxpool)
-  uart_printf("\nRunning layers 3 and 4...\n");
+  printf("\nRunning layers 3 and 4...\n");
   conv_layer(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILING_W, LAYER_3_TILING_H, LAYER_3_MAXPOOL, LAYER_3_OUTPADD, LAYER_3_STRIDE, LAYER_1_OUTPADD, LAYER_3_IGNOREPAD, 0);
 
   //layer5,6 (conv + maxpool)
-  uart_printf("\nRunning layers 5 and 6...\n");
+  printf("\nRunning layers 5 and 6...\n");
   conv_layer(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILING_W, LAYER_5_TILING_H, LAYER_5_MAXPOOL, LAYER_5_OUTPADD, LAYER_5_STRIDE, LAYER_3_OUTPADD, LAYER_5_IGNOREPAD, 0);
 
   //layer7,8 (conv + maxpool)
-  uart_printf("\nRunning layers 7 and 8...\n");
+  printf("\nRunning layers 7 and 8...\n");
   conv_layer(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILING_W, LAYER_7_TILING_H, LAYER_7_MAXPOOL, LAYER_7_OUTPADD, LAYER_7_STRIDE, LAYER_5_OUTPADD, LAYER_7_IGNOREPAD, 0);
 
   //layer9 (conv)
-  uart_printf("\nRunning layer 9...\n");
+  printf("\nRunning layer 9...\n");
   conv_layer(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_TILING_W, LAYER_9_TILING_H, LAYER_9_MAXPOOL, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_7_OUTPADD, LAYER_9_IGNOREPAD, data_pos_layer9);
 
   //layer10 (maxpool)
-  uart_printf("\nRunning layer 10...\n");
+  printf("\nRunning layer 10...\n");
   maxpool_layer(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
 
   //layer11 (conv)
-  uart_printf("\nRunning layer 11...\n");
+  printf("\nRunning layer 11...\n");
   conv_layer(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_11_MAXPOOL, LAYER_11_OUTPADD, LAYER_11_STRIDE, 1, LAYER_11_IGNOREPAD, 0);
 
   //layer12 (maxpool)
-  uart_printf("\nRunning layer 12...\n");
+  printf("\nRunning layer 12...\n");
   maxpool_layer(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0);
 
   //layer13 (conv)
-  uart_printf("\nRunning layer 13...\n");
+  printf("\nRunning layer 13...\n");
   conv_layer(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_13_MAXPOOL, LAYER_13_OUTPADD, LAYER_13_STRIDE, 1, LAYER_13_IGNOREPAD, 0);
 
   //layer14 (conv)
-  uart_printf("\nRunning layer 14...\n");
+  printf("\nRunning layer 14...\n");
   conv_layer(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_14_MAXPOOL, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_13_OUTPADD, LAYER_14_IGNOREPAD, 0);
 
   //layer15 (conv)
-  uart_printf("\nRunning layer 15...\n");
+  printf("\nRunning layer 15...\n");
   conv_layer(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_11_TILING_W, LAYER_11_TILING_H, LAYER_15_MAXPOOL, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_14_OUTPADD, LAYER_15_IGNOREPAD, 0);
 
   //layer16 (conv)
-  uart_printf("\nRunning layer 16...\n");
+  printf("\nRunning layer 16...\n");
   conv_layer(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_16_MAXPOOL, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_15_OUTPADD, LAYER_16_IGNOREPAD, 0);
 
   //layer17 (yolo)
-  start = timer_time_us(TIMER_BASE);
-  uart_printf("\nRunning layer 17...\n");
+  start = timer_time_us();
+  printf("\nRunning layer 17...\n");
   yolo_layer(LAYER_16_W, yolo1_div, 1, data_pos, box_pos);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Total time = %d us\n", end-start);
+  end = timer_time_us();
+  printf("Total time = %d us\n", end-start);
 
   //layer19 (conv)
   data_pos = data_pos_layer14;
-  uart_printf("\nRunning layer 19...\n");
+  printf("\nRunning layer 19...\n");
   conv_layer(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_16_TILING_W, LAYER_16_TILING_H, LAYER_19_MAXPOOL, LAYER_19_OUTPADD, LAYER_19_STRIDE, 0, LAYER_19_IGNOREPAD, data_pos_layer19);
 
   //layer20 (upsample)
-  uart_printf("\nRunning layer 20...\n");
+  printf("\nRunning layer 20...\n");
   upsample();
 
   //layer22 (conv)
-  uart_printf("\nRunning layer 22...\n");
+  printf("\nRunning layer 22...\n");
   conv_layer(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_TILING_W, LAYER_22_TILING_H, LAYER_22_MAXPOOL, LAYER_22_OUTPADD, LAYER_22_STRIDE, 1, LAYER_22_IGNOREPAD, 0);
 
   //layer23 (conv)
-  uart_printf("\nRunning layer 23...\n");
+  printf("\nRunning layer 23...\n");
   conv_layer(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_TILING_W, LAYER_23_TILING_H, LAYER_23_MAXPOOL, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_22_OUTPADD, LAYER_23_IGNOREPAD, 0);
 
   //layer24 (yolo)
-  start = timer_time_us(TIMER_BASE);
-  uart_printf("\nRunning layer 24...\n");
+  start = timer_time_us();
+  printf("\nRunning layer 24...\n");
   yolo_layer(LAYER_23_W, yolo2_div, 0, data_pos, box_pos);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Total time = %d us\n", end-start);
+  end = timer_time_us();
+  printf("Total time = %d us\n", end-start);
 
   //return data
 #ifndef SIM
-  uart_printf("\nTotal config time = %d us\n", total_config_time);
-  uart_printf("Total run time = %d ms\n", total_run_time/1000);
-  uart_printf("Total data time = %d ms\n", total_data_time/1000);
-  uart_printf("Total execution time = %d ms\n", total_time);
+  printf("\nTotal config time = %d us\n", total_config_time);
+  printf("Total run time = %d ms\n", total_run_time/1000);
+  printf("Total data time = %d ms\n", total_data_time/1000);
+  printf("Total execution time = %d ms\n", total_time);
   send_data(box_pos);
 #endif
 
@@ -1194,8 +1194,8 @@ void run_test() {
   while(done()==0);
 
   //check result
-  if(stage[0].memA[3].read(0) == exp_res) uart_printf("xyolo acc feature tested successfully!\n");
-  else uart_printf("xyolo acc feature failed!\nExpected: %d, got %d\n", exp_res, stage[0].memA[3].read(0));
+  if(stage[0].memA[3].read(0) == exp_res) printf("xyolo acc feature tested successfully!\n");
+  else printf("xyolo acc feature failed!\nExpected: %d, got %d\n", exp_res, stage[0].memA[3].read(0));
 
   return;
 }

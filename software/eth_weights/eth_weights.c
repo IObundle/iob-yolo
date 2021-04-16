@@ -15,10 +15,10 @@
 #define NUM_DATA_FRAMES (DATA_FILE_SIZE/ETH_NBYTES)
 #define NUM_WEIGHT_FRAMES (WEIGHTS_FILE_SIZE/ETH_NBYTES)
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nETHERNET TEST\n");
+  printf("\nETHERNET TEST\n");
   uart_txwait();
 
   //init ETHERNET
@@ -34,7 +34,7 @@ void run_test() {
   int i, j;
   int16_t input_data[ETH_NBYTES/2];
   char * input_data_p = (char *) &input_data;
-  uart_printf("\n");
+  printf("\n");
   unsigned int start, end;
 
   //Loop to receive and send back data frames
@@ -45,8 +45,8 @@ void run_test() {
 
      // start timer
      if(j == 0){
-       timer_reset(TIMER_BASE);
-       start = timer_time_us(TIMER_BASE);
+       timer_reset();
+       start = timer_time_us();
      }
 
      //save in local mem
@@ -60,8 +60,8 @@ void run_test() {
   }
 
   //measure final time for data transmission
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Data transmission done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Data transmission done in %d ms\n", (end-start)/1000);
 
   //Loop to receive and send back weight frames
   for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
@@ -71,8 +71,8 @@ void run_test() {
      
      // start timer
      if(j == 0){
-       timer_reset(TIMER_BASE);
-       start = timer_time_us(TIMER_BASE);
+       timer_reset();
+       start = timer_time_us();
      }
 
      //save in local mem
@@ -87,8 +87,8 @@ void run_test() {
   }
 
   //measure final time for weight transmission
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Weight transmission done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Weight transmission done in %d ms\n", (end-start)/1000);
 
   return;
 }

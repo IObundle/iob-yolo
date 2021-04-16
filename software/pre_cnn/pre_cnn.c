@@ -131,7 +131,7 @@ void prepare_resize() {
   //loop to initialize iy and dy
 #ifdef SIM
   for(i = 0; i < 10; i++) {
-    uart_printf("%d\n", i);
+    printf("%d\n", i);
 #else
   for(i = 0; i < NEW_H; i++) {
 #endif
@@ -166,15 +166,15 @@ void reset_DDR() {
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS + NETWORK_INPUT_AUX_PADD;
 
   //measure initial time
-  uart_printf("\nSetting DDR positions to zero\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nSetting DDR positions to zero\n");
+  start = timer_time_us();
 
   //input network
   for(i = 0; i < DATA_LAYER_1; i++) fp_data[i] = 0;
 
   //measure final time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
 //fill grey CNN input image (except padding)
@@ -196,7 +196,7 @@ void rcv_data() {
   int i, j;
   count_bytes = 0;
   char * data_p = (char *) INPUT_IMAGE_BASE_ADDRESS;
-  uart_printf("\nReady to receive data...\n");
+  printf("\nReady to receive data...\n");
 
   //Loop to receive intermediate data frames
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
@@ -205,7 +205,7 @@ void rcv_data() {
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      //start timer
-     if(j == 0) start = timer_time_us(TIMER_BASE);
+     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
@@ -223,8 +223,8 @@ void rcv_data() {
      //update byte counter
      count_bytes += ETH_NBYTES;
   }
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Data received in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Data received in %d ms\n", (end-start)/1000);
 }
 
 //width resize -> 768 to 416
@@ -303,14 +303,14 @@ void width_resize() {
     // wait until done
     while(versat.done()==0);
   #ifdef TIME_RUN
-    end = (unsigned int) timer_get_count(TIMER_BASE);
-    if(i != 0) uart_printf("%d\n", (end - start)*CLK_NS);
+    end = (unsigned int) timer_get_count();
+    if(i != 0) printf("%d\n", (end - start)*CLK_NS);
   #endif
 
     // run configuration
     versat.run();
   #ifdef TIME_RUN
-    start = (unsigned int) timer_get_count(TIMER_BASE);
+    start = (unsigned int) timer_get_count();
   #endif
 
     // stop xyolo_read vread reading from DDR
@@ -400,15 +400,15 @@ void height_resize() {
     // wait until done
     while(versat.done()==0);
   #ifdef TIME_RUN
-    end = (unsigned int) timer_get_count(TIMER_BASE);
-    uart_printf("%d\n", (end - start)*CLK_NS);
-    if(i == 0) uart_printf("\n");
+    end = (unsigned int) timer_get_count();
+    printf("%d\n", (end - start)*CLK_NS);
+    if(i == 0) printf("\n");
   #endif
 
     // run configuration
     versat.run();
   #ifdef TIME_RUN
-    start = (unsigned int) timer_get_count(TIMER_BASE);
+    start = (unsigned int) timer_get_count();
   #endif
 
     // stop xyolo_read vread reading from DDR
@@ -429,7 +429,7 @@ void send_data() {
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
-    if(j == 0) start = timer_time_us(TIMER_BASE);
+    if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
@@ -449,14 +449,14 @@ void send_data() {
   }
 
   //measure transference time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nPRE CNN\n\n");
+  printf("\nPRE CNN\n\n");
 
 #ifndef SIM
   //init ETHERNET
@@ -475,52 +475,52 @@ void run_test() {
 #endif
 
   //initialize ix, iy, dx and dy arrays
-  uart_printf("\nPreparing resize...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nPreparing resize...\n");
+  start = timer_time_us();
   prepare_resize();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
 
 #ifndef SIM
 
   //width resize
  #ifndef TIME_RUN
-  uart_printf("\nWidth resizing...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nWidth resizing...\n");
+  start = timer_time_us();
  #endif
   width_resize();
  #ifndef TIME_RUN
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
  #endif
 
 #endif
 
   //height resize
  #ifndef TIME_RUN
-  uart_printf("\nHeight resizing...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nHeight resizing...\n");
+  start = timer_time_us();
  #endif
   height_resize();
   //end versat
  #ifdef TIME_RUN
   while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
+  end = (unsigned int) timer_get_count();
+  printf("%d\n", (end - start)*CLK_NS);
   versat.run();
-  start = (unsigned int) timer_get_count(TIMER_BASE);
+  start = (unsigned int) timer_get_count();
   while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
+  end = (unsigned int) timer_get_count();
+  printf("%d\n", (end - start)*CLK_NS);
   versat.run();
-  start = (unsigned int) timer_get_count(TIMER_BASE);
+  start = (unsigned int) timer_get_count();
   while(versat.done()==0);
-  end = (unsigned int) timer_get_count(TIMER_BASE);
-  uart_printf("%d\n", (end - start)*CLK_NS);
+  end = (unsigned int) timer_get_count();
+  printf("%d\n", (end - start)*CLK_NS);
  #else
   versat_end();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
  #endif
 
 #ifdef SIM
@@ -528,13 +528,13 @@ void run_test() {
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += NETWORK_INPUT_AUX_PADD + ((NEW_W+2)*IMG_C+LAYER_1_P_OFF)*(EXTRA_H+1);
   int i, j, k;
-  uart_printf("\nVerifying...\n");
+  printf("\nVerifying...\n");
   for(i = 0; i < 10; i++) {
-    uart_printf("Line %d\n", i);
+    printf("Line %d\n", i);
     for(j = 0; j < NEW_W+2; j++)
       for(k = 0; k < IMG_C; k++)
         if(fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] != fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k])
-	  uart_printf("(%d) res = %x, act = %x\n", i*(NEW_W+2)*IMG_C + j*IMG_C + k, fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF);   
+	  printf("(%d) res = %x, act = %x\n", i*(NEW_W+2)*IMG_C + j*IMG_C + k, fp_data[i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF, fp_data[DATA_LAYER_1 + i*(NEW_W+2)*IMG_C + j*IMG_C + k] & 0xFFFF);   
   }
 #endif
 
