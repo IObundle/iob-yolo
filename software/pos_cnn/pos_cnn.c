@@ -110,7 +110,7 @@ void rcv_data() {
   int i, j;
   count_bytes = 0;
   char * data_p = (char *) RGB_BASE_ADDRESS;
-  uart_printf("\nReady to receive yolo layers output...\n");
+  printf("\nReady to receive yolo layers output...\n");
 
   //Loop to receive intermediate data frames
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
@@ -119,7 +119,7 @@ void rcv_data() {
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      //start timer
-     if(j == 0) start = timer_time_us(TIMER_BASE);
+     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
@@ -137,8 +137,8 @@ void rcv_data() {
      //update byte counter
      count_bytes += ETH_NBYTES;
   }
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Image and weights received in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Image and weights received in %d ms\n", (end-start)/1000);
 }
 
 // polynomial approximation of exponential function
@@ -748,7 +748,7 @@ void send_data() {
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
-    if(j == 0) start = timer_time_us(TIMER_BASE);
+    if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
@@ -768,14 +768,14 @@ void send_data() {
   }
 
   //measure transference time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nPOS CNN\n\n");
+  printf("\nPOS CNN\n\n");
 
   //init versat
   versat_init(VERSAT_BASE);
@@ -791,44 +791,44 @@ void run_test() {
 #endif
 
   //create boxes from 1st yolo layer
-  uart_printf("\nCreating boxes from first yolo layer\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nCreating boxes from first yolo layer\n");
+  start = timer_time_us();
   create_boxes(LAYER_16_W, 0, yolo1_div, 1);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
 
   //create boxes from 2nd yolo layer
-  uart_printf("\nCreating boxes from second yolo layer\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nCreating boxes from second yolo layer\n");
+  start = timer_time_us();
   create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
 
-  uart_printf("NUMBER OF BOXES: %d\n", nboxes);
+  printf("NUMBER OF BOXES: %d\n", nboxes);
 
   //filter boxes
-  uart_printf("\nFiltering boxes...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nFiltering boxes...\n");
+  start = timer_time_us();
   filter_boxes();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
 
 #ifndef SIM
   //draw boxes and labels
-  uart_printf("\nDrawing boxes and labels...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nDrawing boxes and labels...\n");
+  start = timer_time_us();
   draw_detections();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Done in %d us\n\n", end-start);
+  end = timer_time_us();
+  printf("Done in %d us\n\n", end-start);
 #else
   //verify results
   int16_t * fp_data = (int16_t *) DATA_BASE_ADDRESS;
   fp_data += 256*13*13 + 256*26*26;
   int i;
-  uart_printf("\nVerifying...\n");
+  printf("\nVerifying...\n");
   for(i = 0; i < 84*nboxes; i++)
     if(boxes[i] != fp_data[i])
-      uart_printf("(%d) res = %x, act = %x\n", i, boxes[i] & 0xFFFF, fp_data[i] & 0xFFFF);
+      printf("(%d) res = %x, act = %x\n", i, boxes[i] & 0xFFFF, fp_data[i] & 0xFFFF);
 #endif
 
 #ifndef SIM

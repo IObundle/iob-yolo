@@ -3,7 +3,7 @@
 #include "iob-uart.h"
 #include "iob-eth.h"
 #include "iob_timer.h"
-#include "firmware.h"
+#include "yolo_sw.h"
 #include "iob-cache.h"
 
 //import c libraries
@@ -56,18 +56,18 @@ void define_memory_regions() {
 
 //check number of cache hits and misses
 void print_cache_status() {
-  uart_printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
-  uart_printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
-  uart_printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
-  uart_printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
-  uart_printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
-  uart_printf("ctrl_data_write_miss = %d\n\n", ctrl_data_write_miss(CACHE_CTRL));
+  printf("ctrl_instr_hit = %d\n", ctrl_instr_hit(CACHE_CTRL));
+  printf("ctrl_instr_miss = %d\n", ctrl_instr_miss(CACHE_CTRL));
+  printf("ctrl_data_read_hit = %d\n", ctrl_data_read_hit(CACHE_CTRL));
+  printf("ctrl_data_read_miss = %d\n", ctrl_data_read_miss(CACHE_CTRL));
+  printf("ctrl_data_write_hit = %d\n", ctrl_data_write_hit(CACHE_CTRL));
+  printf("ctrl_data_write_miss = %d\n\n", ctrl_data_write_miss(CACHE_CTRL));
 }
 
 //receive weights and data
 void receive_data() {
 
-  uart_printf("\nReady to receive input.network and weights\n");
+  printf("\nReady to receive input.network and weights\n");
 
   //char file pointers
   uint16_t * fp_data_aux = (uint16_t *) DATA_BASE_ADDRESS;
@@ -107,7 +107,7 @@ void receive_data() {
 
   //measure transference time
   end = timer_get_count_us(TIMER);
-  uart_printf("input.network transferred in %d ms\n", (end-start)/1000);
+  printf("input.network transferred in %d ms\n", (end-start)/1000);
 
   //Loop to receive weight frames
   for(j = 0; j < NUM_WEIGHT_FRAMES+1; j++) {
@@ -142,7 +142,7 @@ void receive_data() {
 
   //measure transference time
   end = timer_get_count_us(TIMER);
-  uart_printf("weights transferred in %d ms\n", (end-start)/1000);
+  printf("weights transferred in %d ms\n", (end-start)/1000);
 }
 
 //perform convolutional layer
@@ -415,7 +415,7 @@ void send_data(unsigned int data_pos_yolo, unsigned int data_amount) {
 
   //measure transference time
   end = timer_get_count_us(TIMER);
-  uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
+  printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
 //reset certain DDR positions to zero due to padding
@@ -425,7 +425,7 @@ void reset_DDR() {
   unsigned int i, pos;
 
   //measure initial time
-  uart_printf("\nSetting DDR positions to zero\n");
+  printf("\nSetting DDR positions to zero\n");
   timer_reset(TIMER);
   start = timer_get_count_us(TIMER);
 
@@ -467,13 +467,13 @@ void reset_DDR() {
 
   //measure final time
   end = timer_get_count_us(TIMER);
-  uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
+  printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nYOLO SW \n\n");
+  printf("\nYOLO SW \n\n");
   uart_txwait();
 
   //init ETHERNET
@@ -496,7 +496,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(NTW_IN_W, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
+  printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -506,7 +506,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_2_W, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
+  printf("\nLayer2 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -516,7 +516,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_3_W, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
+  printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -526,7 +526,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_4_W, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
+  printf("\nLayer4 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -536,7 +536,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_5_W, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
+  printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -546,7 +546,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_6_W, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
+  printf("\nLayer6 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -556,7 +556,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_7_W, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
+  printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -566,7 +566,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_8_W, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
+  printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -580,7 +580,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_9_W, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
+  printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -590,7 +590,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
+  printf("\nLayer10 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -601,7 +601,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
+  printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -611,7 +611,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   maxpool_layer(LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
+  printf("\nLayer12 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -621,7 +621,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
+  printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -631,7 +631,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
+  printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -644,7 +644,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
+  printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -654,7 +654,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
+  printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -664,7 +664,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_17_W);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
+  printf("\nLayer17 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -683,7 +683,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
+  printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -693,7 +693,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   upsample_layer(LAYER_20_W, LAYER_20_NUM_KER);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
+  printf("\nLayer20 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -704,7 +704,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
+  printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -714,7 +714,7 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   conv_layer(LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
+  printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
@@ -724,13 +724,13 @@ void run_test() {
   start = timer_get_count_us(TIMER);
   yolo_layer(LAYER_24_W);
   end = timer_get_count_us(TIMER);
-  uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
+  printf("\nLayer24 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
   ctrl_counter_reset(CACHE_CTRL);
 
   //return data
-  uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
+  printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
   send_data(data_pos_layer17, DATA_LAYER_17);
   send_data(data_pos, DATA_LAYER_24);
   //uart_putc(4);

@@ -6,7 +6,7 @@
 #include "iob-eth.h"
 #include "iob_timer.h"
 
-#include "firmware.h"
+#include "yolo_sw_full.h"
 #include "iob-cache.h"
 
 //import c libraries
@@ -34,10 +34,10 @@
 
 void print_cache_status() {
 #ifndef PCSIM
-  uart_printf("ctrl_read_hit = %d\n", cache_read_hit());
-  uart_printf("ctrl_read_miss = %d\n", cache_read_miss());
-  uart_printf("ctrl_write_hit = %d\n", cache_write_hit());
-  uart_printf("ctrl_write_miss = %d\n\n", cache_write_miss());
+  printf("ctrl_read_hit = %d\n", cache_read_hit());
+  printf("ctrl_read_miss = %d\n", cache_read_miss());
+  printf("ctrl_write_hit = %d\n", cache_write_hit());
+  printf("ctrl_write_miss = %d\n\n", cache_write_miss());
   cache_counter_reset();
 #endif //ifndef PCSIM
 }
@@ -864,12 +864,12 @@ void print_cache_status() {
     for(j = 0; j < 80; j++) {
       if(fp_data[box_pos+85*i+5+j] != 0) {
 	pred_32 = (uint32_t)((uint32_t)fp_data[box_pos+85*i+5+j]*(uint32_t)100); //Q2.14 * Q16.0 = Q18.14
-	if( (pred_32&0x3FFF) > 0x2000) uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14)+1);
-	else uart_printf("\n%s: %d%%", class_names[j], (pred_32>>14));
+	if( (pred_32&0x3FFF) > 0x2000) printf("\n%s: %d%%", class_names[j], (pred_32>>14)+1);
+	else printf("\n%s: %d%%", class_names[j], (pred_32>>14));
       }
     }
   }
-  uart_printf("\n");	
+  printf("\n");	
  }
 
 #else
@@ -1591,8 +1591,8 @@ void print_cache_status() {
   for(i = 0; i < nboxes; i++)
     for(j = 0; j < 80; j++)
       if(fp_data[box_pos+85*i+5+j] != 0) 
-	uart_printf("\n%s: %.2f%%", class_names[j], fp_data[box_pos+85*i+5+j]*100);
-  uart_printf("\n");	
+	printf("\n%s: %.2f%%", class_names[j], fp_data[box_pos+85*i+5+j]*100);
+  printf("\n");	
  }
 
 #endif
@@ -1604,8 +1604,8 @@ void reset_DDR() {
   unsigned int i, pos;
 
   //measure initial time
-  uart_printf("\nSetting DDR positions to zero\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nSetting DDR positions to zero\n");
+  start = timer_time_us();
 
   //resized image
   for(i = 0; i < IMAGE_INPUT; i++) fp_image[i] = 0;
@@ -1650,8 +1650,8 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
 void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA_SIZE, int interm_flag, char * data_p, int label_flag) {
@@ -1675,7 +1675,7 @@ void rcv_frame(unsigned int pos, unsigned int NUM_DATA_FRAMES, unsigned int DATA
 
      // start timer
      if(interm_flag == 0 && j == 0 && label_flag == 0) {
-       start = timer_time_us(TIMER_BASE);
+       start = timer_time_us();
      }   
 
      //check if it is last packet (has less data that full payload size)
@@ -1707,22 +1707,22 @@ void receive_data() {
 
   //local variables
   unsigned int pos = 0, i, label_size;
-  uart_printf("\nReady to receive input image, weights, labels and intermediate data\n");
+  printf("\nReady to receive input image, weights, labels and intermediate data\n");
 
   //Receive input image
   char * fp_image_char = (char *) DATA_BASE_ADDRESS;
   rcv_frame(0, NUM_INPUT_FRAMES, INPUT_FILE_SIZE, 0, fp_image_char, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("image transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("image transferred in %d ms\n", (end-start)/1000);
   
   //Receive weights
   char * fp_weights_char = (char *) WEIGTHS_BASE_ADDRESS;
   rcv_frame(0, NUM_WEIGHT_FRAMES, WEIGHTS_FILE_SIZE, 0, fp_weights_char, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("weights transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("weights transferred in %d ms\n", (end-start)/1000);
 
   //Receive labels
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
  #ifdef FIXED
   rcv_frame(0, 0, 81, 0, fp_labels, 1);
   for(i = 0; i < 81; i++) {
@@ -1738,12 +1738,12 @@ void receive_data() {
     rcv_frame(0, label_size/ETH_NBYTES, label_size, 0, fp_labels_char, 1);
   }
  #endif
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("labels transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("labels transferred in %d ms\n", (end-start)/1000);
 
 #ifdef INTERM_DATA
   //restart timer
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
 
   //loop to receive intermediate layer 1 data
   for(i = 0; i < NTW_IN_NUM_KER; i++) {
@@ -1806,8 +1806,8 @@ void receive_data() {
   }
 
   //measure transference time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("intermediate data transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("intermediate data transferred in %d ms\n", (end-start)/1000);
 #endif
 }
 
@@ -1823,7 +1823,7 @@ void send_data() {
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      // start timer
-     if(j == 0) start = timer_time_us(TIMER_BASE);
+     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
@@ -1847,17 +1847,17 @@ void send_data() {
   }
 
   //measure transference time
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\noutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
-void run_test() {
+void run() {
 
   //init CACHE
   cache_init(DDR_ADDR_W);
 
   //send init message
-  uart_printf("\nYOLO SW FULL\n\n");
+  printf("\nYOLO SW FULL\n\n");
 
   //init ETHERNET
   eth_init(ETHERNET_BASE);
@@ -1880,75 +1880,75 @@ void run_test() {
 
   //resize input image to 418x316x3
   fill_grey();
-  uart_printf("\nResizing input image to 416x416\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nResizing input image to 416x416\n");
+  start = timer_time_us();
   resize_image();
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Resize image done in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("Resize image done in %d ms\n", (end-start)/1000);
   total_time = (end-start)/1000;
   print_cache_status();
 
   //layer1 (418x316x3 -> 416x316x16)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(NTW_IN_W, NTW_IN_H, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0, NTW_IN_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer1 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer1 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer2 (416x316x16 -> 210x162x16)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_2_W, LAYER_2_H, LAYER_2_NUM_KER, LAYER_2_DOWNSAMPLE, LAYER_2_IGNORE_PADD, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer2 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer2 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer3 (210x162x16 -> 208x160x32)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_3_W, LAYER_3_H, LAYER_3_C, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_PAD, LAYER_3_BATCH_NORM, LAYER_3_NEXT_PADD, LAYER_3_NEXT_STRIDE, LAYER_3_IGNORE_PADD, 0, LAYER_3_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer3 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer3 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer4 (208x160x32 -> 106x84x32)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_4_W, LAYER_4_H, LAYER_4_NUM_KER, LAYER_4_DOWNSAMPLE, LAYER_4_IGNORE_PADD, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer4 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer4 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer5 (106x84x32 -> 104x84x64)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_5_W, LAYER_5_H, LAYER_5_C, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_PAD, LAYER_5_BATCH_NORM, LAYER_5_NEXT_PADD, LAYER_5_NEXT_STRIDE, LAYER_5_IGNORE_PADD, 0, LAYER_5_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer5 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer5 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer6 (104x84x64 -> 54x46x64)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_6_W, LAYER_6_H, LAYER_6_NUM_KER, LAYER_6_DOWNSAMPLE, LAYER_6_IGNORE_PADD, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer6 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer6 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer7 (54x46x64 -> 52x44x128)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_7_W, LAYER_7_H, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, LAYER_7_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer7 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer7 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer8 (52x44x128 -> 28x26x128)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_8_W, LAYER_8_H, LAYER_8_NUM_KER, LAYER_8_DOWNSAMPLE, LAYER_8_IGNORE_PADD, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer8 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer8 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
@@ -1957,51 +1957,51 @@ void run_test() {
 
   //layer9 (28x26x128 -> 28x28x256) -> Zero-padding
   //Result of layer 9 goes after result of layer 20
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_9_W, LAYER_9_H, LAYER_9_C, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_PAD, LAYER_9_BATCH_NORM, LAYER_9_NEXT_PADD, LAYER_9_NEXT_STRIDE, LAYER_9_IGNORE_PADD, data_pos + DATA_LAYER_8 + DATA_LAYER_10 + DATA_LAYER_11 + DATA_LAYER_12 + DATA_LAYER_13 + DATA_LAYER_14 + DATA_LAYER_15 + DATA_LAYER_16 + DATA_LAYER_17 + DATA_LAYER_19 + DATA_LAYER_20, LAYER_9_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer9 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer9 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer10 (28x28x256 -> 15x15x256) -> Ignores padding from layer 9
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_10_W, LAYER_10_W, LAYER_10_NUM_KER, LAYER_10_DOWNSAMPLE, LAYER_10_IGNORE_PADD, data_pos_layer8);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer10 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer10 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer11 (15x15x256 -> 14x14x512)
   //Repeats last line and column of each feature map
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_11_W, LAYER_11_W, LAYER_11_C, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_PAD, LAYER_11_BATCH_NORM, LAYER_11_NEXT_PADD, LAYER_11_NEXT_STRIDE, LAYER_11_IGNORE_PADD, 0, LAYER_11_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer11 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer11 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer12 (14x14x512 -> 15x15x512)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   maxpool_layer(LAYER_12_W, LAYER_12_W, LAYER_12_NUM_KER, LAYER_12_DOWNSAMPLE, LAYER_12_IGNORE_PADD, 0);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer12 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer12 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer13 (15x15x512 -> 13x13x1024)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_13_W, LAYER_13_W, LAYER_13_C, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_PAD, LAYER_13_BATCH_NORM, LAYER_13_NEXT_PADD, LAYER_13_NEXT_STRIDE, LAYER_13_IGNORE_PADD, 0, LAYER_13_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer13 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer13 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer14 (13x13x1024 -> 15x15x256)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_14_W, LAYER_14_W, LAYER_14_C, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_PAD, LAYER_14_BATCH_NORM, LAYER_14_NEXT_PADD, LAYER_14_NEXT_STRIDE, LAYER_14_IGNORE_PADD, 0, LAYER_14_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer14 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer14 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
@@ -2009,26 +2009,26 @@ void run_test() {
   unsigned int data_pos_layer14 = data_pos;
 
   //layer15 (15x15x256 -> 13x13x512)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_15_W, LAYER_15_W, LAYER_15_C, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_PAD, LAYER_15_BATCH_NORM, LAYER_15_NEXT_PADD, LAYER_15_NEXT_STRIDE, LAYER_15_IGNORE_PADD, 0, LAYER_15_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer15 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer15 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer16 (13x13x512 -> 13x13x255)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_16_W, LAYER_16_W, LAYER_16_C, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_PAD, LAYER_16_BATCH_NORM, LAYER_16_NEXT_PADD, LAYER_16_NEXT_STRIDE, LAYER_16_IGNORE_PADD, 0, LAYER_16_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer16 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer16 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer17 (13x13x255 -> 13x13x255)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   yolo_layer(LAYER_17_W);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer17 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer17 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
@@ -2042,64 +2042,64 @@ void run_test() {
   data_pos = data_pos_layer14;
 
   //layer19 (15x15x256 -> 13x13x128)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_19_W, LAYER_19_W, LAYER_19_C, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_PAD, LAYER_19_BATCH_NORM, LAYER_19_NEXT_PADD, LAYER_19_NEXT_STRIDE, LAYER_19_IGNORE_PADD, previous_data_pos, LAYER_19_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer19 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer19 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer20 (13x13x128 -> 28x28x128)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   upsample_layer(LAYER_20_W, LAYER_20_NUM_KER);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer20 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer20 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer22 (28x28x128 -> 26x26x256)
   //layer 21 (second route layer) is not needed as output of layer 9 is already after output of layer 20
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_22_W, LAYER_22_W, LAYER_22_C, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_PAD, LAYER_22_BATCH_NORM, LAYER_22_NEXT_PADD, LAYER_22_NEXT_STRIDE, LAYER_22_IGNORE_PADD, data_pos + DATA_LAYER_20 + DATA_LAYER_9, LAYER_22_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer22 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer22 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer23 (26x26x256 -> 26x26x255)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   conv_layer(LAYER_23_W, LAYER_23_W, LAYER_23_C, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_PAD, LAYER_23_BATCH_NORM, LAYER_23_NEXT_PADD, LAYER_23_NEXT_STRIDE, LAYER_23_IGNORE_PADD, 0, LAYER_23_OFFSET);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer23 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer23 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //layer24 (26x26x255 -> 26x26x255)
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   yolo_layer(LAYER_24_W);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("\nLayer24 %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("\nLayer24 %d ms\n", (end-start)/1000);
   total_time += (end-start)/1000;
   print_cache_status();
 
   //get candidate boxes
-  uart_printf("\nGetting candidate boxes...\n");
+  printf("\nGetting candidate boxes...\n");
   unsigned int box_pos = data_pos+DATA_LAYER_24;
-  start = timer_time_us(TIMER_BASE);
+  start = timer_time_us();
   get_boxes(LAYER_17_W, yolo1_div, 1, data_pos_layer17, box_pos);
   get_boxes(LAYER_24_W, yolo2_div, 0, data_pos, box_pos);
   filter_boxes(box_pos);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Candidate boxes selected in %d us\n", (end-start));
+  end = timer_time_us();
+  printf("Candidate boxes selected in %d us\n", (end-start));
   total_time += (end-start)/1000;
   print_cache_status();
 
   //draw detections
-  uart_printf("\nDrawing detections...\n");
-  start = timer_time_us(TIMER_BASE);
+  printf("\nDrawing detections...\n");
+  start = timer_time_us();
   draw_detections(box_pos);
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("Detection drawn in %d us\n", (end-start));
+  end = timer_time_us();
+  printf("Detection drawn in %d us\n", (end-start));
   total_time += (end-start)/1000;
   print_cache_status();
 
@@ -2107,7 +2107,7 @@ void run_test() {
   print_results(box_pos);
 
   //return data
-  uart_printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
+  printf("\ntotal_time = %d seconds (%d minutes) \n", total_time/1000, (total_time/1000)/60);
   send_data();
 
   return;

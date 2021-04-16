@@ -30,16 +30,16 @@
   #endif //if RUN_DDR==0
 #endif //ifdef PCSIM
 
-void run_test() {
+void run() {
 
   //send init message
-  uart_printf("\nETHERNET and DDR TEST\n");
+  printf("\nETHERNET and DDR TEST\n");
   uart_txwait();
 
   //check for USE_DDR condition
 #if (USE_DDR==0)
-  uart_printf("This test requires USE_DDR=1\n");
-  uart_printf("Ending program...\n");
+  printf("This test requires USE_DDR=1\n");
+  printf("Ending program...\n");
   //end program
   uart_putc(ETX);
   return 0;  
@@ -67,7 +67,7 @@ void run_test() {
 
      //wait to receive frame
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
-     if(j == 0) start = timer_time_us(TIMER_BASE);
+     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_receive = OUTPUT_FILE_SIZE - count_bytes;
@@ -81,14 +81,14 @@ void run_test() {
   }
 
   //measure final time for data transmission
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("output.network received in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("output.network received in %d ms\n", (end-start)/1000);
   uart_puts("Starting output.network transfer\n");
   count_bytes = 0;
 
   //measure initial time for output.network transmission
-  timer_reset(TIMER_BASE);
-  start = timer_time_us(TIMER_BASE);
+  timer_reset();
+  start = timer_time_us();
 
   //Loop to send output.network
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
@@ -108,8 +108,8 @@ void run_test() {
   }
 
   //measure final time for output.network transmission
-  end = timer_time_us(TIMER_BASE);
-  uart_printf("output.network transferred in %d ms\n", (end-start)/1000);
+  end = timer_time_us();
+  printf("output.network transferred in %d ms\n", (end-start)/1000);
 /* #endif */
 
   return;
