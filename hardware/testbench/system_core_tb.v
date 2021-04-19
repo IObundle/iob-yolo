@@ -18,10 +18,8 @@ module system_tb;
 
    //ethernet clocks
    parameter pclk_per = 40;
-   reg RX_CLK = 1;
-   always #(pclk_per/2) RX_CLK = ~RX_CLK;
-   wire TX_CLK;
-   assign TX_CLK = RX_CLK;
+   reg pclk = 1;
+   always #(pclk_per/2) pclk = ~pclk;
 
    //received by getchar
    reg [7:0] cpu_char = 0;
@@ -46,8 +44,6 @@ module system_tb;
    wire                   tester_tx_en;
    wire                   eth_phy_resetn;
    assign tester_pll_locked = 1'b1;
-   assign tester_rx_clk = RX_CLK;
-   assign tester_tx_clk = TX_CLK;
 
    //iterator
    integer                i;
@@ -60,7 +56,13 @@ module system_tb;
    
    //PWIRES
 
-   
+
+   assign RX_CLK = pclk;
+   assign TX_CLK = pclk;
+
+   assign tester_rx_clk = RX_CLK;
+   assign tester_tx_clk = TX_CLK;
+
    /////////////////////////////////////////////
    // TEST PROCEDURE
    //
@@ -182,7 +184,7 @@ module system_tb;
    wire [2*1-1:0]            sys_rlast;
    wire [2*1-1:0]            sys_rvalid;
    wire [2*1-1:0]            sys_rready;
- `else
+ `endif
    //Write address
    wire [0:0] ddr_awid;
    wire [`DDR_ADDR_W-1:0] ddr_awaddr;
@@ -227,7 +229,6 @@ module system_tb;
    //reg                     ddr_ruser_reg = 1'b0;
    wire                    ddr_rvalid;
    wire                    ddr_rready;
- `endif
 `endif
 
    //cpu trap signal
@@ -458,7 +459,7 @@ module system_tb;
  `else
        .FILE("input.hex"),
  `endif
-       .FILE_SIZE(file_size),
+       //.FILE_SIZE(file_size),
        .DATA_WIDTH (`MIG_BUS_W),
        .ADDR_WIDTH (`DDR_ADDR_W-4)
        )

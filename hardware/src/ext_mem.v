@@ -235,7 +235,6 @@ module ext_mem
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
       .WTBUF_DEPTH_W(5), //FIFO's depth -- 5 minimum for BRAM implementation
-      .BE_ADDR_W (`DDR_ADDR_W),
       .CTRL_CACHE (0),   //Cache-Control can't be accessed
       .CTRL_CNT(0),      //Remove counters
     `ifdef RUN_DDR_USE_SRAM
