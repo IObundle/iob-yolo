@@ -33,7 +33,7 @@ INCLUDE+=$(incdir). $(incdir)$(INC_DIR)
 
 #Check for versat.json
 ifneq (,$(wildcard $(SW_DIR)/$(TEST)/xversat.json))
-INCLUDE+=$(incdir)$(SW_DIR)/$(TEST)
+INCLUDE+=$(incdir)$(FIRM_DIR)
 endif
 
 #HEADERS
