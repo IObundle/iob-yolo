@@ -131,14 +131,14 @@ module ext_mem
 `endif //  `ifdef RUN_DDR_USE_SRAM
 
    //l2 cache interface signals
-   wire [1+`DCACHE_ADDR_W+`WRITE_W-1:0]       l2cache_req;
-   wire [`RESP_W-1:0]                        l2cache_resp;
+   wire [`REQ_MIG_BUS_W-1:0]                 l2cache_req;
+   wire [`RESP_MIG_BUS_W-1:0]                l2cache_resp;
    
    //ext_mem control signals
    wire                                      l2_wtb_empty;
    wire                                      invalidate;
    reg                                       invalidate_reg;
-   wire                                      l2_valid = l2cache_req[1+`DCACHE_ADDR_W+`WRITE_W-1];
+   wire                                      l2_valid = l2cache_req[1+`DCACHE_ADDR_W+`MIG_BUS_W+(`MIG_BUS_W/8)-1];
    //Necessary logic to avoid invalidating L2 while it's being accessed by a request
    always @(posedge clk, posedge rst)
      if (rst)
