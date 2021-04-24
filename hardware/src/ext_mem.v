@@ -17,13 +17,13 @@ module ext_mem
 
 `ifdef RUN_DDR_USE_SRAM
     // Instruction bus
-    input [1+`FIRM_ADDR_W-2+`DATA_W+(`DATA_W/8)-1:0] i_req,
-    output [`DATA_W+`READY_W-1:0]            i_resp,
+    input [`REQ_W_(`FIRM_ADDR_W-2, `DATA_W)-1:0] i_req,
+    output [`RESP_W_(`DATA_W)-1:0]           i_resp,
 `endif
 
     // Data bus
-    input [1+1+`DCACHE_ADDR_W-2+`DATA_W+(`DATA_W/8)-1:0] d_req,
-    output [`DATA_W+`READY_W-1:0]            d_resp,
+    input [`REQ_W_(1+`DCACHE_ADDR_W-2, `DATA_W)-1:0] d_req,
+    output [`RESP_W_(`DATA_W)-1:0]           d_resp,
 
     // AXI interface 
     // Address write
@@ -73,7 +73,7 @@ module ext_mem
    //
 
    // Back-end bus
-   wire [1+`DCACHE_ADDR_W+`WRITE_W-1:0]       icache_be_req;
+   wire [`REQ_W_(`DCACHE_ADDR_W, DATA_W)-1:0] icache_be_req;
    wire [`RESP_W-1:0]                        icache_be_resp;
 
 
@@ -95,36 +95,35 @@ module ext_mem
            .reset (rst),
 
            // Front-end interface
-           .valid (i_req[1+`FIRM_ADDR_W-2+`DATA_W+(`DATA_W/8)-1]),
-           .addr  (i_req[`DATA_W+`DATA_W/8 +: `FIRM_ADDR_W-2]),
-           .wdata (i_req[`DATA_W/8 +: `DATA_W]),
-           .wstrb (i_req[0 +: `DATA_W/8]),
-           .rdata (i_resp[`RDATA_P +: `DATA_W]),
-           .ready (i_resp[0]),
+           .valid (i_req[`valid_(0, `FIRM_ADDR_W-2, `DATA_W)]),
+           .addr  (i_req[`address_(0, `FIRM_ADDR_W-2, ADDR_W, `DATA_W)]),
+           .wdata (i_req[`wdata_(0, `FIRM_ADDR_W-2, `DATA_W)]),
+           .wstrb (i_req[`wstrb_(0, `FIRM_ADDR_W-2, `DATA_W)]),
+           .rdata (i_resp[`rdata_(0, `DATA_W)]),
+           .ready (i_resp[`ready_(0, `DATA_W)]),
            //Control IO
            .force_inv_in(1'b0),
            .force_inv_out(),
            .wtb_empty_in(1'b1),
            .wtb_empty_out(),
            // Back-end interface
-           .mem_valid (icache_be_req[1+`DCACHE_ADDR_W+`WRITE_W-1]),
+           .mem_valid (icache_be_req[`valid_(0, `DCACHE_ADDR_W, DATA_W)]),
            .mem_addr  (icache_be_req[`address(0, `DCACHE_ADDR_W)]),
            .mem_wdata (icache_be_req[`wdata(0)]),
            .mem_wstrb (icache_be_req[`wstrb(0)]),
            .mem_rdata (icache_be_resp[`rdata(0)]),
            .mem_ready (icache_be_resp[`ready(0)])
            );
-`endif //  `ifdef RUN_DDR_USE_SRAM
 
    //l2 cache interface signals
-   wire [1+`DCACHE_ADDR_W+`WRITE_W-1:0]       l2cache_req;
+   wire [`REQ_W_(`DCACHE_ADDR_W, DATA_W)-1:0] l2cache_req;
    wire [`RESP_W-1:0]                        l2cache_resp;
    
    //ext_mem control signals
    wire                                      l2_wtb_empty;
    wire                                      invalidate;
    reg                                       invalidate_reg;
-   wire                                      l2_valid = l2cache_req[1+`DCACHE_ADDR_W+`WRITE_W-1];
+   wire                                      l2_valid = l2cache_req[`valid_(0, `DCACHE_ADDR_W, DATA_W)];
    //Necessary logic to avoid invalidating L2 while it's being accessed by a request
    always @(posedge clk, posedge rst)
      if (rst)
@@ -143,7 +142,7 @@ module ext_mem
    //
 
    // Back-end bus
-   wire [1+`DCACHE_ADDR_W+`WRITE_W-1:0]       dcache_be_req;
+   wire [`REQ_W_(`DCACHE_ADDR_W, DATA_W)-1:0] dcache_be_req;
    wire [`RESP_W-1:0]                        dcache_be_resp;
    
    // Data cache instance
@@ -163,19 +162,19 @@ module ext_mem
            .reset (rst),
 
            // Front-end interface
-           .valid (d_req[2+`DCACHE_ADDR_W-2+`DATA_W+(`DATA_W/8)-1]),
-           .addr  (d_req[`DATA_W+`DATA_W/8 +: 1+`DCACHE_ADDR_W-2]),
-           .wdata (d_req[`DATA_W/8 +: `DATA_W]),
-           .wstrb (d_req[0 +: `DATA_W/8]),
-           .rdata (d_resp[`RDATA_P +: `DATA_W]),
-           .ready (d_resp[0]),
+           .valid (d_req[`valid_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+           .addr  (d_req[`address_(0, 1+`DCACHE_ADDR_W-2, ADDR_W, `DATA_W)]),
+           .wdata (d_req[`wdata_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+           .wstrb (d_req[`wstrb_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+           .rdata (d_resp[`rdata_(0, `DATA_W)]),
+           .ready (d_resp[`ready_(0, `DATA_W)]),
            //Control IO
            .force_inv_in(1'b0),
            .force_inv_out(invalidate),
            .wtb_empty_in(l2_wtb_empty),
            .wtb_empty_out(),
            // Back-end interface
-           .mem_valid (dcache_be_req[1+`DCACHE_ADDR_W+`WRITE_W-1]),
+           .mem_valid (dcache_be_req[`valid_(0, `DCACHE_ADDR_W, DATA_W)]),
            .mem_addr  (dcache_be_req[`address(0,`DCACHE_ADDR_W)]),
            .mem_wdata (dcache_be_req[`wdata(0)]),
            .mem_wstrb (dcache_be_req[`wstrb(0)]),
@@ -187,37 +186,32 @@ module ext_mem
    merge
      #(
        .ADDR_W(`DCACHE_ADDR_W),
-`ifdef RUN_DDR_USE_SRAM
        .N_MASTERS(2),
-`else
-       .N_MASTERS(1),
-`endif
-      .DATA_W(DATA_W)
+       .DATA_W(DATA_W)
        )
    merge_i_d_buses_into_l2
      (
       .clk(clk),
       .rst(rst),
       // masters
-`ifdef RUN_DDR_USE_SRAM
       .m_req  ({icache_be_req, dcache_be_req}),
       .m_resp ({icache_be_resp, dcache_be_resp}),
-`else
-      .m_req  (dcache_be_req),
-      .m_resp (dcache_be_resp),
-`endif                 
       // slave
       .s_req  (l2cache_req),
       .s_resp (l2cache_resp)
       );
-
+`endif //  `ifdef RUN_DDR_USE_SRAM
    
    // L2 cache instance
    iob_cache_axi # 
      (
+`ifdef RUN_DDR_USE_SRAM
       .FE_ADDR_W(`DCACHE_ADDR_W),
+`else
+      .FE_ADDR_W(`DCACHE_ADDR_W+1),
+`endif
       .BE_ADDR_W (`DDR_ADDR_W),
-      .N_WAYS(4),        //Number of Ways
+      .N_WAYS(1),        //Number of Ways
       .LINE_OFF_W(4),    //Cache Line Offset (number of lines)
       .WORD_OFF_W(4),    //Word Offset (number of words per line)
       .WTBUF_DEPTH_W(5), //FIFO's depth -- 5 minimum for BRAM implementation
@@ -234,25 +228,32 @@ module ext_mem
       
             // Native interface
 `ifdef RUN_DDR_USE_SRAM
-            .valid    (l2cache_req[1+`DCACHE_ADDR_W+`WRITE_W-1]),
+            .valid    (l2cache_req[`valid_(0, `DCACHE_ADDR_W, DATA_W)]),
             .addr     (l2cache_req[`address(0, `DCACHE_ADDR_W)-$clog2(DATA_W/8)]),
             .wdata    (l2cache_req[`wdata(0)]),
             .wstrb    (l2cache_req[`wstrb(0)]),
             .rdata    (l2cache_resp[`rdata(0)]),
             .ready    (l2cache_resp[`ready(0)]),
-`else
-            .valid    (l2cache_req[1+`DCACHE_ADDR_W+`DATA_W+(`DATA_W/8)-1]),
-            .addr     (l2cache_req[`DATA_W+`DATA_W/8+`DCACHE_ADDR_W-1 -: `DCACHE_ADDR_W-2]),
-            .wdata    (l2cache_req[`DATA_W/8 +: `DATA_W]),
-            .wstrb    (l2cache_req[0 +: `DATA_W/8]),
-            .rdata    (l2cache_resp[`RDATA_P +: `DATA_W]),
-            .ready    (l2cache_resp[0]),
-`endif
+
             //Control IO
             .force_inv_in(invalidate_reg & ~l2_valid),
             .force_inv_out(),
             .wtb_empty_in(1'b1),
             .wtb_empty_out(l2_wtb_empty),
+`else
+            .valid    (d_req[`valid_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+            .addr     (d_req[`address_(0, 1+`DCACHE_ADDR_W-2, ADDR_W, `DATA_W)]),
+            .wdata    (d_req[`wdata_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+            .wstrb    (d_req[`wstrb_(0, 1+`DCACHE_ADDR_W-2, `DATA_W)]),
+            .rdata    (d_resp[`rdata_(0, `DATA_W)]),
+            .ready    (d_resp[`ready_(0, `DATA_W)]),
+
+            //Control IO
+            .force_inv_in(1'b0),
+            .force_inv_out(),
+            .wtb_empty_in(1'b1),
+            .wtb_empty_out(),
+`endif
             // AXI interface
             // Address write
             .axi_awid(axi_awid), 
