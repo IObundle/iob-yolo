@@ -10,9 +10,9 @@ set INCLUDE [lindex $argv 0]
 set DEFINE [lindex $argv 1]
 set VSRC [lindex $argv 2]
 
-set USE_DDR [string last "USE_DDR" $DEFINE]
-set DDR_ADDR_W [string last "DDR_ADDR_W" $DEFINE]
-set MIG_BUS_W [string last "MIG_BUS_W" $DEFINE]
+set USE_DDR [expr [lsearch $DEFINE "USE_DDR"] + 1]
+regexp {\d+} [lindex $DEFINE [lsearch $DEFINE "DDR_ADDR_W*"]] DDR_ADDR_W
+regexp {\d+} [lindex $DEFINE [lsearch $DEFINE "MIG_BUS_W*"]] MIG_BUS_W
 
 #verilog sources
 foreach file [split $VSRC \ ] {
@@ -23,7 +23,7 @@ foreach file [split $VSRC \ ] {
 
 set_property part $PART [current_project]
 
-if { $USE_DDR < 0 } {
+if { !$USE_DDR } {
     read_verilog verilog/clock_wizard.v
 } else {
 
@@ -45,12 +45,12 @@ if { $USE_DDR < 0 } {
         set_property -dict \
             [list \
                  CONFIG.NUM_SLAVE_PORTS {2}\
-                 CONFIG.AXI_ADDR_WIDTH {$DDR_ADDR_W}\
+                 CONFIG.AXI_ADDR_WIDTH $DDR_ADDR_W \
                  CONFIG.ACLK_PERIOD {5000} \
-                 CONFIG.INTERCONNECT_DATA_WIDTH {$MIG_BUS_W}\
-                 CONFIG.S00_AXI_DATA_WIDTH {$MIG_BUS_W}\
-                 CONFIG.S01_AXI_DATA_WIDTH {$MIG_BUS_W}\
-                 CONFIG.M00_AXI_DATA_WIDTH {$MIG_BUS_W}\
+                 CONFIG.INTERCONNECT_DATA_WIDTH $MIG_BUS_W \
+                 CONFIG.S00_AXI_DATA_WIDTH $MIG_BUS_W \
+                 CONFIG.S01_AXI_DATA_WIDTH $MIG_BUS_W \
+                 CONFIG.M00_AXI_DATA_WIDTH $MIG_BUS_W \
                  CONFIG.M00_AXI_IS_ACLK_ASYNC {1}\
                  CONFIG.M00_AXI_WRITE_FIFO_DEPTH {32}\
                  CONFIG.M00_AXI_READ_FIFO_DEPTH {32}\
@@ -87,8 +87,8 @@ if { $USE_DDR < 0 } {
              CONFIG.C0.DDR4_AxiSelection {true} \
              CONFIG.C0.DDR4_CasLatency {11} \
              CONFIG.C0.DDR4_CasWriteLatency {11} \
-             CONFIG.C0.DDR4_AxiDataWidth {$MIG_BUS_W} \
-             CONFIG.C0.DDR4_AxiAddressWidth {$DDR_ADDR_W} \
+             CONFIG.C0.DDR4_AxiDataWidth $MIG_BUS_W \
+             CONFIG.C0.DDR4_AxiAddressWidth $DDR_ADDR_W \
              CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {100} \
              CONFIG.C0.BANK_GROUP_WIDTH {1}] [get_ips ddr4_0]
 	
