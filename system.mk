@@ -168,6 +168,7 @@ SIM_DIR=$(HW_DIR)/simulation/$(SIMULATOR)
 BOARD_DIR=$(HW_DIR)/fpga/$(BOARD)
 ASIC_DIR=$(HW_DIR)/asic/$(ASIC_NODE)
 SW_DIR:=$(ROOT_DIR)/software
+TEST_DIR:=$(SW_DIR)/$(TEST)
 FIRM_DIR:=$(SW_DIR)/firmware
 BOOT_DIR:=$(SW_DIR)/bootloader
 CONSOLE_DIR:=$(SW_DIR)/console

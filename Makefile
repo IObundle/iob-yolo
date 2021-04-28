@@ -117,13 +117,13 @@ kill-remote-console:
 ld-eth:
 	$(eval RMAC := $(shell ethtool -P $(RMAC_INTERFACE) | awk '{print $$3}' | sed 's/://g'))
 ifneq ($(SIM),1)
-	@source /opt/pyeth/bin/activate; python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
+	@source /opt/pyeth/bin/activate; python $(TEST_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR); deactivate;
 else
-	python $(FIRM_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR) PCsim
+	python $(TEST_DIR)/eth_comm.py $(RMAC_INTERFACE) $(RMAC) $(FIRM_DIR) PCsim
 endif
-ifneq (,$(wildcard $(FIRM_DIR)/write_image.py))
+ifneq (,$(wildcard $(TEST_DIR)/write_image.py))
 	@echo "Creating image file with detections...\n"
-	@python $(FIRM_DIR)/write_image.py $(FIRM_DIR)/detections.bin
+	@python $(TEST_DIR)/write_image.py $(FIRM_DIR)/detections.bin
 	@echo "Opening image file...\n"
 	@display $(FIRM_DIR)/detections.png
 endif
