@@ -1,5 +1,3 @@
-TEST_DIR:=$(SW_DIR)/$(TEST)
-
 #sources
 SRC+=$(TEST_DIR)/*.c
 

@@ -3,8 +3,6 @@ INTERM_DATA = 0
 FIXED = 1
 GEMM = 0
 
-TEST_DIR:=$(SW_DIR)/$(TEST)
-
 #defines
 ifeq ($(INTERM_DATA),1)
 DEFINE+=$(defmacro)INTERM_DATA

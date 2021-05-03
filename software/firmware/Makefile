@@ -1,6 +1,6 @@
 ROOT_DIR:=../..
 include ../software.mk
-include ../$(TEST)/firmware.mk
+include $(TEST_DIR)/firmware.mk
 
 #additional compiler flags
 ifneq ($(PCSIM),1)
@@ -42,18 +42,18 @@ pcsim: $(HDR) $(SRC)
 	./$@
 
 versat:
-	python $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py ../$(TEST) .
-	python $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(VERSAT_CNN_INC_DIR)/new_versat $(VERSAT_CNN_INC_DIR)/dma .
+	@python $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py ../$(TEST) .
+	@python $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(VERSAT_CNN_INC_DIR)/new_versat $(VERSAT_CNN_INC_DIR)/dma .
 
 #peripherals' base addresses
 periphs.h: periphs_tmp.h
-	is_diff=`diff -q $@ $<`; if [ "$$is_diff" ]; then cp $< $@; fi
+	@is_diff=`diff -q -N $@ $<`; if [ "$$is_diff" ]; then cp $< $@; fi
 	@rm periphs_tmp.h
 
 periphs_tmp.h:
 	$(foreach p, $(PERIPHERALS), $(shell echo "#define $p_BASE (1<<$P) |($p<<($P-N_SLAVES_W))" >> $@) )
 
 clean: gen-clean test-clean
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h pcsim *.vh versat.h
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex periphs.h pcsim *.vh versat.h
 
-.PHONY: run clean subs periphs_tmp.h versat
+.PHONY: run clean versat
