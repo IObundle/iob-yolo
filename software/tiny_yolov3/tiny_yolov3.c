@@ -189,7 +189,7 @@ void rcv_data() {
   for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
      //wait to receive frame
-     while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     while(eth_rcv_frame(data_rcv, ETH_NBYTES, rcv_timeout) !=0);
 
      //start timer
      if(j == 0) start = timer_time_us();
