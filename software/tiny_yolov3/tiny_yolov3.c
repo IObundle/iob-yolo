@@ -201,11 +201,11 @@ void rcv_data() {
      //save in DDR
      for(i = 0; i < bytes_to_receive; i++) {
        data_p[j*ETH_NBYTES + i] = data_rcv[14+i];
-       data_to_send[i] = data_p[j*ETH_NBYTES + i];
+       //data_to_send[i] = data_p[j*ETH_NBYTES + i];
      }
 
      //send data back as ack
-     eth_send_frame(data_to_send, ETH_NBYTES);
+     eth_send_frame((data_rcv+14)/*data_to_send*/, ETH_NBYTES);
 
      //update byte counter
      count_bytes += ETH_NBYTES;
@@ -1564,14 +1564,15 @@ void send_data() {
   //Loop to send data
   int i, j;
   count_bytes = 0;
-  char * fp_data_char = (char *) fp_image;
-  for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
+  //char * fp_data_char = (char *) fp_image;
+  char * fp_data_char = (char *) WEIGHTS_BASE_ADDRESS;
+  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
 
     //start timer
     if(j == 0) start = timer_time_us();
 
      //check if it is last packet (has less data that full payload size)
-     if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
+     if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
      else bytes_to_send = ETH_NBYTES;
 
      //prepare variable to be sent
@@ -1581,7 +1582,7 @@ void send_data() {
      eth_send_frame(data_to_send, ETH_NBYTES);
 
      //wait to receive frame as ack
-     if(j != NUM_OUTPUT_FRAMES) while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
+     if(j != NUM_INPUT_FRAMES) while(eth_rcv_frame(data_rcv, ETH_NBYTES, rcv_timeout) !=0);
 
      //update byte counter
      count_bytes += ETH_NBYTES;
@@ -1590,6 +1591,79 @@ void send_data() {
   //measure transference time
   end = timer_time_us();
   printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
+}
+
+#define ETH_NBYTES (1024-18) // minimum ethernet payload excluding FCS
+#define RCV_TIMEOUT 5000
+
+char buffer[ETH_NBYTES];
+
+unsigned int eth_rcv_file(char *data, int size) {
+  int num_frames = size/ETH_NBYTES;
+  unsigned int bytes_to_receive;
+  unsigned int count_bytes = 0;
+  int i, j;
+
+  if (size % ETH_NBYTES) num_frames++;
+
+  printf("num_frames = %d\n", num_frames);
+  printf("\nReady to receive input image and weights...\n");
+
+  // Loop to receive intermediate data frames
+  for(j = 0; j < num_frames; j++) {
+
+     // wait to receive frame
+     while(eth_rcv_frame(buffer, ETH_NBYTES, RCV_TIMEOUT));
+
+     // check if it is last packet (has less data that full payload size)
+     if(j == (num_frames-1)) bytes_to_receive = size - count_bytes;
+     else bytes_to_receive = ETH_NBYTES;
+
+     // save in DDR
+     for(i = 0; i < bytes_to_receive; i++) {
+       data[j*ETH_NBYTES + i] = buffer[14+i];
+     }
+
+     // send data back as ack
+     eth_send_frame((buffer+14), ETH_NBYTES);
+
+     // update byte counter
+     count_bytes += ETH_NBYTES;
+  }
+
+  return count_bytes;
+}
+
+unsigned int eth_send_file(char *data, int size) {
+  int num_frames = size/ETH_NBYTES;
+  unsigned int bytes_to_send;
+  unsigned int count_bytes = 0;
+  int i, j;
+
+  if (size % ETH_NBYTES) num_frames++;
+
+  // Loop to send data
+  for(j = 0; j < num_frames; j++) {
+     //printf("frame = %d\n", j);
+
+     // check if it is last packet (has less data that full payload size)
+     if(j == (num_frames-1)) bytes_to_send = size - count_bytes;
+     else bytes_to_send = ETH_NBYTES;
+
+     // prepare variable to be sent
+     for(i = 0; i < bytes_to_send; i++) buffer[i] = data[j*ETH_NBYTES*2 + i*2];
+
+     // send frame
+     eth_send_frame(buffer, ETH_NBYTES);
+
+     // wait to receive frame as ack
+     if(j != (num_frames-1)) while(eth_rcv_frame(buffer, ETH_NBYTES, RCV_TIMEOUT));
+
+     // update byte counter
+     count_bytes += ETH_NBYTES;
+  }
+
+  return count_bytes;
 }
 
 void run() {
@@ -1625,12 +1699,16 @@ void run() {
 
   //pre-initialize DDR
 #ifndef SIM
-  reset_DDR();
-  rcv_data();
-  fill_grey();
+  //reset_DDR();
+  //rcv_data();
+  start = timer_time_us();
+  eth_rcv_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
+  end = timer_time_us();
+  printf("Image and weights received in %d ms\n", (end-start)/1000);
+  //fill_grey();
 #endif
 
-  //initialize ix, iy, dx and dy arrays
+/*  //initialize ix, iy, dx and dy arrays
   printf("\nPreparing resize...\n");
   start = timer_time_us();
   prepare_resize();
@@ -1936,10 +2014,19 @@ void run() {
   //print detected objects and corresponding probability scores
   printf("\nDetections:\n");
   print_results();
-#endif
+#endif*/
 
 #ifndef SIM
-  send_data();
+ #ifndef TIME_RUN
+  start = timer_time_us();
+ #endif
+  //send_data();
+  //eth_rcv_file((char *)fp_image, OUTPUT_FILE_SIZE);
+  eth_send_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
+ #ifndef TIME_RUN
+  end = timer_time_us();
+  printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
+ #endif
 #endif
 
   return;

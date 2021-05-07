@@ -32,19 +32,21 @@ f_input = open(input_filename, 'rb')
 
 #Frame parameters
 input_file_size = getsize(input_filename)
-num_frames_input = int(input_file_size/eth_nbytes)
+num_frames_input = input_file_size/eth_nbytes
+if(input_file_size % eth_nbytes): num_frames_input+=1
 print("input_file_size: %d" % input_file_size)
-print("num_frames_input: %d" % (num_frames_input+1))
+print("num_frames_input: %d" % num_frames_input)
 
 #Reset byte counter
 count_bytes = 0
 count_errors = 0
 
 # Loop to send input frames
-for j in range(num_frames_input+1):
+for j in range(num_frames_input):
+    print ("frame = %d" % j)
 
     # check if it is last packet (not enough for full payload)
-    if j == num_frames_input:
+    if j == num_frames_input-1:
         bytes_to_send = input_file_size - count_bytes
         padding = '\x00' * (eth_nbytes-bytes_to_send)
     else:
@@ -93,16 +95,18 @@ count_bytes = 0
 
 #Frame parameters
 output_file_size = getsize(output_filename)
-num_frames_output = int(output_file_size/eth_nbytes)
-print("output_file_size: %d" % output_file_size)     
-print("num_frames_output: %d" % (num_frames_output+1))
+num_frames_output = output_file_size/eth_nbytes
+if(output_file_size % eth_nbytes): num_frames_output+=1
+print("output_file_size: %d" % input_file_size)     
+print("num_frames_output: %d" % num_frames_input)
 
 #Loop to receive one yolo layer output
-for j in range(num_frames_output+1):
+for j in range(num_frames_input):
+    print ("frame = %d" % j)
 
     #Check if it is last packet (not enough for full payload)
-    if j == num_frames_output:
-        bytes_to_receive = output_file_size - count_bytes
+    if j == num_frames_input-1:
+        bytes_to_receive = input_file_size - count_bytes
         padding = '\x00' * (eth_nbytes-bytes_to_receive)
     else:
         bytes_to_receive = eth_nbytes
@@ -122,7 +126,7 @@ for j in range(num_frames_output+1):
             count_errors += 1
             
     #Send data back as ack
-    if(j != num_frames_output):
+    if(j != num_frames_input-1):
     	s.send(dst_addr + src_addr + eth_type + payload + padding)
         
 #Close file
