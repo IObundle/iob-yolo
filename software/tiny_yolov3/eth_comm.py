@@ -43,7 +43,6 @@ count_errors = 0
 
 # Loop to send input frames
 for j in range(num_frames_input):
-    print ("frame = %d" % j)
 
     # check if it is last packet (not enough for full payload)
     if j == num_frames_input-1:
@@ -57,7 +56,7 @@ for j in range(num_frames_input):
     payload = f_input.read(bytes_to_send)
 
     # accumulate sent bytes
-    count_bytes += eth_nbytes
+    count_bytes += bytes_to_send
 
     #Send packet
     s.send(dst_addr + src_addr + eth_type + payload + padding)
@@ -77,17 +76,17 @@ print("input file transmitted with %d errors..." %(count_errors))
 #Open output image files
 print("\nStarting reception of result...")
 output_filename = '../tiny_yolov3_out.bin'
-f_output = open(output_filename, "rb")
+f_output = open(input_filename, "rb")
 
 #Open write detections file
 output_image_filename = sys.argv[3]+'/detections.bin'
 f_output_image =  open(output_image_filename, "wb")
-image_w = struct.unpack('i', f_output.read(4))[0]
-image_h = struct.unpack('i', f_output.read(4))[0]
-image_c = struct.unpack('i', f_output.read(4))[0]
-f_output_image.write(struct.pack('i', image_w))
-f_output_image.write(struct.pack('i', image_h))
-f_output_image.write(struct.pack('i', image_c))
+#image_w = struct.unpack('i', f_output.read(4))[0]
+#image_h = struct.unpack('i', f_output.read(4))[0]
+#image_c = struct.unpack('i', f_output.read(4))[0]
+#f_output_image.write(struct.pack('i', image_w))
+#f_output_image.write(struct.pack('i', image_h))
+#f_output_image.write(struct.pack('i', image_c))
 
 #Reset counters
 count_errors = 0
@@ -102,7 +101,6 @@ print("num_frames_output: %d" % num_frames_input)
 
 #Loop to receive one yolo layer output
 for j in range(num_frames_input):
-    print ("frame = %d" % j)
 
     #Check if it is last packet (not enough for full payload)
     if j == num_frames_input-1:
@@ -113,7 +111,7 @@ for j in range(num_frames_input):
         padding = ''
 
     #Accumulate rcv bytes
-    count_bytes += eth_nbytes
+    count_bytes += bytes_to_send
     
     #form frame
     payload = f_output.read(bytes_to_receive)
