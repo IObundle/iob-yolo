@@ -83,12 +83,9 @@ uint8_t box_IDs[MAX_NUM_BOXES];
 #define LAYER_5_TILE_W 52
 #define LAYER_7_TILE_W 26
 
-//define ethernet constants
-//#define ETH_NBYTES (1024-18) //minimum ethernet payload excluding FCS
+// Input and output data
 #define INPUT_FILE_SIZE ((RGB_VALUES_SIZE + LABELS_FILE_SIZE + TOTAL_WEIGHTS + IMAGE_INPUT)*2) //16 bits
-//#define NUM_INPUT_FRAMES (INPUT_FILE_SIZE/ETH_NBYTES)
 #define OUTPUT_FILE_SIZE (IMAGE_INPUT) //8 bits
-//#define NUM_OUTPUT_FRAMES (OUTPUT_FILE_SIZE/ETH_NBYTES)
 
 //define DDR mapping
 #define ix_BASE_ADDRESS (DDR_MEM + (1 << (FIRM_ADDR_W))) //after main mem
@@ -104,12 +101,6 @@ uint8_t box_IDs[MAX_NUM_BOXES];
 #else
   #define DATA_BASE_ADDRESS (RESIZED_IMAGE_BASE_ADDRESS + 2* NETWORK_INPUT_AUX)
 #endif
-
-//ETHERNET variables
-//int rcv_timeout = 5000;
-//char data_to_send[ETH_NBYTES];
-//char data_rcv[ETH_NBYTES+18];
-//unsigned int bytes_to_receive, bytes_to_send, count_bytes;
 
 //TIMER variables
 unsigned int start, end;
@@ -175,44 +166,6 @@ void reset_DDR() {
   end = timer_time_us();
   printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
-
-//receive weigths and resized padded image
-/*void rcv_data() {
-
-  //Local variables
-  int i, j;
-  count_bytes = 0;
-  char * data_p = (char *) WEIGHTS_BASE_ADDRESS;
-  printf("\nReady to receive input image and weights...\n");
-
-  //Loop to receive intermediate data frames
-  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
-
-     //wait to receive frame
-     while(eth_rcv_frame(data_rcv, ETH_NBYTES, rcv_timeout) !=0);
-
-     //start timer
-     if(j == 0) start = timer_time_us();
-
-     //check if it is last packet (has less data that full payload size)
-     if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
-     else bytes_to_receive = ETH_NBYTES;
-
-     //save in DDR
-     for(i = 0; i < bytes_to_receive; i++) {
-       data_p[j*ETH_NBYTES + i] = data_rcv[14+i];
-       data_to_send[i] = data_p[j*ETH_NBYTES + i];
-     }
-
-     //send data back as ack
-     eth_send_frame(data_to_send, ETH_NBYTES);
-
-     //update byte counter
-     count_bytes += ETH_NBYTES;
-  }
-  end = timer_time_us();
-  printf("Image and weights received in %d ms\n", (end-start)/1000);
-}*/
 
 //fill grey CNN input image (except padding)
 void fill_grey() {
@@ -1558,41 +1511,6 @@ void print_results() {
   printf("\n");
 }
 
-//send results back
-/*void send_data() {
-
-  //Loop to send data
-  int i, j;
-  count_bytes = 0;
-  //char * fp_data_char = (char *) fp_image;
-  char * fp_data_char = (char *) WEIGHTS_BASE_ADDRESS;
-  for(j = 0; j < NUM_INPUT_FRAMES+1; j++) {
-
-    //start timer
-    if(j == 0) start = timer_time_us();
-
-     //check if it is last packet (has less data that full payload size)
-     if(j == NUM_INPUT_FRAMES) bytes_to_send = INPUT_FILE_SIZE - count_bytes;
-     else bytes_to_send = ETH_NBYTES;
-
-     //prepare variable to be sent
-     for(i = 0; i < bytes_to_send; i++) data_to_send[i] = fp_data_char[j*ETH_NBYTES*2 + i*2];
-
-     //send frame
-     eth_send_frame(data_to_send, ETH_NBYTES);
-
-     //wait to receive frame as ack
-     if(j != NUM_INPUT_FRAMES) while(eth_rcv_frame(data_rcv, ETH_NBYTES, rcv_timeout) !=0);
-
-     //update byte counter
-     count_bytes += ETH_NBYTES;
-  }
-
-  //measure transference time
-  end = timer_time_us();
-  printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
-}*/
-
 void run() {
 
   //send init message
@@ -1601,7 +1519,7 @@ void run() {
 #ifndef SIM
   //init ETHERNET
   eth_init(ETHERNET_BASE);
-  //eth_set_rx_payload_size(ETH_NBYTES);
+  eth_set_rx_payload_size(ETH_NBYTES);
 #endif
 
   //init VERSAT
