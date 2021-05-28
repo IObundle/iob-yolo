@@ -13,12 +13,12 @@ if len(sys.argv) < 4:
 interface = sys.argv[1]
 src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
-eth_type = "\x08\x00"                       # ethernet frame type
-ETH_P_ALL = 0x0800  
+eth_type = "\x60\x00"                       # ethernet frame type
+ETH_P_ALL = 0x6000
 
 #Frame parameters
 eth_nbytes = 1024-18
-    
+
 #Open socket and bind
 s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
 s.bind((interface, 0))
@@ -45,12 +45,9 @@ count_errors = 0
 for j in range(num_frames_input):
 
     # check if it is last packet (not enough for full payload)
-    if j == num_frames_input-1:
-        bytes_to_send = input_file_size - count_bytes
-        padding = '\x00' * (eth_nbytes-bytes_to_send)
-    else:
-        bytes_to_send = eth_nbytes
-        padding = ''
+    if j == num_frames_input-1: bytes_to_send = input_file_size - count_bytes
+    else: bytes_to_send = eth_nbytes
+    padding = '\x00' * (eth_nbytes-bytes_to_send)
 
     #form frame
     payload = f_input.read(bytes_to_send)
