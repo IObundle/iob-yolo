@@ -1511,6 +1511,22 @@ void print_results() {
   printf("\n");
 }
 
+//**
+void dirty_DDR(char *ddr_ptr){
+   unsigned int i;
+
+   for(i = 0; i < 2**30; i++) {
+     if (i%2) {
+       ddr_ptr[i] = 0x55;
+     } else {
+       ddr_ptr[i] = 0xAA;
+     }
+   }
+
+   return;
+}
+//**
+
 void run() {
 
   //send init message
@@ -1544,8 +1560,9 @@ void run() {
 
   //pre-initialize DDR
 #ifndef SIM
+  printf("ddr pointer = %x\n", DDR_MEM);
+  dirty_DDR((char *)DDR_MEM); //**
   //reset_DDR();
-  //rcv_data();
   printf("\nReady to receive input image and weights...\n");
   start = timer_time_us();
   eth_rcv_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
@@ -1866,13 +1883,11 @@ void run() {
  #ifndef TIME_RUN
   start = timer_time_us();
  #endif
-  //send_data();
-  //eth_rcv_file((char *)fp_image, OUTPUT_FILE_SIZE);
   /*char *fp_data_char = (char *)fp_image;
   int i;
   for(i = 1; i < (OUTPUT_FILE_SIZE<<1); i++) fp_data_char[i] = fp_data_char[i*2];
   eth_send_file((char *)fp_image, OUTPUT_FILE_SIZE);*/
-  eth_send_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
+  eth_send_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE); //**
  #ifndef TIME_RUN
   end = timer_time_us();
   printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);

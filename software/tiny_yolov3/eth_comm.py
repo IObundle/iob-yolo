@@ -108,7 +108,7 @@ for j in range(num_frames_input):
         padding = ''
 
     #Accumulate rcv bytes
-    count_bytes += bytes_to_send
+    count_bytes += bytes_to_receive
     
     #form frame
     payload = f_output.read(bytes_to_receive)
