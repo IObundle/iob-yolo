@@ -1071,6 +1071,11 @@ int16_t exp_fnc(int16_t val) {
 // create boxes
 void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
+  if (nboxes == (MAX_NUM_BOXES-1)) {
+    printf("create_boxes: warning, maximum number of boxes achieved!\n");
+    return;
+  }
+
   //local variable
   int i, j, k, m, n, n_start, n_end;
   int16_t val_16, obj_score;
@@ -1130,6 +1135,10 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
           //Update number of candidate boxes
           nboxes++;
+          if (nboxes == (MAX_NUM_BOXES-1)) {
+            printf("create_boxes: warning, maximum number of boxes achieved!\n");
+            return;
+          }
         }
       }
     }
@@ -1515,7 +1524,7 @@ void print_results() {
 void dirty_DDR(char *ddr_ptr){
    unsigned int i;
 
-   for(i = 0; i < 2**30; i++) {
+   for(i = 0; i < (1<<30); i++) {
      if (i%2) {
        ddr_ptr[i] = 0x55;
      } else {
@@ -1560,15 +1569,19 @@ void run() {
 
   //pre-initialize DDR
 #ifndef SIM
-  printf("ddr pointer = %x\n", DDR_MEM);
-  dirty_DDR((char *)DDR_MEM); //**
-  //reset_DDR();
+  //printf("ddr pointer = %x\n", DDR_MEM); //**
+  //printf("Dirtying DDR...\n"); //**
+  //start = timer_time_us(); //**
+  //dirty_DDR((char *)DDR_MEM); //**
+  //end = timer_time_us(); //**
+  //printf("Done in %d s\n\n", (end-start)/1000000); //**
+  reset_DDR();
   printf("\nReady to receive input image and weights...\n");
   start = timer_time_us();
   eth_rcv_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
   end = timer_time_us();
   printf("Image and weights received in %d ms\n", (end-start)/1000);
-  //fill_grey();
+  fill_grey();
 #endif
 
 /*  //initialize ix, iy, dx and dy arrays
@@ -1881,11 +1894,12 @@ void run() {
 
 #ifndef SIM
  #ifndef TIME_RUN
+  printf("\nTransfering the output layer...\n");
   start = timer_time_us();
  #endif
   /*char *fp_data_char = (char *)fp_image;
   int i;
-  for(i = 1; i < (OUTPUT_FILE_SIZE<<1); i++) fp_data_char[i] = fp_data_char[i*2];
+  for(i = 1; i < OUTPUT_FILE_SIZE; i++) fp_data_char[i] = fp_data_char[i*2];
   eth_send_file((char *)fp_image, OUTPUT_FILE_SIZE);*/
   eth_send_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE); //**
  #ifndef TIME_RUN
