@@ -1520,81 +1520,6 @@ void print_results() {
   printf("\n");
 }
 
-//**
-/*int16_t* test; // input vector
-int test_lines = 10; // 10 lines of 256bits
-
-int16_t* aux_vec; //[16] = {0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1}; // 1's
-int16_t* destination; //output location
-
-void debug_versat_kernel(int16_t* aux_vector, int input_lines, int16_t* input_vector, int16_t* output_vector){
-  int l;
-
-  // VERSAT CONFIGURATIONS
-
-  // yread ext: read 1 rgb line for the j class
-  versat.yread.setExtAddr((int) (aux_vector)); //16x2Bytes to jump a 32Byte line
-  versat.yread.setExtIter(1);
-  versat.yread.setExtPer(1); // only one MIG_BUS_W transfer
-  versat.yread.setExtIncr(16); // does this really matter?
-
-  // yread int: send first line to xyolo
-  versat.yread.setIntIter(input_lines/nYOLOmacs);
-  versat.yread.setIntPer(2);
-
-  // ywrite read ext: read label line
-  versat.ywrite.read.setPingPong(1);
-  versat.ywrite.read.setExtIter(1);
-  versat.ywrite.read.setExtPer((input_lines+15)/16); // ceil(x/y) = (x+y-1)/y
-  versat.ywrite.read.setExtIncr(16);
-  versat.dma.ywrite_read_setLen((input_lines+15)/16-1); //ceil(x/y)-1
-
-  // ywrite read int: send 1 line every 2 cycles
-  versat.ywrite.read.setIntIter(input_lines/nYOLOmacs);
-  versat.ywrite.read.setIntPer(2);
-  versat.ywrite.read.setIntShift(1);
-
-  // xyolo: multiply and bypass adder
-  versat.ywrite.yolo.setIter(input_lines/nYOLOmacs);
-  versat.ywrite.yolo.setPer(2);
-  versat.ywrite.yolo.setShift(8);
-  versat.ywrite.yolo.setBypassAdder(1);
-
-  // ywrite int: write results from xyolo
-  versat.ywrite.write.setIntDuty(2*(nYOLOvect/LAYER_1_C));
-  versat.ywrite.write.setIntDelay(XYOLO_READ_LAT + XYOLO_WRITE_LAT -4 - 2);
-  versat.ywrite.write.setIntIter(input_lines/nYOLOmacs);
-  versat.ywrite.write.setIntPer(2*(nYOLOvect/LAYER_1_C));
-  versat.ywrite.write.setIntShift(1);
-
-  // ywrite ext: write result burst
-  versat.ywrite.write.setExtIter(1);
-  versat.ywrite.write.setExtPer((input_lines+15)/16); //ceil(x/y) = (x+y-1)/y
-  versat.ywrite.write.setExtIncr(16);
-  versat.dma.ywrite_write_setNBytesW(2*input_lines);
-
-  // each run writes a label line to fp_image
-  for(l = 0; l < 1; l++) {
-    versat.ywrite.read.setExtAddr((int) &input_vector); // start of input vector
-    versat.ywrite.write.setExtAddr((int) &output_vector); // start of output vector
-
-    //wait until done
-    while(versat.done() == 0);
-    //run configuration
-    versat.run();
-
-    //stop yread transfers
-    versat.yread.setExtIter(0);
-  }
-
-  //clear configurations
-  versat.clear();
-
-  //final runs
-  versat_end();
-}*/
-//**
-
 void run() {
 
   //send init message
@@ -1636,49 +1561,6 @@ void run() {
   printf("Image and weights received in %d ms\n", (end-start)/1000);
   fill_grey();
 #endif
-
-  //**
-  /*test = (int16_t *)(DDR_MEM);
-  aux_vec = (int16_t *)(DDR_MEM + test_lines*16*2);
-  destination = (int16_t *)(DDR_MEM + test_lines*16*2 + 16*2);
-
-  printf("\ntest[] %x %x\n", test, &test[test_lines*16-1]);
-  printf("aux_vec[] %x %x\n", aux_vec, &aux_vec[16-1]);
-  printf("destination[] %x %x\n", destination, &destination[test_lines*16-1]);
-
-  int i;
-  for (i = 0; i < 16; i++) {
-    if (i < 12) {
-      aux_vec[i] = 0;
-    } else {
-      aux_vec[i] = 1;
-    }
-  }
-  for (i = 0; i < (test_lines*16); i++) {
-    test[i] = 2*i;
-  }
-  for (i = 0; i < (test_lines*16); i++) {
-    destination[i] = 0;
-  }
-
-  printf("\ntest =\n");
-  for (i = 0; i < 5; i++) {
-    printf("%d: %d\n", i, test[i]);
-  }
-  for (i = (test_lines*16) - 5; i < (test_lines*16); i++) {
-    printf("%d: %d\n", i, test[i]);
-  }
-
-  debug_versat_kernel(aux_vec, 16*test_lines, test, destination);
-
-  printf("\ndestination =\n");
-  for (i = 0; i < 5; i++) {
-    printf("%d: %d\n", i, destination[i]);
-  }
-  for (i = (test_lines*16) - 5; i < (test_lines*16); i++) {
-    printf("%d: %d\n", i, destination[i]);
-  }*/
-  //**
 
   //initialize ix, iy, dx and dy arrays
   printf("\nPreparing resize...\n");
