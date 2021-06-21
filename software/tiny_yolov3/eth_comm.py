@@ -13,12 +13,12 @@ if len(sys.argv) < 4:
 interface = sys.argv[1]
 src_addr = bytearray.fromhex(sys.argv[2])   # sender MAC address
 dst_addr = "\x01\x60\x6e\x11\x02\x0f"       # receiver MAC address
-eth_type = "\x08\x00"                       # ethernet frame type
-ETH_P_ALL = 0x0800  
+eth_type = "\x60\x00"                       # ethernet frame type
+ETH_P_ALL = 0x6000
 
 #Frame parameters
 eth_nbytes = 1024-18
-    
+
 #Open socket and bind
 s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))
 s.bind((interface, 0))
@@ -45,12 +45,9 @@ count_errors = 0
 for j in range(num_frames_input):
 
     # check if it is last packet (not enough for full payload)
-    if j == num_frames_input-1:
-        bytes_to_send = input_file_size - count_bytes
-        padding = '\x00' * (eth_nbytes-bytes_to_send)
-    else:
-        bytes_to_send = eth_nbytes
-        padding = ''
+    if j == num_frames_input-1: bytes_to_send = input_file_size - count_bytes
+    else: bytes_to_send = eth_nbytes
+    padding = '\x00' * (eth_nbytes-bytes_to_send)
 
     #form frame
     payload = f_input.read(bytes_to_send)
@@ -76,17 +73,17 @@ print("input file transmitted with %d errors..." %(count_errors))
 #Open output image files
 print("\nStarting reception of result...")
 output_filename = '../tiny_yolov3_out.bin'
-f_output = open(input_filename, "rb")
+f_output = open(output_filename, "rb")
 
 #Open write detections file
 output_image_filename = sys.argv[3]+'/detections.bin'
 f_output_image =  open(output_image_filename, "wb")
-#image_w = struct.unpack('i', f_output.read(4))[0]
-#image_h = struct.unpack('i', f_output.read(4))[0]
-#image_c = struct.unpack('i', f_output.read(4))[0]
-#f_output_image.write(struct.pack('i', image_w))
-#f_output_image.write(struct.pack('i', image_h))
-#f_output_image.write(struct.pack('i', image_c))
+image_w = struct.unpack('i', f_output.read(4))[0]
+image_h = struct.unpack('i', f_output.read(4))[0]
+image_c = struct.unpack('i', f_output.read(4))[0]
+f_output_image.write(struct.pack('i', image_w))
+f_output_image.write(struct.pack('i', image_h))
+f_output_image.write(struct.pack('i', image_c))
 
 #Reset counters
 count_errors = 0
@@ -96,22 +93,19 @@ count_bytes = 0
 output_file_size = getsize(output_filename)
 num_frames_output = output_file_size/eth_nbytes
 if(output_file_size % eth_nbytes): num_frames_output+=1
-print("output_file_size: %d" % input_file_size)     
-print("num_frames_output: %d" % num_frames_input)
+print("output_file_size: %d" % output_file_size)
+print("num_frames_output: %d" % num_frames_output)
 
 #Loop to receive one yolo layer output
-for j in range(num_frames_input):
+for j in range(num_frames_output):
 
     #Check if it is last packet (not enough for full payload)
-    if j == num_frames_input-1:
-        bytes_to_receive = input_file_size - count_bytes
-        padding = '\x00' * (eth_nbytes-bytes_to_receive)
-    else:
-        bytes_to_receive = eth_nbytes
-        padding = ''
+    if j == num_frames_output-1: bytes_to_receive = output_file_size - count_bytes
+    else: bytes_to_receive = eth_nbytes
+    padding = '\x00' * (eth_nbytes-bytes_to_receive)
 
     #Accumulate rcv bytes
-    count_bytes += bytes_to_send
+    count_bytes += bytes_to_receive
     
     #form frame
     payload = f_output.read(bytes_to_receive)
@@ -124,7 +118,7 @@ for j in range(num_frames_input):
             count_errors += 1
             
     #Send data back as ack
-    if(j != num_frames_input-1):
+    if(j != num_frames_output-1):
     	s.send(dst_addr + src_addr + eth_type + payload + padding)
         
 #Close file

@@ -1071,6 +1071,11 @@ int16_t exp_fnc(int16_t val) {
 // create boxes
 void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
+  if (nboxes == (MAX_NUM_BOXES-1)) {
+    printf("create_boxes: warning, maximum number of boxes achieved!\n");
+    return;
+  }
+
   //local variable
   int i, j, k, m, n, n_start, n_end;
   int16_t val_16, obj_score;
@@ -1130,6 +1135,10 @@ void create_boxes(int w, unsigned int pos, int16_t xy_div, int first_yolo) {
 
           //Update number of candidate boxes
           nboxes++;
+          if (nboxes == (MAX_NUM_BOXES-1)) {
+            printf("create_boxes: warning, maximum number of boxes achieved!\n");
+            return;
+          }
         }
       }
     }
@@ -1544,17 +1553,16 @@ void run() {
 
   //pre-initialize DDR
 #ifndef SIM
-  //reset_DDR();
-  //rcv_data();
+  reset_DDR();
   printf("\nReady to receive input image and weights...\n");
   start = timer_time_us();
   eth_rcv_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
   end = timer_time_us();
   printf("Image and weights received in %d ms\n", (end-start)/1000);
-  //fill_grey();
+  fill_grey();
 #endif
 
-/*  //initialize ix, iy, dx and dy arrays
+  //initialize ix, iy, dx and dy arrays
   printf("\nPreparing resize...\n");
   start = timer_time_us();
   prepare_resize();
@@ -1860,19 +1868,17 @@ void run() {
   //print detected objects and corresponding probability scores
   printf("\nDetections:\n");
   print_results();
-#endif*/
+#endif
 
 #ifndef SIM
  #ifndef TIME_RUN
+  printf("\nTransfering the output layer...\n");
   start = timer_time_us();
  #endif
-  //send_data();
-  //eth_rcv_file((char *)fp_image, OUTPUT_FILE_SIZE);
-  /*char *fp_data_char = (char *)fp_image;
+  char *fp_data_char = (char *)fp_image;
   int i;
-  for(i = 1; i < (OUTPUT_FILE_SIZE<<1); i++) fp_data_char[i] = fp_data_char[i*2];
-  eth_send_file((char *)fp_image, OUTPUT_FILE_SIZE);*/
-  eth_send_file((char *)WEIGHTS_BASE_ADDRESS, INPUT_FILE_SIZE);
+  for(i = 1; i < OUTPUT_FILE_SIZE; i++) fp_data_char[i] = fp_data_char[i*2];
+  eth_send_file((char *)fp_image, OUTPUT_FILE_SIZE);
  #ifndef TIME_RUN
   end = timer_time_us();
   printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
