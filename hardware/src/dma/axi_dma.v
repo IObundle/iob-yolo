@@ -221,7 +221,7 @@ module axi_dma #(
    //Concatenate vread databuses to merge master interface
    genvar			  l;
    generate
-      for(l = 0; l < N_IFACES_R; l++) begin : read_merge
+      for(l = 0; l < N_IFACES_R; l=l+1) begin : read_merge
          assign read_m_req[`valid_MIG_BUS(l)] = databus_valid[N_IFACES_R-l-1 -: 1];
          assign read_m_req[`address_MIG_BUS(l, `DDR_ADDR_W)] = databus_addr[N_IFACES_R*`IO_ADDR_W-l*`IO_ADDR_W-1 -: `IO_ADDR_W];
          assign read_m_req[`wdata_MIG_BUS(l)] = databus_wdata[N_IFACES_R*`MIG_BUS_W-l*`MIG_BUS_W-1 -: `MIG_BUS_W];

@@ -28,8 +28,8 @@ pcsim: $(HDR) $(SRC)
 	./pcsim
 
 versat:
-	python $(VERSAT_PYTHON_DIR)/mkvhdr.py . .
-	python $(VERSAT_PYTHON_DIR)/mkhdr.py . $(HW_DIR)/include/new_versat $(HW_DIR)/include/dma .
+	python3 $(VERSAT_PYTHON_DIR)/mkvhdr.py . .
+	python3 $(VERSAT_PYTHON_DIR)/mkhdr.py . $(HW_DIR)/include/new_versat $(HW_DIR)/include/dma .
 
 clean:
 	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim *.vh versat.h
