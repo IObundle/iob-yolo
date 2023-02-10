@@ -42,8 +42,8 @@ pcsim: $(HDR) $(SRC)
 	./$@
 
 versat:
-	@python $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py ../$(TEST) .
-	@python $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(VERSAT_CNN_INC_DIR)/new_versat $(VERSAT_CNN_INC_DIR)/dma .
+	@python3 $(VERSAT_CNN_PYTHON_DIR)/mkvhdr.py ../$(TEST) .
+	@python3 $(VERSAT_CNN_PYTHON_DIR)/mkhdr.py . $(VERSAT_CNN_INC_DIR)/new_versat $(VERSAT_CNN_INC_DIR)/dma .
 
 #peripherals' base addresses
 periphs.h: periphs_tmp.h
