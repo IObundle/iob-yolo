@@ -26,7 +26,8 @@ endif
 TEST:=tiny_yolov3
 
 #Ethernet
-RMAC_ADDR:=00e04c690ba0 #Baba
+RMAC_ADDR:=4437e6a6893b #Arroz
+#RMAC_ADDR:=00e04c690ba0 #Baba
 #RMAC_ADDR:=309c231e624b #Pudim
 
 #Versat
@@ -57,11 +58,11 @@ ifeq ($(BOARD),)
 endif
 
 ifeq ($(BOARD),AES-KU040-DB-G)
-	COMPILE_USER=$(USER)
+	COMPILE_USER=$(KU40_USER)
 	COMPILE_SERVER=$(COMPILE_USER)@$(PUDIM)
 	COMPILE_OBJ=synth_system.bit
-	BOARD_USER=$(USER)
-	BOARD_SERVER=$(BOARD_USER)@$(BABA)
+	BOARD_USER=$(KU40_USER)
+	BOARD_SERVER=$(KU40_USER)@$(KU40_SERVER)
 else
 #default
 	BOARD=CYCLONEV-GT-DK
@@ -160,7 +161,7 @@ endif
 
 DEFINE+=$(defmacro)BAUD=$(BAUD)
 ifeq ($(FREQ),)
-DEFINE+=$(defmacro)FREQ=100000000
+DEFINE+=$(defmacro)FREQ=50000000
 else
 DEFINE+=$(defmacro)FREQ=$(FREQ)
 endif

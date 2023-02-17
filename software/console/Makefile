@@ -1,7 +1,7 @@
 ROOT_DIR:=../..
 include $(ROOT_DIR)/system.mk
 
-SERIAL:=/dev/ttyUSB0
+SERIAL:=/dev/usb-uart
 
 CC:=gcc
 CFLAGS:=-g -Wall

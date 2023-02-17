@@ -23,3 +23,18 @@ Repository for the implementation of an object detection application based on th
 - **pre_cnn:** Performs input image resize before CNN. Goal: accelerate pre_cnn with new versat.
 - **pos_cnn:** Performs detection filtering and box/label display after CNN.
 - **tiny_yolov3:** Execution of full yolov3-tiny pipeline (pre-CNN, CNN and pos-CNN) in new_versat. Goal: run all pipeline in 30 fps.
+
+
+# FPGA execution
+## Python Dependencies
+- Pillow
+- numpy
+
+## Input files
+- `../tiny_yolov3_in_x4.bin`
+- `../tiny_yolov3_out.bin`
+
+## Target launch order
+- `make fpga-load` on remote machine (or ld-hw locally)
+- `make ld-sw` locally (launches console) 
+- `make ld-eth` locally in parallel with `make ld-sw` (send data and receive results)

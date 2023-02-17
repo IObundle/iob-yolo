@@ -87,7 +87,7 @@ if { $USE_DDR < 0 } {
              CONFIG.C0.DDR4_CasWriteLatency {11} \
              CONFIG.C0.DDR4_AxiDataWidth {256} \
              CONFIG.C0.DDR4_AxiAddressWidth {30} \
-             CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {100} \
+             CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {50} \
              CONFIG.C0.BANK_GROUP_WIDTH {1}] [get_ips ddr4_0]
 	
         generate_target all [get_files ./ip/ddr4_0/ddr4_0.xci]
