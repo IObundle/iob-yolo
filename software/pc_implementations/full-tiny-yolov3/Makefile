@@ -1,7 +1,7 @@
 EXEC = embedded
 CC = gcc
 COMMON = -Isrc/
-CFLAGS = -Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -O3 -pg
+CFLAGS = -Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -O3 -pg -lm
 EXECOBJ = embedded.o
 FILE = src/embedded.c
 
@@ -26,7 +26,7 @@ endif
 
 $(EXEC):
 	@ $(CC) $(COMMON) $(DEFS) $(CFLAGS) -c $(FILE)
-	@ $(CC) $(EXECOBJ) -o $@ -pg
+	@ $(CC) $(EXECOBJ) -o $@ -pg -lm
 
 clean-json:
 	@rm -rf ./map/*.json

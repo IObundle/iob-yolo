@@ -1,5 +1,5 @@
 #clear all existing files
-clear
+#clear
 make clean
 filename=dog.bin
 
@@ -15,4 +15,4 @@ make FIXED=1 INTERM_DATA=0 LINEAR_EXP=0 GEMM=0 MAX_MIN=0
 #gprof embedded gmon.out > embedded.txt
 
 #write output image
-python python/write_image.py ../output_data/$filename
+python3 python/write_image.py ../output_data/$filename

@@ -1,10 +1,11 @@
 //Libraries
-#include "embedded.h"
+#include "embedded_fix.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
 #include <float.h>
+#include <math.h>
 
 //Variables dependent on image input
 int IMG_W, IMG_H, IMG_C, IMAGE_INPUT;
@@ -1935,7 +1936,7 @@ int main(int argc, char **argv) {
 	
 	//layer1 (418x316x3 -> 416x316x16)
 	start = clock();
-	conv_layer(NTW_IN_W, NTW_IN_H, NTW_IN_C, NTW_IN_NUM_KER, NTW_IN_KER_SIZE, NTW_IN_PAD, NTW_IN_BATCH_NORM, NTW_IN_NEXT_PADD, NTW_IN_NEXT_STRIDE, NTW_IN_IGNORE_PADD, 0, NTW_IN_OFFSET, LAYER_1_SHIFT, LAYER_1_B_SHIFT);
+	conv_layer(LAYER_1_W, LAYER_1_H, LAYER_1_C, LAYER_1_NUM_KER, LAYER_1_KER_SIZE, LAYER_1_PAD, LAYER_1_BATCH_NORM, LAYER_1_NEXT_PADD, LAYER_1_NEXT_STRIDE, LAYER_1_IGNORE_PADD, 0, LAYER_1_OFFSET, LAYER_1_SHIFT, LAYER_1_B_SHIFT);
 	end = clock();
 	cpu_time_used += ((double) (end - start)) / CLOCKS_PER_SEC;
 #ifndef mAP
