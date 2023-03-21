@@ -5,6 +5,13 @@ CFLAGS = -Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC -O3 
 EXECOBJ = embedded.o
 FILE = src/embedded.c
 
+
+ifeq ($(EIGHT_BITS),1)
+	DEFS = -D EIGHT_BITS
+#	rm ../yolov3-tiny_8-bit_conv.hex
+#else
+#	rm ../yolov3-tiny_float_conv.hex	
+endif
 ifeq ($(FIXED),1)
 	DEFS = -D FIXED
 endif
@@ -25,12 +32,15 @@ ifeq ($(MAX_MIN),1)
 endif
 
 $(EXEC):
-	@ $(CC) $(COMMON) $(DEFS) $(CFLAGS) -c $(FILE)
-	@ $(CC) $(EXECOBJ) -o $@ -pg -lm
+	@ $(CC) -g $(COMMON) $(DEFS) $(CFLAGS) -c $(FILE)
+	@ $(CC) -g $(EXECOBJ) -o $@ -pg -lm
 
 clean-json:
 	@rm -rf ./map/*.json
 	
+clean-hex-out:
+	rm ../yolov3-tiny_*_conv.hex
+
 clean:
 	@rm -rf $(EXEC) $(EXECOBJ)
-	@rm -rf *.txt *.out *.hex
+	@rm -rf *.out *.hex *.txt

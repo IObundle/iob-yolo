@@ -355,25 +355,36 @@
 
 //Memory space
 static int16_t ix[YOLO_INPUT*2], iy[YOLO_INPUT]; 
+#ifdef EIGHT_BITS
+	static int8_t weights[TOTAL_WEIGTHS];
+	static int8_t data[TOTAL_DATA];
+	static uint8_t label[81 + MAX_LABEL_SIZE*81];
+	static int8_t dx[YOLO_INPUT*2], dy[YOLO_INPUT*2];
+	#ifdef GEMM
+		static int16_t gemm_in[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE];
+		static int32_t gemm_out[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER];
+	#endif
+#else
 #ifdef FIXED
 	static int16_t weights[TOTAL_WEIGTHS];
 	static int16_t data[TOTAL_DATA];
 	static uint8_t label[81 + MAX_LABEL_SIZE*81];
 	static int16_t dx[YOLO_INPUT*2], dy[YOLO_INPUT*2];
 	#ifdef GEMM
-		static int16_t gemm_in[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE];
-		static int32_t gemm_out[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER];
+		static int16_t gemm_in[NTW_IN_W*NTW_IN_H*LAYER_1_NUM_KER*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE];
+		static int32_t gemm_out[NTW_IN_W*NTW_IN_H*LAYER_1_NUM_KER];
 	#endif
-#else
+#else //relative to #ifdef FIXED
 	static float weights[TOTAL_WEIGTHS];
 	static float data[TOTAL_DATA];
 	static float label[81 + MAX_LABEL_SIZE*81];
 	static float dx[YOLO_INPUT*2], dy[YOLO_INPUT*2];
 	#ifdef GEMM
-		static float gemm_in[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER*NTW_IN_KER_SIZE*NTW_IN_KER_SIZE];
-		static float gemm_out[NTW_IN_W*NTW_IN_H*NTW_IN_NUM_KER];
+		static float gemm_in[NTW_IN_W*NTW_IN_H*LAYER_1_NUM_KER*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE];
+		static float gemm_out[NTW_IN_W*NTW_IN_H*LAYER_1_NUM_KER];
 	#endif
-#endif
+#endif // relative to #ifdef FIXED
+#endif // relative to #ifndef EIGHT_BITS
 
 //Base addresses
 #define WEIGTHS_BASE_ADDRESS weights
