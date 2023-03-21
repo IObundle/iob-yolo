@@ -453,8 +453,6 @@ FILE *results;
 		unsigned int output_pos2, output_pos3, output_pos4;
 		int8_t op1, op2;
 		int16_t acc, acc2, acc3, acc4, mul;
-		int16_t bias_post = bias_pos[0]<<b_shift;
-		printf("bias: %d\tb_shift: %d\tpost-shift bias: %d\n", bias_pos[0], b_shift, bias_post);
 		//perform convolution
 		for(i = 0; i < num_ker; i+=4) {								//Number of kernels
 			for(j = 0; j < h; j++) {   								//Output map size
@@ -474,6 +472,10 @@ FILE *results;
 					acc2 = ((int16_t)bias_pos[i+1]) << b_shift;
 					acc3 = ((int16_t)bias_pos[i+2]) << b_shift;
 					acc4 = ((int16_t)bias_pos[i+3]) << b_shift;
+					if(acc*bias_pos[i]<0 || acc2*bias_pos[i+1]<0 || acc3*bias_pos[i+2]<0 || acc4*bias_pos[i+3]<0){
+						printf("ERROR: Bias overflow\n%d read as %d\n%d read as %d\n%d read as %d\n%d read as %d\n", bias_pos[i], acc, bias_pos[i+1], acc2, bias_pos[i+2], acc3, bias_pos[i+3], acc4);
+						exit(1);
+					}
 					for(m = 0; m < ker_size; m++) {				//Kernel size
 						for(n = 0; n < ker_size; n++) {
 							for(l = 0; l < c; l++) { 			//Number of channels
@@ -516,10 +518,30 @@ FILE *results;
 					
 										
 					//store results
-					out_d_pos[output_pos] = (int8_t) (acc >> shift);
-					out_d_pos[output_pos2] = (int8_t) (acc2 >> shift);
-					out_d_pos[output_pos3] = (int8_t) (acc3 >> shift);
-					out_d_pos[output_pos4] = (int8_t) (acc4 >> shift);
+					if(acc>>shift < 0x7F)
+						out_d_pos[output_pos] = (int8_t) (acc >> shift);
+					else{
+						printf("Saturated pixel: %x\n", acc>>shift);
+						out_d_pos[output_pos] = (int8_t) 0x7F;
+					}
+					if(acc2>>shift < 0x7F)
+						out_d_pos[output_pos2] = (int8_t) (acc2 >> shift);
+					else{
+						printf("Saturated pixel: %x\n", acc2>>shift);
+						out_d_pos[output_pos2] = (int8_t) 0x7F;
+					}
+					if(acc3>>shift < 0x7F)
+						out_d_pos[output_pos3] = (int8_t) (acc3 >> shift);
+					else{
+						printf("Saturated pixel: %x\n", acc3>>shift);
+						out_d_pos[output_pos3] = (int8_t) 0x7F;
+					}
+					if(acc4>>shift < 0x7F)
+						out_d_pos[output_pos4] = (int8_t) (acc4 >> shift);
+					else{
+						printf("Saturated pixel: %x\n", acc4>>shift);
+						out_d_pos[output_pos4] = (int8_t) 0x7F;
+					}
 				//	printf("shift: %d\taccs: %d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);
 					
 				//	printf("outputs: %d\t%d\t%d\t%d\n", out_d_pos[output_pos], out_d_pos[output_pos2], out_d_pos[output_pos3], out_d_pos[output_pos4]);
