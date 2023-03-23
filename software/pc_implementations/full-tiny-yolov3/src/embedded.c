@@ -472,10 +472,12 @@ FILE *results;
 					acc2 = ((int16_t)bias_pos[i+1]) << b_shift;
 					acc3 = ((int16_t)bias_pos[i+2]) << b_shift;
 					acc4 = ((int16_t)bias_pos[i+3]) << b_shift;
+					/*
 					if(acc*bias_pos[i]<0 || acc2*bias_pos[i+1]<0 || acc3*bias_pos[i+2]<0 || acc4*bias_pos[i+3]<0){
 						printf("ERROR: Bias overflow\n%d read as %d\n%d read as %d\n%d read as %d\n%d read as %d\n", bias_pos[i], acc, bias_pos[i+1], acc2, bias_pos[i+2], acc3, bias_pos[i+3], acc4);
 						exit(1);
 					}
+					*/
 					for(m = 0; m < ker_size; m++) {				//Kernel size
 						for(n = 0; n < ker_size; n++) {
 							for(l = 0; l < c; l++) { 			//Number of channels
@@ -516,32 +518,64 @@ FILE *results;
 						if(i != 0 && i != 84) acc4 = sigmoid(acc4);
 					}
 					
-										
+					printf("shift=%d\n%d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);				
+					
 					//store results
-					if(acc>>shift < 0x7F)
-						out_d_pos[output_pos] = (int8_t) (acc >> shift);
-					else{
-						printf("Saturated pixel: %x\n", acc>>shift);
+					/*
+					if(acc>>shift > 0x7F){
 						out_d_pos[output_pos] = (int8_t) 0x7F;
+						printf("Saturated pixel: %x to %x\n", acc>>shift, out_d_pos[output_pos]);
 					}
-					if(acc2>>shift < 0x7F)
-						out_d_pos[output_pos2] = (int8_t) (acc2 >> shift);
+					else if(acc>>shift < (int8_t) 0x80){
+						out_d_pos[output_pos] = (int8_t) 0x80;
+						printf("Saturated pixel: %x to %x\n", acc>>shift, out_d_pos[output_pos]);
+					}
 					else{
-						printf("Saturated pixel: %x\n", acc2>>shift);
+						out_d_pos[output_pos] = (int8_t) acc>>shift;
+					}
+
+					if(acc2>>shift > 0x7F){
 						out_d_pos[output_pos2] = (int8_t) 0x7F;
+						printf("Saturated pixel: %x to %x\n", acc2>>shift, out_d_pos[output_pos2]);
 					}
-					if(acc3>>shift < 0x7F)
-						out_d_pos[output_pos3] = (int8_t) (acc3 >> shift);
+					else if(acc2>>shift < (int8_t) 0x80){
+						out_d_pos[output_pos2] = (int8_t) 0x80;
+						printf("Saturated pixel: %x to %x\n", acc2>>shift, out_d_pos[output_pos2]);
+					}
 					else{
-						printf("Saturated pixel: %x\n", acc3>>shift);
+						out_d_pos[output_pos2] = (int8_t) acc2>>shift;
+					}
+
+					if(acc3>>shift > 0x7F){
 						out_d_pos[output_pos3] = (int8_t) 0x7F;
+						printf("Saturated pixel: %x to %x\n", acc3>>shift, out_d_pos[output_pos3]);
 					}
-					if(acc4>>shift < 0x7F)
-						out_d_pos[output_pos4] = (int8_t) (acc4 >> shift);
+					else if(acc3>>shift < (int8_t) 0x80){
+						out_d_pos[output_pos3] = (int8_t) 0x80;
+						printf("Saturated pixel: %x to %x\n", acc3>>shift, out_d_pos[output_pos3]);
+					}
 					else{
-						printf("Saturated pixel: %x\n", acc4>>shift);
-						out_d_pos[output_pos4] = (int8_t) 0x7F;
+						out_d_pos[output_pos3] = (int8_t) acc3>>shift;
 					}
+
+					if(acc4>>shift > 0x7F){
+						out_d_pos[output_pos4] = (int8_t) 0x7F;
+						printf("Saturated pixel: %x to %x\n", acc4>>shift, out_d_pos[output_pos4]);
+					}
+					else if(acc4>>shift < (int8_t) 0x80){
+						out_d_pos[output_pos4] = (int8_t) 0x80;
+						printf("Saturated pixel: %x to %x\n", acc4>>shift, out_d_pos[output_pos4]);
+					}
+					else{
+						out_d_pos[output_pos4] = (int8_t) acc4>>shift;
+					}
+					*/
+
+					out_d_pos[output_pos] = (int8_t) acc>>shift;
+					out_d_pos[output_pos2] = (int8_t) acc2>>shift;
+					out_d_pos[output_pos3] = (int8_t) acc3>>shift;
+					out_d_pos[output_pos4] = (int8_t) acc4>>shift;
+
 				//	printf("shift: %d\taccs: %d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);
 					
 				//	printf("outputs: %d\t%d\t%d\t%d\n", out_d_pos[output_pos], out_d_pos[output_pos2], out_d_pos[output_pos3], out_d_pos[output_pos4]);
@@ -557,10 +591,11 @@ FILE *results;
 					for (int item=0; item<4; item++){
 						do{
 							res = fwrite((int8_t*) (out_d_pos)+(output_positions[item]), sizeof(int8_t), 1, results);
-							//printf("%x\n", *((out_d_pos)+(output_positions[item])));
+							printf("%d\t", *((out_d_pos)+(output_positions[item])));
 						}while(!res);
 						item_count++;
 					}
+					printf("\n");
 					//exit(0);
 					
 				}
