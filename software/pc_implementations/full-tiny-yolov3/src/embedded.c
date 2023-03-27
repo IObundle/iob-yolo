@@ -7,6 +7,8 @@
 #include <float.h>
 #include <math.h>
 
+int print_vals;
+
 //Variables dependent on image input
 int IMG_W, IMG_H, IMG_C, IMAGE_INPUT;
 int EXTRA_W, EXTRA_H, NEW_W, NEW_H, NETWORK_INPUT_AUX;
@@ -389,13 +391,15 @@ FILE *results;
 		unsigned int pos_delta = (w+2*pad)*new_h*c;
 		int8_t * w_pos;
 		w_pos = (int8_t *) fp_weights + weight_pos;
-		printf("weight_pos: %d\n",  weight_pos);
 		int8_t * bias_pos = (int8_t *) fp_weights + weight_pos + num_ker*ker_size*ker_size*c;
 		int8_t * in_d_pos = (int8_t *) fp_data + data_pos;
-		printf("data_pos: %d\n", data_pos);
 		int8_t * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (int8_t *) fp_data + new_output_pos; else out_d_pos = (int8_t *) in_d_pos + pos_delta;
 		
+		printf("Bias and shift:\n");
+		for(int i=0;i<num_ker;i++)
+			printf("\t%d -> %d\n", bias_pos[i], ((int16_t) bias_pos[i]<<b_shift));
+		printf("\n");
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;
@@ -472,6 +476,7 @@ FILE *results;
 					acc2 = ((int16_t)bias_pos[i+1]) << b_shift;
 					acc3 = ((int16_t)bias_pos[i+2]) << b_shift;
 					acc4 = ((int16_t)bias_pos[i+3]) << b_shift;
+					if(print_vals) printf("b_shift: %d\tbias: %x\t%x\t%x\t%x\n", b_shift, acc, acc2, acc3, acc4);
 					/*
 					if(acc*bias_pos[i]<0 || acc2*bias_pos[i+1]<0 || acc3*bias_pos[i+2]<0 || acc4*bias_pos[i+3]<0){
 						printf("ERROR: Bias overflow\n%d read as %d\n%d read as %d\n%d read as %d\n%d read as %d\n", bias_pos[i], acc, bias_pos[i+1], acc2, bias_pos[i+2], acc3, bias_pos[i+3], acc4);
@@ -482,19 +487,24 @@ FILE *results;
 						for(n = 0; n < ker_size; n++) {
 							for(l = 0; l < c; l++) { 			//Number of channels
 								op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n];
+								if(print_vals) printf("\nPixel = %d\nweights:\n", op1);
 								op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								//printf("pixel: %x\tweights: %x\t", op1, op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
 								acc += mul;
+								if(print_vals) printf("%d\t", op2);
 								op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
 								acc2 += mul;	
 								op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
 								acc3 += mul;
 								op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\n", op2);
 								//printf("%x\n", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
 								acc4 += mul;								
@@ -518,7 +528,7 @@ FILE *results;
 						if(i != 0 && i != 84) acc4 = sigmoid(acc4);
 					}
 					
-					printf("shift=%d\n%d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);				
+					if(print_vals) printf("shift=%d\n%d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);				
 					
 					//store results
 					
@@ -569,13 +579,14 @@ FILE *results;
 					else{
 						out_d_pos[output_pos4] = (int8_t) (acc4>>shift);
 					}
+					
 
-					/*
+					
 					out_d_pos[output_pos] = (int8_t) (acc>>shift);
 					out_d_pos[output_pos2] = (int8_t) (acc2>>shift);
 					out_d_pos[output_pos3] = (int8_t) (acc3>>shift);
 					out_d_pos[output_pos4] = (int8_t) (acc4>>shift);
-					*/
+					
 
 				//	printf("shift: %d\taccs: %d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);
 					
@@ -592,12 +603,11 @@ FILE *results;
 					for (int item=0; item<4; item++){
 						do{
 							res = fwrite((int8_t*) (out_d_pos)+(output_positions[item]), sizeof(int8_t), 1, results);
-							printf("%d\t", *((out_d_pos)+(output_positions[item])));
+							if(print_vals) printf("%d\t", *((out_d_pos)+(output_positions[item])));
 						}while(!res);
 						item_count++;
 					}
-					printf("\n");
-					//exit(0);
+					if(print_vals){printf("\n");exit(0);}
 					
 				}
 			}
@@ -1343,7 +1353,6 @@ FILE *results;
 					mul = (int32_t)((int32_t)dx[2*c]*(int32_t)(fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c]])); //Q2.14 * Q8.8 = Q10.22
 					mul += (int32_t)((int32_t)dx[2*c+1]*(int32_t)(fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c+1]])); //Q10.22
 					fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-					printf("%d\n", (int16_t) (mul>>7));
 				}
 			}
 		}
@@ -1363,7 +1372,6 @@ FILE *results;
 					mul = (int32_t)((int32_t)dy[2*r]*(int32_t)fp_data[k*NEW_W*IMG_H + iy[r]*NEW_W + c]); //Q2.14 * Q1.15 = Q3.29
 					mul += (int32_t)((int32_t)dy[2*r+1]*(int32_t)fp_data[k*NEW_W*IMG_H + (iy[r]+1)*NEW_W + c]); //Q3.29
 					fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = (int16_t)(mul >> 14); //Q3.29 to Q1.15
-					printf("%d\n", (int16_t)(mul >> 14));
 				}
 			}
 		}
@@ -1436,10 +1444,15 @@ FILE *results;
 		int16_t * w_pos;
 		w_pos = (int16_t *) fp_weights + weight_pos;
 		int16_t * bias_pos = (int16_t *) fp_weights + weight_pos + num_ker*ker_size*ker_size*c;
+		if(print_vals) printf("\n");
 		int16_t * in_d_pos = (int16_t *) fp_data + data_pos;
 		int16_t * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (int16_t *) fp_data + new_output_pos; else out_d_pos = (int16_t *) in_d_pos + pos_delta;
 		
+		printf("Bias and shift:\n");
+		for(int i=0;i<num_ker;i++)
+			printf("\t%d -> %d\n", bias_pos[i], (bias_pos[i]<<b_shift));
+		printf("\n");
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;
@@ -1517,22 +1530,27 @@ FILE *results;
 					acc2 = bias_pos[i+1] << b_shift;
 					acc3 = bias_pos[i+2] << b_shift;
 					acc4 = bias_pos[i+3] << b_shift;
-					printf("b_shift: %d\tbias: %x\t%x\t%x\t%x\n", b_shift, acc, acc2, acc3, acc4);
+					if(print_vals) printf("b_shift: %d\tbias: %x\t%x\t%x\t%x\n", b_shift, acc, acc2, acc3, acc4);
 										
 					for(m = 0; m < ker_size; m++) {				//Kernel size
 						for(n = 0; n < ker_size; n++) {
 							for(l = 0; l < c; l++) { 			//Number of channels
 								op1 = in_d_pos[(j+ignorePadding)*(w+2*pad) + (k+ignorePadding) + l*(w+2*pad)*new_h + m*(w+2*pad) + n];
+								if(print_vals) printf("\nPixel: %d\nweights:\n", op1);
 								op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\t", op2);
 								mul = (int32_t)((int32_t)op1*(int32_t)op2);
 								acc += mul;
 								op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\t", op2);
 								mul = (int32_t)((int32_t)op1*(int32_t)op2);
 								acc2 += mul;	
 								op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\t", op2);
 								mul = (int32_t)((int32_t)op1*(int32_t)op2);
 								acc3 += mul;
 								op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
+								if(print_vals) printf("%d\n", op2);
 								mul = (int32_t)((int32_t)op1*(int32_t)op2);
 								acc4 += mul;								
 							}
@@ -1569,8 +1587,10 @@ FILE *results;
 								res = fwrite((uint8_t*)(&out_d_pos[output_ptr[item]])+_byte, sizeof(uint8_t), 1, results);
 							}while(!res);
 						}
+						if(print_vals) printf("%d\n", out_d_pos[output_ptr[item]]);
 						item_count++;
 					}
+					if(print_vals) exit(0);
 				}
 			}
 		}
@@ -2358,7 +2378,6 @@ FILE *results;
 	//perform convolutional layer
 	void conv_layer(int w, int h, int c, int num_ker, int ker_size, int pad, int batch_norm, int nextPadding, int nextStride, int ignorePadding, unsigned int new_output_pos, unsigned int offset, int shift, int b_shift) {
 
-		printf("output_pos: %d\n", new_output_pos);
 		item_count=0;
 		
 		//locate weight and data pointers
@@ -2376,13 +2395,14 @@ FILE *results;
 		unsigned int pos_delta = (w+2*pad)*new_h*c;
 		float * w_pos;
 		w_pos = (float *) fp_weights + weight_pos;
-		printf("weight_pos: %d\n",  weight_pos);
 		float * bias_pos = (float *) fp_weights + weight_pos + num_ker*ker_size*ker_size*c;
 		float * in_d_pos = (float *) fp_data + data_pos;
-		printf("data_pos: %d\n", data_pos);
 		float * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (float *) fp_data + new_output_pos; else out_d_pos = (float *) in_d_pos + pos_delta;
-		
+	
+		printf("Bias:\n");
+		for(int i=0;i<num_ker;i++)
+			printf("\t%.4f\n", bias_pos[i]);
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;
@@ -3022,9 +3042,12 @@ FILE *results;
 
 #endif //
 	
+
 //run tiny-yolo network
 int main(int argc, char **argv) {
-	
+
+	print_vals=0;
+
 	//open output file
 	if((results = fopen(conv_out_filename, "wb"))==NULL){
 		printf("Unable to open results file\n");
@@ -3097,6 +3120,7 @@ int main(int argc, char **argv) {
 #ifndef mAP
 	printf("Layer1 done in %f seconds\t%d values written to file\n", ((double) (end - start)) / CLOCKS_PER_SEC, item_count);
 #endif
+	exit(0);
 	
 	/*
 	//Quantization Test. Print some values
@@ -3156,6 +3180,7 @@ int main(int argc, char **argv) {
 	printf("Layer6 done in %f seconds\n", ((double) (end - start)) / CLOCKS_PER_SEC);
 #endif
 			
+	print_vals = 1;	
 	//layer7 (54x46x64 -> 52x44x128)
 	start = clock();
 	conv_layer(LAYER_7_W, LAYER_7_H, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, LAYER_7_OFFSET, LAYER_7_SHIFT, LAYER_7_B_SHIFT);
@@ -3173,7 +3198,6 @@ int main(int argc, char **argv) {
 #ifndef mAP
 	printf("Layer8 done in %f seconds\n", ((double) (end - start)) / CLOCKS_PER_SEC);
 #endif
-	
 	//layer9 (28x26x128 -> 28x28x256) -> Zero-padding
 	//Result of layer 9 goes after result of layer 20
 	start = clock();
