@@ -32,6 +32,21 @@ int item_count;
 
 #ifdef EIGHT_BITS
 
+int16_t add_and_check_overflow(int16_t a, int16_t b){
+	int16_t res = a + b;
+	int sign_a = (a>>15)&&1, sign_b = (b>>15)&&1, sign_res = (res>>15)&&1;
+	
+	if( !(sign_a^sign_b) ){ // Same sign
+		//printf("Same sign. There could be overflow\n");
+		if( sign_res ^ sign_a ){ // res "flipped"
+			printf("Overflow: sign_res=%d, sign_a=%d\n", sign_res, sign_a);
+			res = sign_a ? 0x8000 : 0x7FFF;
+		}
+	}
+	
+	return res;
+}
+
 FILE *results;
 #define conv_out_filename "../yolov3-tiny_8-bit_conv.hex"
 
@@ -146,12 +161,21 @@ FILE *results;
 		fclose(data);
 		
 		//load weigths
-		if ((data = fopen("../yolov3-tiny_batch-8bit.weights", "r+")) == NULL) {
+		if ((data = fopen("../yolov3-tiny_batch-fp28bit.weights", "r+")) == NULL) {
 			fprintf(stderr, "unable to open file yolov3-tiny_batch-8bit.weights\n");
 			exit(1);
 		}
 		fread(fp_weights, sizeof(int8_t), TOTAL_WEIGTHS, data);
 		fclose(data);
+		
+		/* Print 4th kernel of layer 1 */
+		printf("Layer 1 -- 3th kernel\n");
+		for(int i=0; i<LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C; i++)
+			printf("%d\n", fp_weights[2*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C+i]);
+		/* Print 4th kernel of layer 1 */
+		printf("Layer 1 -- 4th kernel\n");
+		for(int i=0; i<LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C; i++)
+			printf("%d\n", fp_weights[3*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C+i]);
 
 		//load labels
 		if ((data = fopen("data/classes.bin", "r+")) == NULL) {
@@ -289,9 +313,16 @@ FILE *results;
 			for(c = 0; c < NEW_W; c++) {
 				for(k = 0; k < NTW_IN_C; k++) {
 					mul = (int16_t)((int16_t)dx[2*c]*(int16_t)((uint8_t) fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c]])); //Q2.6 * Q0.8 = Q2.14
-					mul += (int16_t)((int16_t)dx[2*c+1]*(int16_t)((uint8_t) fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c+1]])); //Q2.6 * Q0.8 = Q2.14
+					mul = add_and_check_overflow(mul, (int16_t)((int16_t)dx[2*c+1]*(int16_t)((uint8_t) fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c+1]]))); //Q2.6 * Q0.8 = Q2.14
 					//fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-					fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int8_t) (mul >> 7); //Q2.14 to Q1.7
+					if((mul>>7)<(int8_t)0x7F){
+						if((mul>>7)>(int8_t)0x80)
+							fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int8_t) (mul >> 7); //Q2.14 to Q1.7
+						else
+							fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int8_t) 0x80;
+					} else {
+						fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int8_t) 0x7F;
+					}
 					//printf("%d\n", (int8_t) (mul>>7));
 					//if (mul>>7 <0) exit(1);
 				}
@@ -311,7 +342,7 @@ FILE *results;
 			for(c = 0; c < NEW_W; c++) {
 				for(k = 0; k < NTW_IN_C; k++) {
 					mul = (int16_t)((int16_t)dy[2*r]*(int16_t)fp_data[k*NEW_W*IMG_H + iy[r]*NEW_W + c]); //Q2.6 * Q1.7 = Q3.13
-					mul += (int16_t)((int16_t)dy[2*r+1]*(int16_t)fp_data[k*NEW_W*IMG_H + (iy[r]+1)*NEW_W + c]); //Q2.6 * Q1.7 = Q3.13
+					mul = add_and_check_overflow(mul, (int16_t)((int16_t)dy[2*r+1]*(int16_t)fp_data[k*NEW_W*IMG_H + (iy[r]+1)*NEW_W + c])); //Q2.6 * Q1.7 = Q3.13
 					//fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = (int16_t)(mul >> 14); //Q3.29 to Q1.15
 					fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = (int8_t)(mul >> 6); //Q3.13 to Q1.7
 					//printf("%d\n", (int8_t)(mul>>6));
@@ -491,23 +522,23 @@ FILE *results;
 								op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								//printf("pixel: %x\tweights: %x\t", op1, op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc += mul;
+								acc = add_and_check_overflow(acc, mul);
 								if(print_vals) printf("%d\t", op2);
 								op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc2 += mul;	
+								acc2 = add_and_check_overflow(acc2, mul);	
 								op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc3 += mul;
+								acc3 = add_and_check_overflow(acc3, mul);
 								op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\n", op2);
 								//printf("%x\n", op2);
 								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc4 += mul;								
+								acc4 = add_and_check_overflow(acc4, mul);								
 							}
 						}
 					}
@@ -2195,6 +2226,10 @@ FILE *results;
 		}
 		fread(fp_weights, sizeof(float), TOTAL_WEIGTHS, data);
 		fclose(data);
+		/* Print 4th kernel of layer 1 */
+		printf("Layer 1 -- 4th kernel\n");
+		for(int i=0; i<LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C; i++)
+			printf("%f\n", fp_weights[3*LAYER_1_KER_SIZE*LAYER_1_KER_SIZE*LAYER_1_C+i]);
 		
 		//load labels
 		if ((data = fopen("data/classes.bin", "r+")) == NULL) {
@@ -3093,7 +3128,6 @@ int main(int argc, char **argv) {
 #ifndef mAP
 	printf("Height reduction in %f seconds\n", ((double) (end - start)) / CLOCKS_PER_SEC);
 #endif
-	//exit(0);
 	
 	//Quantization Test. Print some values
 	printf("----------\n  Input:\n");
@@ -3120,8 +3154,6 @@ int main(int argc, char **argv) {
 #ifndef mAP
 	printf("Layer1 done in %f seconds\t%d values written to file\n", ((double) (end - start)) / CLOCKS_PER_SEC, item_count);
 #endif
-	exit(0);
-	
 	/*
 	//Quantization Test. Print some values
 	printf("----------\n  Data:\n");
@@ -3180,7 +3212,6 @@ int main(int argc, char **argv) {
 	printf("Layer6 done in %f seconds\n", ((double) (end - start)) / CLOCKS_PER_SEC);
 #endif
 			
-	print_vals = 1;	
 	//layer7 (54x46x64 -> 52x44x128)
 	start = clock();
 	conv_layer(LAYER_7_W, LAYER_7_H, LAYER_7_C, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_PAD, LAYER_7_BATCH_NORM, LAYER_7_NEXT_PADD, LAYER_7_NEXT_STRIDE, LAYER_7_IGNORE_PADD, 0, LAYER_7_OFFSET, LAYER_7_SHIFT, LAYER_7_B_SHIFT);
