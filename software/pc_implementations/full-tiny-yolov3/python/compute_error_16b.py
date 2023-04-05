@@ -14,19 +14,19 @@ filename_fp = '../yolov3-tiny_float_conv.hex'
 # f_in:      number of fractional bits in the input FM
 # f_out:     number of fractional bits in the out put FM
 
-net_conf = [{'size': 2768896, 'f_weights': 10, 'f_in': 15, 'shift': 17},
+net_conf = [{'size': 2768896, 'f_weights': 10, 'f_in': 15, 'shift': 16},
 			{'size': 1384448, 'f_weights': 15, 'f_in': 0, 'shift': 14},
 			{'size': 692224, 'f_weights': 14, 'f_in': 0, 'shift': 14},
 			{'size': 346112, 'f_weights': 15, 'f_in': 0, 'shift': 15},
 			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 15},
-			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 15},
-			{'size': 173056, 'f_weights': 14, 'f_in': 0, 'shift': 15},
-			{'size': 43264, 'f_weights': 15, 'f_in': 0, 'shift': 13},
-			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 15},
+			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 14},
+			{'size': 173056, 'f_weights': 14, 'f_in': 0, 'shift': 16},
+			{'size': 43264, 'f_weights': 15, 'f_in': 0, 'shift': 12},
+			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 16},
 			{'size': 43264, 'f_weights': 14, 'f_in': 0, 'shift': 11},
-			{'size': 21632, 'f_weights': 14, 'f_in': 0, 'shift': 15},
-			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 14},
-			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 11},
+			{'size': 21632, 'f_weights': 14, 'f_in': 0, 'shift': 14},
+			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 16},
+			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 12},
 			]
 #########################################################
 
@@ -63,9 +63,6 @@ for l in range(len(net_conf)): # l is for 'layer'
 		#print('corresponding 8-bit value after shift:', val_8b_conv)
 		#exit()
 		
-		if l==4:
-			print('float:', val_fp,'\tfixed:',val_16b_conv,'\t before conversion:',val_16b)
-	
 		fm_fp[p] = val_fp
 		fm_16b[p] = val_16b_conv
 		

@@ -14,25 +14,28 @@ filename_fp = '../yolov3-tiny_float_conv.hex'
 # f_in:      number of fractional bits in the input FM
 # f_out:     number of fractional bits in the out put FM
 
-net_conf = [{'size': 2768896, 'f_weights': 2, 'f_in': 7, 'shift': 9},
-			{'size': 1384448, 'f_weights': 7, 'f_in': 0, 'shift': 6},
-			{'size': 692224, 'f_weights': 6, 'f_in': 0, 'shift': 6},
-			{'size': 346112, 'f_weights': 7, 'f_in': 0, 'shift': 7},
-			{'size': 173056, 'f_weights': 7, 'f_in': 0, 'shift': 7},
-			{'size': 86528, 'f_weights': 7, 'f_in': 0, 'shift': 7},
-			{'size': 173056, 'f_weights': 6, 'f_in': 0, 'shift': 7},
-			{'size': 43264, 'f_weights': 7, 'f_in': 0, 'shift': 5},
-			{'size': 86528, 'f_weights': 7, 'f_in': 0, 'shift': 7},
-			{'size': 43264, 'f_weights': 6, 'f_in': 0, 'shift': 3},
-			{'size': 21632, 'f_weights': 6, 'f_in': 0, 'shift': 7},
-			{'size': 173056, 'f_weights': 7, 'f_in': 0, 'shift': 6},
-			{'size': 173056, 'f_weights': 7, 'f_in': 0, 'shift': 3},
+net_conf = [{'size': 2768896, 'f_weights': 10, 'f_in': 15, 'shift': 16},
+			{'size': 1384448, 'f_weights': 15, 'f_in': 0, 'shift': 14},
+			{'size': 692224, 'f_weights': 14, 'f_in': 0, 'shift': 14},
+			{'size': 346112, 'f_weights': 15, 'f_in': 0, 'shift': 15},
+			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 15},
+			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 14},
+			{'size': 173056, 'f_weights': 14, 'f_in': 0, 'shift': 16},
+			{'size': 43264, 'f_weights': 15, 'f_in': 0, 'shift': 12},
+			{'size': 86528, 'f_weights': 15, 'f_in': 0, 'shift': 16},
+			{'size': 43264, 'f_weights': 14, 'f_in': 0, 'shift': 11},
+			{'size': 21632, 'f_weights': 14, 'f_in': 0, 'shift': 14},
+			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 16},
+			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 12},
 			]
 #########################################################
 
 # Calculate FM fractional bits for conversion
 print('Network Configuration:')
+net_conf[0]['f_in'] -= 8
 for i in range(len(net_conf)):
+	net_conf[i]['shift'] -= 8
+	net_conf[i]['f_weights'] -= 8
 	if i==10:
 		net_conf[i]['f_in'] = net_conf[7]['f_out']
 	elif i>0:
@@ -65,9 +68,6 @@ for l in range(len(net_conf)): # l is for 'layer'
 		#print('corresponding 8-bit value after shift:', val_8b_conv)
 		#exit()
 
-		if l==4:
-			print('float:', val_fp,'\tfixed:',val_8b_conv,'\t before conversion:',val_8b)
-	
 		fm_fp[p] = val_fp
 		fm_8b[p] = val_8b_conv
 	

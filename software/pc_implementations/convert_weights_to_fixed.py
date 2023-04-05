@@ -26,8 +26,8 @@ conv_conf = [
 f_in = open(filename_in, 'rb')
 f_out = open(filename_out, "wb")
 
-#_max=0.0
-#_min=0.0
+_max=0.0
+_min=0.0
 
 #Iterate through conv configs
 for i in range(len(conv_conf)):
@@ -35,21 +35,30 @@ for i in range(len(conv_conf)):
 	#Convert weights to Q(16-shift).shift	
 	for j in range(conv_conf[i]['num']):
 		val = unpack('f', f_in.read(4))[0]
-		#if val > _max:
-		#	_max=val
-		#if val<_min:
-		#	_min=val
+		if val > _max:
+			_max=val
+		if val<_min:
+			_min=val
 		val_fixed = int(val * (1 << conv_conf[i]['shift'])) & 0xFFFF
 		f_out.write(val_fixed.to_bytes(2, byteorder="little"))
     
-	#print(i, ":", "max =",_max, "\tmin =", _min)
-	#_max=0
-	#_min=0       
+	print("Layer",i+1,"W:", "max =",_max, "\tmin =", _min, f"\tQ{16-conv_conf[i]['shift']:d}.{conv_conf[i]['shift']:d}")
+	_max=0
+	_min=0
+
 	#Convert bias to Q(16-b_shift).b_shift	
 	for j in range(conv_conf[i]['n']):
 		val = unpack('f', f_in.read(4))[0]
 		val_fixed = int(val * (1 << conv_conf[i]['b_shift'])) & 0xFFFF
 		f_out.write(val_fixed.to_bytes(2, byteorder="little"))  
+		if val > _max:
+			_max=val
+		if val<_min:
+			_min=val
+
+	print("Layer",i+1, "B:", "max =",_max, "\tmin =", _min, f"\tQ{16-conv_conf[i]['b_shift']:d}.{conv_conf[i]['b_shift']:d}", "\n")
+	_max=0
+	_min=0
 
 #Close files  
 f_in.close()

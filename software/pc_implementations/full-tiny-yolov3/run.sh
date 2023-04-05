@@ -8,7 +8,7 @@ rm -rf ../output_data/*
 mkdir -p ../output_data/
 
 #compile
-make EIGHT_BITS=0 FIXED=1 INTERM_DATA=0 LINEAR_EXP=0 GEMM=0 MAX_MIN=0
+make EIGHT_BITS=1 FIXED=0 INTERM_DATA=0 LINEAR_EXP=0 GEMM=0 MAX_MIN=0
 
 #object detection
 ./embedded data/$filename
