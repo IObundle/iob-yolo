@@ -401,8 +401,8 @@ FILE *results;
 		
 	//linear approximation of sigmoid function
 	int16_t sigmoid(int16_t val) {
-		int16_t fp2375 = 0x260, fp084375 = 0xD8, fp0625 = 0xA0, fp05 = 0x80; //Q8.8
-		int16_t fp5 = 0x500, fp1 = 0x100; //Q8.8
+		int16_t fp2375 = 0x4C0, fp084375 = 0x1B0, fp0625 = 0x140, fp05 = 0x100; //Q7.9
+		int16_t fp5 = 0xA00, fp1 = 0x200; //Q7.9
 		int16_t val_out;
 		if(val < 0.) val_out = ~val + 1; //emulates multiplying by -1 
 		else val_out = val;
@@ -411,7 +411,7 @@ FILE *results;
 		else if(val_out >= fp1) val_out = fp0625 + (val_out >> 3); //emulates multiplying by 0.125 = 2^(-3)
 		else val_out = fp05 + (val_out >> 2); //emulates multiplying by 0.25 = 2^(-2);
 		if(val < 0.) val_out = fp1 - val_out;
-		return val_out; //Q8.8
+		return val_out; //Q7.9
 	}
 	
 	//perform convolutional layer
@@ -444,11 +444,6 @@ FILE *results;
 		int8_t * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (int8_t *) fp_data + new_output_pos; else out_d_pos = (int8_t *) in_d_pos + pos_delta;
 		
-		//printf("Bias and shift:\n");
-		//for(int i=0;i<num_ker;i++)
-		//	printf("\t%d -> %d\n", bias_pos[i], ((int16_t) bias_pos[i]<<b_shift));
-		//printf("\n");
-
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;
@@ -517,7 +512,7 @@ FILE *results;
 			for(j = 0; j < h; j++) {   								//Output map size
 				for(k = 0; k < w; k++) {
 		#endif
-					if(j==h/2 && k==w/2) print_vals=1;
+					//if(j==h/2 && k==w/2) print_vals=1;
 
 					if(nextPadding) {
 						output_pos = i*new_w*new_w + (j+1)*new_w + (k+1) + (out_offset*new_w); 
@@ -601,17 +596,6 @@ FILE *results;
 					out_d_pos[output_pos3] = round_to_8bit(acc3, shift);
 					out_d_pos[output_pos4] = round_to_8bit(acc4, shift);
 
-				/*	
-					out_d_pos[output_pos] += ((acc>>(shift-1))&1);
-					out_d_pos[output_pos2] += ((acc2>>(shift-1))&1);
-					out_d_pos[output_pos3] += ((acc3>>(shift-1))&1);
-					out_d_pos[output_pos4] += ((acc4>>(shift-1))&1);
-				*/	
-
-				//	printf("shift: %d\taccs: %d\t%d\t%d\t%d\n", shift, acc, acc2, acc3, acc4);
-					
-				//	printf("outputs: %d\t%d\t%d\t%d\n", out_d_pos[output_pos], out_d_pos[output_pos2], out_d_pos[output_pos3], out_d_pos[output_pos4]);
-
 					int output_positions[4] = {output_pos,output_pos2,output_pos3,output_pos4};
 					/*
 					fwrite((out_d_pos+output_pos), sizeof(int8_t), 1, results);
@@ -692,18 +676,19 @@ FILE *results;
 			
 	//polynomial approximation of exponential function
 	int16_t exp_fnc(int8_t val) {
-		int16_t val_16, exp_val_fixed;
+		int16_t val_16, exp_val_fixed, in_16;
 		int32_t val_32;
-		exp_val_fixed = ((int16_t) val<<8) + 0x2000; //1+w -> Q3.13 (val is therefore converted from Q3.5 to Q3.13)
-		val_32 = (int32_t)((int32_t)val*(int32_t)val); //w^2 -> Q3.13*Q3.13 = Q6.26
-		val_16 = (int16_t)(val_32 >> 13); //w^2 -> Q6.26 to Q3.13
+		in_16 = (int16_t) val<<7; //w -> 3.13
+		exp_val_fixed = in_16 + 0x2000; //w+1 -> Q3.13
+		val_32 = (int32_t)((int32_t)in_16*(int32_t)in_16); //w^2 -> Q2.14*Q2.14 = Q4.28
+		val_16 = (int16_t)(val_32 >> 15); //w^2 -> Q4.28 to Q3.13
 		val_32 = (int32_t)((int32_t)0x2000*(int32_t)val_16); //0.5*w^2 -> Q2.14*Q3.13 = Q5.27
 		exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2 -> Q5.27 to Q3.13
-		val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^3 -> Q3.13*Q3.13 = Q6.26
+		val_32 = (int32_t)((int32_t)val_16*(int32_t)in_16); //w^3 -> Q3.13*Q3.13 = Q6.26
 		val_16 = (int16_t)(val_32 >> 13); //w^3 -> Q6.26 to Q3.13
 		val_32 = (int32_t)((int32_t)c3*(int32_t)val_16); //c3*w^3 -> Q2.14*Q3.13 = Q5.27
 		exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3 -> Q5.27 to Q3.13
-		val_32 = (int32_t)((int32_t)val_16*(int32_t)val); //w^4 -> Q3.13*Q3.13 = Q6.26
+		val_32 = (int32_t)((int32_t)val_16*(int32_t)in_16); //w^4 -> Q3.13*Q3.13 = Q6.26
 		val_16 = (int16_t)(val_32 >> 13); //w^4 -> Q6.26 to Q3.13
 		val_32 = (int32_t)((int32_t)c4*(int32_t)val_16); //c4*w^4 -> Q2.14*Q3.13 = Q5.27
 		exp_val_fixed += (int16_t)(val_32 >> 14); //1+w+0.5*w^2+c3*w^3+c4*w^4 -> Q5.27 to Q3.13
@@ -729,24 +714,24 @@ FILE *results;
 				for(k = 0; k < w; k++) {
 					
 					//sigmoid of objectness score
-					obj_score = (int16_t)(input[(4+85*i)*w*w + j*w + k]<<8); //Q3.13
+					obj_score = (int16_t)(input[(4+85*i)*w*w + j*w + k]<<8); //Q2.14
 					
 					//check if objectness score is above threshold
 					if(obj_score > threshold) {
 																							
 						//Calculate x
-						val_16 = (int16_t)(input[85*i*w*w + j*w + k]<<8); //Q3.13
-						val_32 = (int32_t)((int32_t)(val_16 + (k<<13))*(int32_t)xy_div); //Q3.13 *Q1.15 = Q4.28
-						val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+						val_16 = (int16_t)(input[85*i*w*w + j*w + k]<<8); //Q2.14
+						val_32 = (int32_t)((int32_t)(val_16 + (k<<14))*(int32_t)xy_div); //Q2.14 *Q1.15 = Q3.29
+						val_16 = (int16_t)(val_32 >> 16); //Q3.29 to Q3.13
 						val_32 = (int32_t)((int32_t)val_16*(int32_t)x_scales); //Q3.13 * Q2.14 = Q5.27
 						val_16 = (int16_t)(val_32 >> 14); //Q5.27 to Q3.13
 						val_16 -= (int16_t)x_bias; //Q3.13
 						output[84*nboxes] = (int8_t)(val_16>>8); //x in Q3.5 
 												
 						//Calculate y
-						val_16 = (int16_t)(input[(1+85*i)*w*w + j*w + k]<<8); //Q3.13
-						val_32 = (int32_t)((int32_t)(val_16 + (j<<13))*(int32_t)xy_div); //Q3.13 *Q1.15 = Q4.28
-						val_16 = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
+						val_16 = (int16_t)(input[(1+85*i)*w*w + j*w + k]<<8); //Q2.14
+						val_32 = (int32_t)((int32_t)(val_16 + (j<<14))*(int32_t)xy_div); //Q2.14 *Q1.15 = Q3.29
+						val_16 = (int16_t)(val_32 >> 16); //Q3.29 to Q3.13
 						val_32 = (int32_t)((int32_t)val_16*(int32_t)y_scales); //Q3.13 * Q2.14 = Q5.27
 						val_16 = (int16_t)(val_32 >> 14); //Q5.27 to Q3.13
 						val_16 -= (int16_t)y_bias; //Q3.13
@@ -772,9 +757,9 @@ FILE *results;
 												
 						//Calculate probability scores
 						for(m = 0; m < 80; m++) {
-							val_16 = (int16_t)(input[(5+m+85*i)*w*w + j*w + k]<<8); //Q3.13
-							val_32 = (int32_t)((int32_t)val_16*(int32_t)obj_score); //Q3.13 * Q3.13 = Q6.26
-							pred_score = (int16_t)(val_32 >> 13); //Q6.26 to Q3.13
+							val_16 = (int16_t)(input[(5+m+85*i)*w*w + j*w + k]<<8); //Q2.14
+							val_32 = (int32_t)((int32_t)val_16*(int32_t)obj_score); //Q2.14 * Q2.14 = Q4.28
+							pred_score = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
 							if(pred_score <= threshold) pred_score = 0; //Q3.13
 							output[84*nboxes+4+m] = (int8_t)(pred_score>>8); // prediction scores
 						}
@@ -1469,10 +1454,6 @@ FILE *results;
 		int16_t * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (int16_t *) fp_data + new_output_pos; else out_d_pos = (int16_t *) in_d_pos + pos_delta;
 		
-		printf("Bias and shift:\n");
-		for(int i=0;i<num_ker;i++)
-			printf("\t%d -> %d\n", bias_pos[i], (bias_pos[i]<<b_shift));
-		printf("\n");
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;
@@ -1546,12 +1527,10 @@ FILE *results;
 						output_pos3 = (i+2)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 						output_pos4 = (i+3)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 					}
-					printf("output positions:\t%d,\t%d,\t%d,\t%d\n", output_pos, output_pos2, output_pos3, output_pos4);
 					acc = bias_pos[i] << b_shift;
 					acc2 = bias_pos[i+1] << b_shift;
 					acc3 = bias_pos[i+2] << b_shift;
 					acc4 = bias_pos[i+3] << b_shift;
-					if(print_vals) printf("b_shift: %d\tbias: %x\t%x\t%x\t%x\n", b_shift, acc, acc2, acc3, acc4);
 										
 					for(m = 0; m < ker_size; m++) {				//Kernel size
 						for(n = 0; n < ker_size; n++) {
@@ -2424,9 +2403,6 @@ FILE *results;
 		float * out_d_pos;
 		if(new_output_pos != 0) out_d_pos = (float *) fp_data + new_output_pos; else out_d_pos = (float *) in_d_pos + pos_delta;
 	
-		printf("Bias:\n");
-		for(int i=0;i<num_ker;i++)
-			printf("\t%.4f\n", bias_pos[i]);
 		//local variables
 		int i, j, k, l, m, n;
 		unsigned int output_pos;

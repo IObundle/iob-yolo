@@ -26,7 +26,7 @@ net_conf = [{'size': 2768896, 'f_weights': 10, 'f_in': 15, 'shift': 16},
 			{'size': 43264, 'f_weights': 14, 'f_in': 0, 'shift': 11},
 			{'size': 21632, 'f_weights': 14, 'f_in': 0, 'shift': 14},
 			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 16},
-			{'size': 173056, 'f_weights': 15, 'f_in': 0, 'shift': 12},
+			{'size': 173056, 'f_weights': 14, 'f_in': 0, 'shift': 11},
 			]
 #########################################################
 
