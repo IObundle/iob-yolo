@@ -49,9 +49,9 @@ int16_t add_and_check_overflow(int16_t a, int16_t b){
 	return res;
 }
 
-int8_t round_to_8bit(int16_t val, int shift){
+int8_t round_to_8bit(int32_t val, int shift){
 	int8_t res;
-	int16_t aux = (val>>shift) + ((val>>(shift-1))&1);
+	int32_t aux = (val>>shift) + ((val>>(shift-1))&1);
 
 	if(aux <= 127){
 		if(aux >= -128)
@@ -75,9 +75,9 @@ FILE *results;
 
 //Constants for bounding boxes
 #ifdef mAP
-#define threshold ((int16_t)(((float)0.005)*((int32_t)1<<5))) //Q3.5
+#define threshold ((int16_t)(((float)0.005)*((int32_t)1<<14))) //Q2.14
 #else
-	#define threshold ((int16_t)(((float)0.5)*((int32_t)1<<5))) //Q3.5
+	#define threshold ((int16_t)(((float)0.05)*((int32_t)1<<14))) //Q2.14
 #endif
 	#define nms_threshold ((int8_t)(((float)0.45)*((int32_t)1<<5))) //Q3.5
 	#define yolo1_div ((int16_t)(((float)1/LAYER_17_W)*((int32_t)1<<15))) //Q1.15
@@ -338,7 +338,7 @@ FILE *results;
 					mul = (int16_t)((int16_t)dx[2*c]*(int16_t)((uint8_t) fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c]])); //Q2.6 * Q0.8 = Q2.14
 					mul = add_and_check_overflow(mul, (int16_t)((int16_t)dx[2*c+1]*(int16_t)((uint8_t) fp_image[k*IMG_W*IMG_H + r*IMG_W + ix[2*c+1]]))); //Q2.6 * Q0.8 = Q2.14
 					//fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = (int16_t) (mul >> 7); //Q10.22 to Q1.15
-					fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = round_to_8bit(mul, 7);//Q2.14 to Q1.7
+					fp_data[k*NEW_W*IMG_H + r*NEW_W + c] = round_to_8bit((int32_t)mul, 7);//Q2.14 to Q1.7
 					//printf("%d\n", (int8_t) (mul>>7));
 					//if (mul>>7 <0) exit(1);
 				}
@@ -361,7 +361,7 @@ FILE *results;
 					mul = add_and_check_overflow(mul, (int16_t)((int16_t)dy[2*r+1]*(int16_t)fp_data[k*NEW_W*IMG_H + (iy[r]+1)*NEW_W + c])); //Q2.6 * Q1.7 = Q3.13
 					//fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = (int16_t)(mul >> 14); //Q3.29 to Q1.15
 					//fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = (int8_t)(mul >> 6) + ((mul>>5)&1); //Q3.13 to Q1.7
-					fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = round_to_8bit(mul, 6); //Q3.13 to Q1.7
+					fp_data[k*(NTW_IN_W+2)*(NTW_IN_H+2) + (r+GREY_PADD)*(NTW_IN_W+2) + (c+1) + EXTRA_W + ((NTW_IN_W+2)*EXTRA_H) + NETWORK_INPUT_AUX] = round_to_8bit((int32_t)mul, 6); //Q3.13 to Q1.7
 					//printf("%d\n", (int8_t)(mul>>6));
 				}
 			}
@@ -400,10 +400,10 @@ FILE *results;
 	}
 		
 	//linear approximation of sigmoid function
-	int16_t sigmoid(int16_t val) {
-		int16_t fp2375 = 0x4C0, fp084375 = 0x1B0, fp0625 = 0x140, fp05 = 0x100; //Q7.9
-		int16_t fp5 = 0xA00, fp1 = 0x200; //Q7.9
-		int16_t val_out;
+	int16_t sigmoid(int32_t val) {
+		int32_t fp2375 = 0x4C0, fp084375 = 0x1B0, fp0625 = 0x140, fp05 = 0x100; //Q7.9
+		int32_t fp5 = 0xA00, fp1 = 0x200; //Q7.9
+		int32_t val_out;
 		if(val < 0.) val_out = ~val + 1; //emulates multiplying by -1 
 		else val_out = val;
 		if(val_out >= fp5) val_out = fp1;
@@ -499,7 +499,7 @@ FILE *results;
 		//local variables
 		unsigned int output_pos2, output_pos3, output_pos4;
 		int8_t op1, op2;
-		int16_t acc, acc2, acc3, acc4, mul;
+		int32_t acc, acc2, acc3, acc4, mul;
 		//perform convolution
 		for(i = 0; i < num_ker; i+=4) {								//Number of kernels
 		#ifdef DEBUG
@@ -526,10 +526,10 @@ FILE *results;
 						output_pos4 = (i+3)*new_w*new_h_output + j*new_w + k + (out_offset*new_w);
 					}
 					if(print_vals) printf("output positions:\t%d,\t%d,\t%d,\t%d\n", output_pos, output_pos2, output_pos3, output_pos4);
-					acc = ((int16_t)bias_pos[i]) << b_shift;
-					acc2 = ((int16_t)bias_pos[i+1]) << b_shift;
-					acc3 = ((int16_t)bias_pos[i+2]) << b_shift;
-					acc4 = ((int16_t)bias_pos[i+3]) << b_shift;
+					acc = ((int32_t)bias_pos[i]) << b_shift;
+					acc2 = ((int32_t)bias_pos[i+1]) << b_shift;
+					acc3 = ((int32_t)bias_pos[i+2]) << b_shift;
+					acc4 = ((int32_t)bias_pos[i+3]) << b_shift;
 					if(print_vals) printf("b_shift: %d\tbias: %d\t%d\t%d\t%d\n", b_shift, acc, acc2, acc3, acc4);
 					/*
 					if(acc*bias_pos[i]<0 || acc2*bias_pos[i+1]<0 || acc3*bias_pos[i+2]<0 || acc4*bias_pos[i+3]<0){
@@ -544,28 +544,30 @@ FILE *results;
 								if(print_vals) printf("\nPixel = %d\nweights:\n", op1);
 								op2 = w_pos[i*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								//printf("pixel: %x\tweights: %x\t", op1, op2);
-								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc = add_and_check_overflow(acc, mul);
-								//acc += mul;
+								mul = (int32_t)((int32_t)op1*(int32_t)op2);
+								//add_and_check_overflow(acc, mul);
+								acc += mul;
 								if(print_vals) printf("%d\t", op2);
+
 								op2 = w_pos[(i+1)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
-								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc2 = add_and_check_overflow(acc2, mul);	
-								//acc2 += mul;
+								mul = (int32_t)((int32_t)op1*(int32_t)op2);
+								//acc2 = add_and_check_overflow(acc2, mul);	
+								acc2 += mul;
 								op2 = w_pos[(i+2)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\t", op2);
 								//printf("%x\t", op2);
-								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc3 = add_and_check_overflow(acc3, mul);
-								//acc3 += mul;
+								mul = (int32_t)((int32_t)op1*(int32_t)op2);
+								//acc3 = add_and_check_overflow(acc3, mul);
+								acc3 += mul;
+
 								op2 = w_pos[(i+3)*c*ker_size*ker_size + l*ker_size*ker_size + m*ker_size + n];
 								if(print_vals) printf("%d\n", op2);
 								//printf("%x\n", op2);
-								mul = (int16_t)((int16_t)op1*(int16_t)op2);
-								acc4 = add_and_check_overflow(acc4, mul);								
-								//acc4 += mul;
+								mul = (int32_t)((int32_t)op1*(int32_t)op2);
+								//acc4 = add_and_check_overflow(acc4, mul);								
+								acc4 += mul;
 								if(print_vals) printf("accs:\n%d\t%d\t%d\t%d\n", acc, acc2, acc3, acc4);
 							}
 						}
@@ -760,7 +762,7 @@ FILE *results;
 							val_16 = (int16_t)(input[(5+m+85*i)*w*w + j*w + k]<<8); //Q2.14
 							val_32 = (int32_t)((int32_t)val_16*(int32_t)obj_score); //Q2.14 * Q2.14 = Q4.28
 							pred_score = (int16_t)(val_32 >> 15); //Q4.28 to Q3.13
-							if(pred_score <= threshold) pred_score = 0; //Q3.13
+							if(pred_score <= threshold>>1) pred_score = 0; //Q3.13
 							output[84*nboxes+4+m] = (int8_t)(pred_score>>8); // prediction scores
 						}
 						
@@ -2079,7 +2081,7 @@ FILE *results;
 #ifdef mAP
 	#define threshold ((float)0.005)
 #else
-	#define threshold ((float)0.5)
+	#define threshold ((float)0.05)
 #endif
 	#define nms_threshold ((float)0.45)
 	#define yolo1_div ((float)1/LAYER_17_W)
@@ -2188,7 +2190,8 @@ FILE *results;
 		fclose(data);
 		
 		//load weights
-		if ((data = fopen("../yolov3-tiny_batch-float.weights", "r+")) == NULL) {
+		//if ((data = fopen("../yolov3-tiny_batch-float.weights", "r+")) == NULL) {
+		if ((data = fopen("../yolov3-tiny_batch-8b-approx.weights", "r+")) == NULL) {
 			fprintf(stderr, "unable to open file yolov3-tiny_batch-float.weights\n");
 			exit(1);
 		}
