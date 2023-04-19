@@ -3,7 +3,7 @@ include ../software.mk
 
 #include peripherals
 dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
-
+#PERIPH_INC:=(for p in $(PERIPHERALS); do (echo $$p; include $(SUBMODULES_DIR)/$$p/software/embedded/embedded.mk); done)
 
 #local sources
 HDR+=$(SW_DIR)/periphs.h

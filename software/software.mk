@@ -4,7 +4,7 @@ include $(ROOT_DIR)/system.mk
 
 #submodules
 include $(INTERCON_DIR)/software/software.mk
-
+#include $(ROOT_DIR)/submodules/VERSAT/software/software.mk
 #software directory
 SW_DIR:=$(ROOT_DIR)/software
 

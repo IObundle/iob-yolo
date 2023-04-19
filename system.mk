@@ -98,7 +98,7 @@ BOOT_SRC_DIR:=$(SOC_SW_DIR)/bootloader
 CONSOLE_DIR:=$(SW_DIR)/console
 CONSOLE_SRC_DIR:=$(SOC_SW_DIR)/console
 
-PYTHON_DIR:=$(SOC_SW_DIR)/python
+PYTHON_DIR:=$(SOC_DIR)/submodules/LIB/software/python
 
 #IOb-SoC - special submodule
 SOC_SUBMODULES_DIR=$(SOC_DIR)/submodules
