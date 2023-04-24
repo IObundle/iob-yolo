@@ -4,16 +4,17 @@ include $(ROOT_DIR)/system.mk
 
 #submodules
 include $(INTERCON_DIR)/software/software.mk
-#include $(ROOT_DIR)/submodules/VERSAT/software/software.mk
+
 #software directory
 SW_DIR:=$(ROOT_DIR)/software
+VERSAT_PYTHON_DIR:=../../submodules/VERSAT/software/python
 
 #include
 #INCLUDE+=$(incdir)$(SW_DIR)
 INCLUDE+=-I$(SW_DIR)
 
 #headers
-HDR=$(SW_DIR)/system.h
+HDR+=$(SW_DIR)/system.h
 
 #sources (none so far)
 #SRC=$(SW_DIR)/*.c

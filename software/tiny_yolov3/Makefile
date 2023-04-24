@@ -2,8 +2,9 @@ ROOT_DIR:=../..
 include ../software.mk
 
 #include peripherals
-dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$p/software/embedded/embedded.mk))
-#PERIPH_INC:=(for p in $(PERIPHERALS); do (echo $$p; include $(SUBMODULES_DIR)/$$p/software/embedded/embedded.mk); done)
+#dummy=(for p in $(PERIPHERALS); do (include $(SUBMODULES_DIR)/$(p)/software/embedded/embedded.mk); done)
+#dummy:=$(foreach p, $(PERIPHERALS), $(eval include $(SUBMODULES_DIR)/$(p)/software/embedded/embedded.mk))
+dummy:=$(foreach p, $(PERIPHERALS), $(eval include $($(p)_SW_DIR)/embedded/embedded.mk))
 
 #local sources
 HDR+=$(SW_DIR)/periphs.h
@@ -32,6 +33,6 @@ versat:
 	python3 $(VERSAT_PYTHON_DIR)/mkhdr.py . $(HW_DIR)/include/new_versat $(HW_DIR)/include/dma .
 
 clean:
-	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim *.vh versat.h
+	@rm -rf firmware.bin firmware.elf firmware.map *.hex ../periphs.h *~ pcsim *.vh versat.h *iob*swreg*
 
 .PHONY: run clean

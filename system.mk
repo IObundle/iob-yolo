@@ -172,6 +172,8 @@ endif
 all: run
 
 #create periph indices and directories
+dummy:=$(foreach p, $(PERIPHERALS), $(eval $(p)_DIR:=$(SUBMODULES_DIR)/$(p)))
+dummy:=$(foreach p, $(PERIPHERALS), $(eval $(p)_SW_DIR:=$($(p)_DIR)/software/))
 
 #UART - IOb-SoC submodule - slave 0
 UART_DIR:=$(SOC_SUBMODULES_DIR)/UART
@@ -180,7 +182,6 @@ DEFINE+=$(defmacro)UART=$(UART)
 
 # IOb-SoC-yolo submodules
 N_SLAVES:=1
-dummy:=$(foreach p, $(PERIPHERALS), $(eval $p_DIR:=$(SUBMODULES_DIR)/$p))
 dummy:=$(foreach p, $(PERIPHERALS), $(eval $p=$(N_SLAVES)) $(eval N_SLAVES:=$(shell expr $(N_SLAVES) \+ 1)))
 dummy:=$(foreach p, $(PERIPHERALS), $(eval DEFINE+=$(defmacro)$p=$($p)))
 

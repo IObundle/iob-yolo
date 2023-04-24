@@ -38,8 +38,9 @@ $(EXEC):
 clean-json:
 	@rm -rf ./map/*.json
 	
-clean-hex-out:
+clean-outputs:
 	rm ../yolov3-tiny_*_conv.hex
+	rm -rf ../debug_data
 
 clean:
 	@rm -rf $(EXEC) $(EXECOBJ)

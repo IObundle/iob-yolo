@@ -3,6 +3,7 @@ SHELL:=/bin/bash
 ROOT_DIR:=.
 include ./system.mk
 
+
 run: sim
 
 sim-loc:
@@ -110,6 +111,7 @@ endif
 # ssh $(USER)@$(FPGA_BOARD_SERVER) "cd $(REMOTE_ROOT_DIR); make -C $(CONSOLE_DIR) run"
 
 firmware:
+	$(foreach p, $(PERIPHERALS), $(eval $(p)_DIR:=$(SUBMODULES_DIR)/$(p)))
 	make -C $(FIRM_DIR) BAUD=$(BAUD) SIM=$(SIM)
 
 bootloader: firmware
