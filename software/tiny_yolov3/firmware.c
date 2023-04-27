@@ -3,7 +3,7 @@
 #include "periphs.h"
 #include "iob-uart.h"
 #include "iob-eth.h"
-#include "iob-timer.h"
+#include "iob_timer.h"
 #include "new_versat.hpp"
 #include "firmware.h"
 
@@ -130,7 +130,7 @@ void reset_DDR() {
 
   //measure initial time
   uart_printf("\nSetting DDR positions to zero\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
 
   //input network
   for(i = 0; i < DATA_LAYER_1; i++) fp_data[i] = 0;
@@ -171,7 +171,7 @@ void reset_DDR() {
   for(i = 0; i < DATA_LAYER_19 + DATA_LAYER_9; i++) fp_data[pos + i] = 0;
 
   //measure final time
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("DDR reset to zero done in %d ms\n", (end-start)/1000);
 }
 
@@ -191,7 +191,7 @@ void rcv_data() {
      while(eth_rcv_frame(data_rcv, ETH_NBYTES+18, rcv_timeout) !=0);
 
      //start timer
-     if(j == 0) start = timer_time_us();
+     if(j == 0) start = timer_time_us(TIMER_BASE);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_INPUT_FRAMES) bytes_to_receive = INPUT_FILE_SIZE - count_bytes;
@@ -209,7 +209,7 @@ void rcv_data() {
      //update byte counter
      count_bytes += ETH_NBYTES;
   }
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Image and weights received in %d ms\n", (end-start)/1000);
 }
 
@@ -1567,7 +1567,7 @@ void send_data() {
   for(j = 0; j < NUM_OUTPUT_FRAMES+1; j++) {
 
     //start timer
-    if(j == 0) start = timer_time_us();
+    if(j == 0) start = timer_time_us(TIMER_BASE);
 
      //check if it is last packet (has less data that full payload size)
      if(j == NUM_OUTPUT_FRAMES) bytes_to_send = OUTPUT_FILE_SIZE - count_bytes;
@@ -1587,7 +1587,7 @@ void send_data() {
   }
 
   //measure transference time
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("\n\nOutput layer transferred in %d ms\n\n", (end-start)/1000);
 }
 
@@ -1634,9 +1634,9 @@ int main(int argc, char **argv) {
 
   //initialize ix, iy, dx and dy arrays
   uart_printf("\nPreparing resize...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
   prepare_resize();
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
 
 #ifndef SIM
@@ -1644,11 +1644,11 @@ int main(int argc, char **argv) {
   //width resize
  #ifndef TIME_RUN
   uart_printf("\nWidth resizing...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   width_resize();
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time = end-start;
  #endif
@@ -1656,11 +1656,11 @@ int main(int argc, char **argv) {
   //height resize
   #ifndef TIME_RUN
   uart_printf("\nHeight resizing...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   height_resize();
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1668,11 +1668,11 @@ int main(int argc, char **argv) {
   //layers 1 and 2
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 1 and 2...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   layer1();
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1680,11 +1680,11 @@ int main(int argc, char **argv) {
   //layers 3 and 4
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 3 and 4...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv(LAYER_3_W, LAYER_1_NUM_KER, LAYER_3_NUM_KER, LAYER_3_KER_SIZE, LAYER_3_TILE_W, 1, LAYER_3_SHIFT, LAYER_3_B_SHIFT); //w_start(1)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1692,11 +1692,11 @@ int main(int argc, char **argv) {
   //layers 5 and 6
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 5 and 6...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv(LAYER_5_W, LAYER_3_NUM_KER, LAYER_5_NUM_KER, LAYER_5_KER_SIZE, LAYER_5_TILE_W, 0, LAYER_5_SHIFT, LAYER_5_B_SHIFT); //w_start(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1704,11 +1704,11 @@ int main(int argc, char **argv) {
   //layers 7 and 8
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 7 and 8...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv(LAYER_7_W, LAYER_5_NUM_KER, LAYER_7_NUM_KER, LAYER_7_KER_SIZE, LAYER_7_TILE_W, 0, LAYER_7_SHIFT, LAYER_7_B_SHIFT); //w_start(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1716,11 +1716,11 @@ int main(int argc, char **argv) {
   //layer 9
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 9...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_9_W, LAYER_7_NUM_KER, LAYER_9_NUM_KER, LAYER_9_KER_SIZE, LAYER_9_OUTPADD, LAYER_9_STRIDE, LAYER_9_PINGPONG, LAYER_7_OUTPADD, LAYER_9_ZXY, LAYER_9_LEAKY, LAYER_9_IGNOREPAD, data_pos_layer9, LAYER_9_UPSAMPLE, LAYER_9_SHIFT, LAYER_9_B_SHIFT);
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1728,11 +1728,11 @@ int main(int argc, char **argv) {
   //layer 10
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 10...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   maxpool(LAYER_9_W, LAYER_9_NUM_KER, LAYER_10_INPADD, LAYER_10_STRIDE, data_pos_layer10);
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1740,11 +1740,11 @@ int main(int argc, char **argv) {
   //layer 11
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 11...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_11_W, LAYER_9_NUM_KER, LAYER_11_NUM_KER, LAYER_11_KER_SIZE, LAYER_11_OUTPADD, LAYER_11_STRIDE, LAYER_11_PINGPONG, LAYER_10_OUTPADD, LAYER_11_ZXY, LAYER_11_LEAKY, LAYER_11_IGNOREPAD, 0, LAYER_11_UPSAMPLE, LAYER_11_SHIFT, LAYER_11_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1752,11 +1752,11 @@ int main(int argc, char **argv) {
   //layer 12
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 12...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   maxpool(LAYER_11_W, LAYER_11_NUM_KER, LAYER_12_INPADD, LAYER_12_STRIDE, 0); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Maxpool done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1764,11 +1764,11 @@ int main(int argc, char **argv) {
   //layer 13
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 13...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_13_W, LAYER_11_NUM_KER, LAYER_13_NUM_KER, LAYER_13_KER_SIZE, LAYER_13_OUTPADD, LAYER_13_STRIDE, LAYER_13_PINGPONG, LAYER_12_OUTPADD, LAYER_13_ZXY, LAYER_13_LEAKY, LAYER_13_IGNOREPAD, 0, LAYER_13_UPSAMPLE, LAYER_13_SHIFT, LAYER_13_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1776,11 +1776,11 @@ int main(int argc, char **argv) {
   //layer 14
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 14...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_14_W, LAYER_13_NUM_KER, LAYER_14_NUM_KER, LAYER_14_KER_SIZE, LAYER_14_OUTPADD, LAYER_14_STRIDE, LAYER_14_PINGPONG, LAYER_13_OUTPADD, LAYER_14_ZXY, LAYER_14_LEAKY, LAYER_14_IGNOREPAD, 0, LAYER_14_UPSAMPLE, LAYER_14_SHIFT, LAYER_14_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1788,11 +1788,11 @@ int main(int argc, char **argv) {
   //layer 15
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 15...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_15_W, LAYER_14_NUM_KER, LAYER_15_NUM_KER, LAYER_15_KER_SIZE, LAYER_15_OUTPADD, LAYER_15_STRIDE, LAYER_15_PINGPONG, LAYER_14_OUTPADD, LAYER_15_ZXY, LAYER_15_LEAKY, LAYER_15_IGNOREPAD, 0, LAYER_15_UPSAMPLE, LAYER_15_SHIFT, LAYER_15_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1800,11 +1800,11 @@ int main(int argc, char **argv) {
   //layer 16 and 17
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 16 and 17...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_16_W, LAYER_15_NUM_KER, LAYER_16_NUM_KER, LAYER_16_KER_SIZE, LAYER_16_OUTPADD, LAYER_16_STRIDE, LAYER_16_PINGPONG, LAYER_15_OUTPADD, LAYER_16_ZXY, LAYER_16_LEAKY, LAYER_16_IGNOREPAD, 0, LAYER_16_UPSAMPLE, LAYER_16_SHIFT, LAYER_16_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1812,12 +1812,12 @@ int main(int argc, char **argv) {
   //layers 19 and 20
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 19 and 20...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   p_pos = data_pos_layer14;
   conv2(LAYER_19_W, LAYER_14_NUM_KER, LAYER_19_NUM_KER, LAYER_19_KER_SIZE, LAYER_19_OUTPADD, LAYER_19_STRIDE, LAYER_19_PINGPONG, 0, LAYER_19_ZXY, LAYER_19_LEAKY, LAYER_19_IGNOREPAD, data_pos_layer19, LAYER_19_UPSAMPLE, LAYER_19_SHIFT, LAYER_19_B_SHIFT); //inpadd(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + upsample done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1825,11 +1825,11 @@ int main(int argc, char **argv) {
   //layer 22
  #ifndef TIME_RUN
   uart_printf("\nRunning layer 22...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_22_W, LAYER_9_NUM_KER+LAYER_19_NUM_KER, LAYER_22_NUM_KER, LAYER_22_KER_SIZE, LAYER_22_OUTPADD, LAYER_22_STRIDE, LAYER_22_PINGPONG, LAYER_19_OUTPADD, LAYER_22_ZXY, LAYER_22_LEAKY, LAYER_22_IGNOREPAD, 0, LAYER_22_UPSAMPLE, LAYER_22_SHIFT, LAYER_22_B_SHIFT); //outpos(0)
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1837,7 +1837,7 @@ int main(int argc, char **argv) {
   //layers 23 and 24
  #ifndef TIME_RUN
   uart_printf("\nRunning layers 23 and 24...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   conv2(LAYER_23_W, LAYER_22_NUM_KER, LAYER_23_NUM_KER, LAYER_23_KER_SIZE, LAYER_23_OUTPADD, LAYER_23_STRIDE, LAYER_23_PINGPONG, LAYER_22_OUTPADD, LAYER_23_ZXY, LAYER_23_LEAKY, LAYER_23_IGNOREPAD, 0, LAYER_23_UPSAMPLE, LAYER_23_SHIFT, LAYER_23_B_SHIFT); //outpos(0)
   // end versat
@@ -1857,7 +1857,7 @@ int main(int argc, char **argv) {
   uart_printf("%d\n", (end - start)*CLK_NS);
  #else
   versat_end();
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Convolution + yolo done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1867,7 +1867,7 @@ int main(int argc, char **argv) {
   //create boxes from 1st yolo layer
  #ifndef TIME_RUN
   uart_printf("\nCreating boxes from first yolo layer\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
  #ifdef SIM
   create_boxes(LAYER_16_W, 0, yolo1_div, 1);
@@ -1875,7 +1875,7 @@ int main(int argc, char **argv) {
   create_boxes(LAYER_16_W, data_pos_layer19-DATA_LAYER_16, yolo1_div, 1);
  #endif
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1883,7 +1883,7 @@ int main(int argc, char **argv) {
   //create boxes from 2nd yolo layer
  #ifndef TIME_RUN
   uart_printf("\nCreating boxes from second yolo layer\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
  #ifdef SIM
   create_boxes(LAYER_23_W, 256*13*13, yolo2_div, 0);
@@ -1891,7 +1891,7 @@ int main(int argc, char **argv) {
   create_boxes(LAYER_23_W, p_pos, yolo2_div, 0);
  #endif
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1899,11 +1899,11 @@ int main(int argc, char **argv) {
   //filter boxes
  #ifndef TIME_RUN
   uart_printf("\nFiltering boxes...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   filter_boxes();
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
@@ -1912,11 +1912,11 @@ int main(int argc, char **argv) {
  #ifndef TIME_RUN
   //draw boxes and labels
   uart_printf("\nDrawing boxes and labels...\n");
-  start = timer_time_us();
+  start = timer_time_us(TIMER_BASE);
  #endif
   draw_detections();
  #ifndef TIME_RUN
-  end = timer_time_us();
+  end = timer_time_us(TIMER_BASE);
   uart_printf("Done in %d us\n\n", end-start);
   total_time += end-start;
  #endif
